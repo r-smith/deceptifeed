@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/r-smith/cti-honeypot/internal/config"
-	"github.com/r-smith/cti-honeypot/internal/threatfeed"
 )
 
 // StartUDP serves as a wrapper to initialize and start a generic UDP honeypot
@@ -76,10 +75,6 @@ func startUDP(cfg *config.Config, srv *config.Server) error {
 
 			// Print a simplified version of the interaction to the console.
 			fmt.Printf("[UDP] %s Data: %s\n", src_ip, strings.TrimSpace(string(buffer[:n])))
-
-			// Update the threat feed with the source IP address from the
-			// interaction.
-			threatfeed.UpdateIoC(src_ip)
 		}()
 	}
 }
