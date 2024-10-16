@@ -16,8 +16,11 @@ import (
 // server. It listens on the specified port, logging any received data without
 // responding back to the client. Since UDP is connectionless, clients are
 // unaware of the server's existence and that it is actively listening and
-// recording data sent to the port. This function calls the underlying startUDP
-// function to perform the actual server startup.
+// recording data sent to the port. Note that source IP addresses for UDP
+// packets are unreliable due to potential spoofing. As a result, interactions
+// logged from the UDP server will not be added to the threat feed. This
+// function calls the underlying startUDP function to perform the actual server
+// startup.
 func StartUDP(cfg *config.Config, srv *config.Server) {
 	fmt.Printf("Starting UDP server on port: %s\n", srv.Port)
 	if err := startUDP(cfg, srv); err != nil {
@@ -51,20 +54,25 @@ func startUDP(cfg *config.Config, srv *config.Server) error {
 
 		go func() {
 			// The UDP server has received incoming data from a client. Log the
-			// interaction and the received data. Note: Go's listenUDP does not
-			// capture the local IP address that received the UDP packet. To
-			// assist with logging, call config.GetHostIP(), which returns the
-			// first active local IP address found on the system. On systems
-			// with multiple IP addresses, this may not correspond to the IP
-			// address that received the UDP data. However, this limitation is
-			// acceptable as the primary goal is to log the source IP and
-			// received data.
+			// interaction and the received data. Because the source IP address
+			// and port may be spoofed, an "[unreliable]" tag is added to both
+			// the source IP and source port.
+			//
+			// Note:
+			// Go's listenUDP does not capture the local IP address that
+			// received the UDP packet. To assist with logging, call
+			// config.GetHostIP(), which returns the first active local IP
+			// address found on the system. On systems with multiple IP
+			// addresses, this may not correspond to the IP address that
+			// received the UDP data. However, this limitation is acceptable as
+			// the primary goal is to log the received data.
 			_, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
 			src_ip, src_port, _ := net.SplitHostPort(remoteAddr.String())
 			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 				slog.String("event_type", "udp"),
-				slog.String("source_ip", src_ip),
-				slog.String("source_port", src_port),
+				slog.String("source_ip", src_ip+" [unreliable]"),
+				slog.String("source_port", src_port+" [unreliable]"),
+				slog.String("source_reliability", "unreliable"),
 				slog.String("sensor_ip", config.GetHostIP()),
 				slog.String("sensor_port", dst_port),
 				slog.String("sensor_name", config.GetHostname()),
