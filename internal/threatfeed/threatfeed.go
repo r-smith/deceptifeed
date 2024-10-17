@@ -63,8 +63,9 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	// Serve the sorted list of IP addresses.
 	w.Header().Set("Content-Type", "text/plain")
 	for _, ip := range netIPs {
-		if ip == nil {
-			// Skip IP addresses that failed parsing.
+		if ip == nil || (!isPrivateIncluded && ip.IsPrivate()) {
+			// Skip IP addresses that failed parsing or are private, based on
+			// the configuration.
 			continue
 		}
 		_, err := w.Write([]byte(ip.String() + "\n"))
