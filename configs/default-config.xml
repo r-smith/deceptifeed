@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <logPath>/opt/cti-honeypot/var/log/honeypot-log.txt</logPath>
+  <honeypotServers>
+    <server type="http">
+      <enabled>true</enabled>
+      <port>8080</port>
+    </server>
+    <server type="https">
+      <enabled>true</enabled>
+      <port>8443</port>
+      <certPath>/opt/cti-honeypot/certs/https-cert.pem</certPath>
+      <keyPath>/opt/cti-honeypot/certs/https-key.pem</keyPath>
+    </server>
+    <server type="ssh">
+      <enabled>true</enabled>
+      <port>2022</port>
+      <keyPath>/opt/cti-honeypot/certs/ssh-key.pem</keyPath>
+      <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
+    </server>
+  </honeypotServers>
+  <threatFeed>
+    <enabled>true</enabled>
+    <port>8081</port>
+    <databasePath>/opt/cti-honeypot/var/log/threatfeed.json</databasePath>
+    <threatExpiryHours>168</threatExpiryHours>
+    <isPrivateIncluded>false</isPrivateIncluded>
+  </threatFeed>
+</config>
