@@ -7,38 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
-	"sync"
 	"time"
-
-	"github.com/r-smith/cti-honeypot/internal/config"
-)
-
-var (
-	// iocMap stores the Indicator of Compromise (IoC) entries which makes up
-	// the threat feed database. It is initially populated by loadIoC if an
-	// existing JSON database file is provided. The map is subsequently updated
-	// by UpdateIoC whenever a client interacts with a honeypot server. This
-	// map is accessed and served by the threat feed HTTP server.
-	iocMap = make(map[string]*IoC)
-
-	// isPrivateIncluded indicates whether private IP addresses are included in
-	// the threat feed database. It is set once by loadIoC according to the
-	// threat feed configuration.
-	isPrivateIncluded bool
-
-	// jsonFile holds the path to the JSON file used to save IoC data to disk.
-	// It is set once by loadIoC according to the threat feed configuration.
-	// This file ensures the threat feed database persists across server
-	// restarts.
-	jsonFile string
-
-	// expiryHours specifies the duration after which an IoC entry is
-	// considered expired based on its last seen date. It is set once by
-	// loadIoC according to the threat feed configuration.
-	expiryHours uint
-
-	// mutex is to ensure thread-safe access to iocMap.
-	mutex sync.Mutex
 )
 
 // IoC represents an Indicator of Compromise (IoC) entry in the threat feed
@@ -68,12 +37,8 @@ type IoC struct {
 // loadIoC reads IoC data from an existing JSON database. If found, it
 // populates iocMap. This function is called once during the initialization of
 // the threat feed server.
-func loadIoC(threatFeed *config.ThreatFeed) error {
-	jsonFile = threatFeed.DatabasePath
-	expiryHours = threatFeed.ExpiryHours
-	isPrivateIncluded = threatFeed.IsPrivateIncluded
-
-	file, err := os.Open(jsonFile)
+func loadIoC() error {
+	file, err := os.Open(configuration.DatabasePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -106,7 +71,7 @@ func UpdateIoC(ip string) {
 	if netIP == nil {
 		return
 	}
-	if !isPrivateIncluded && netIP.IsPrivate() {
+	if !configuration.IsPrivateIncluded && netIP.IsPrivate() {
 		return
 	}
 
@@ -138,12 +103,12 @@ func UpdateIoC(ip string) {
 func removeExpired() {
 	// If expiryHours is set to 0, entries never expire and will remain
 	// indefinitely.
-	if expiryHours <= 0 {
+	if configuration.ExpiryHours <= 0 {
 		return
 	}
 
 	var iocToRemove []string
-	expirtyTime := time.Now().Add(-time.Hour * time.Duration(expiryHours))
+	expirtyTime := time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours))
 
 	for key, value := range iocMap {
 		if value.LastSeen.Before(expirtyTime) {
@@ -161,7 +126,7 @@ func removeExpired() {
 // database persists across server restarts. This function should be called
 // exclusively by UpdateIoC, which manages the mutex lock.
 func saveIoC() error {
-	file, err := os.Create(jsonFile)
+	file, err := os.Create(configuration.DatabasePath)
 	if err != nil {
 		return err
 	}

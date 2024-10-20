@@ -7,18 +7,40 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/r-smith/cti-honeypot/internal/config"
+)
+
+var (
+	// iocMap stores the Indicator of Compromise (IoC) entries which makes up
+	// the threat feed database. It is initially populated by loadIoC if an
+	// existing JSON database file is provided. The map is subsequently updated
+	// by UpdateIoC whenever a client interacts with a honeypot server. This
+	// map is accessed and served by the threat feed HTTP server.
+	iocMap = make(map[string]*IoC)
+
+	// mutex is to ensure thread-safe access to iocMap.
+	mutex sync.Mutex
+
+	// configuration holds the global configuration for the threat feed server.
+	// This variable is assigned the config.ThreatFeed value that's passed in
+	// during the server's startup.
+	configuration config.ThreatFeed
 )
 
 // StartThreatFeed initializes and starts the threat feed server. The server
 // provides a list of IP addresses observed interacting with the honeypot
 // servers. The data is served in a format compatible with most enterprise
 // firewalls.
-func StartThreatFeed(threatFeed *config.ThreatFeed) {
+func StartThreatFeed(cfg *config.ThreatFeed) {
+	// Assign the passed-in config.ThreatFeed to the global configuration
+	// variable.
+	configuration = *cfg
+
 	// Check for and open an existing threat feed JSON database, if available.
-	err := loadIoC(threatFeed)
+	err := loadIoC()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has terminated: Failed to open Threat Feed database:", err)
 		return
@@ -30,8 +52,8 @@ func StartThreatFeed(threatFeed *config.ThreatFeed) {
 	mux.HandleFunc("/empty/", serveEmpty)
 
 	// Start the threat feed HTTP server.
-	fmt.Printf("Starting Threat Feed server on port: %s\n", threatFeed.Port)
-	if err := http.ListenAndServe(":"+threatFeed.Port, mux); err != nil {
+	fmt.Printf("Starting Threat Feed server on port: %s\n", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has terminated:", err)
 	}
 }
@@ -45,7 +67,7 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 
 	// Calculate expiry time.
 	now := time.Now()
-	expiryTime := now.Add(-time.Hour * time.Duration(expiryHours))
+	expiryTime := now.Add(-time.Hour * time.Duration(configuration.ExpiryHours))
 
 	// If the IP is not expired, convert it to a string for sorting.
 	var netIPs []net.IP
@@ -63,7 +85,7 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	// Serve the sorted list of IP addresses.
 	w.Header().Set("Content-Type", "text/plain")
 	for _, ip := range netIPs {
-		if ip == nil || (!isPrivateIncluded && ip.IsPrivate()) {
+		if ip == nil || (!configuration.IsPrivateIncluded && ip.IsPrivate()) {
 			// Skip IP addresses that failed parsing or are private, based on
 			// the configuration.
 			continue
