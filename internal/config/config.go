@@ -143,6 +143,10 @@ func Load(filename string) (*Config, error) {
 // path if none is provided.
 func (c *Config) InitializeLoggers() error {
 	for i := range c.Servers {
+		if !c.Servers[i].Enabled {
+			continue
+		}
+
 		// Use the global log path if the server log path is not specified.
 		var logPath string
 		if len(c.Servers[i].LogPath) > 0 {
