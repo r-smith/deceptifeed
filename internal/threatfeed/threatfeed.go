@@ -96,6 +96,20 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	// If a custom threat file is supplied in the configuration, append the
+	// contents of the file to the HTTP response. To allow for flexibility, the
+	// contents of the file are not parsed or validated.
+	if len(configuration.CustomThreatFile) > 0 {
+		data, err := os.ReadFile(configuration.CustomThreatFile)
+		if err != nil {
+			return
+		}
+		_, err = w.Write(data)
+		if err != nil {
+			http.Error(w, "Falled to write response", http.StatusInternalServerError)
+		}
+	}
 }
 
 // serveEmpty handles HTTP requests to /empty/. It returns an empty body with
