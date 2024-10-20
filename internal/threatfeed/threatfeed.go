@@ -1,12 +1,14 @@
 package threatfeed
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,7 +71,8 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	expiryTime := now.Add(-time.Hour * time.Duration(configuration.ExpiryHours))
 
-	// If the IP is not expired, convert it to a string for sorting.
+	// Parse IPs from the iocMap to net.IP for filtering and sorting. Skip any
+	// IPs that have expired.
 	var netIPs []net.IP
 	for ip, ioc := range iocMap {
 		if ioc.LastSeen.After(expiryTime) {
@@ -77,14 +80,28 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// If an exclude list is provided, filter the original IP list.
+	var filteredIPList []net.IP
+	if len(configuration.ExcludeListPath) > 0 {
+		ipsToRemove, err := readIPsFromFile(configuration.ExcludeListPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to read threat feed exclude list:", err)
+			filteredIPList = netIPs
+		} else {
+			filteredIPList = filterIPs(netIPs, ipsToRemove)
+		}
+	} else {
+		filteredIPList = netIPs
+	}
+
 	// Sort the IP addresses.
-	sort.Slice(netIPs, func(i, j int) bool {
-		return bytes.Compare(netIPs[i], netIPs[j]) < 0
+	sort.Slice(filteredIPList, func(i, j int) bool {
+		return bytes.Compare(filteredIPList[i], filteredIPList[j]) < 0
 	})
 
 	// Serve the sorted list of IP addresses.
 	w.Header().Set("Content-Type", "text/plain")
-	for _, ip := range netIPs {
+	for _, ip := range filteredIPList {
 		if ip == nil || (!configuration.IsPrivateIncluded && ip.IsPrivate()) {
 			// Skip IP addresses that failed parsing or are private, based on
 			// the configuration.
@@ -111,6 +128,59 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Falled to write response", http.StatusInternalServerError)
 		}
 	}
+}
+
+// readIPsFromFile reads IP addresses and CIDR ranges from a file. Each line
+// should contain an IP address or CIDR. It returns a map of the unique IPs and
+// CIDR ranges found in the file.
+func readIPsFromFile(filepath string) (map[string]struct{}, error) {
+	ips := make(map[string]struct{})
+
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if len(line) > 0 {
+			ips[line] = struct{}{}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return ips, nil
+}
+
+// filterIPs removes IPs from ipList that are found in the ipsToRemove map. The
+// keys in ipsToRemove may be single IP addresses or CIDR ranges. If a key is a
+// CIDR range, an IP will be removed if it falls within that range.
+func filterIPs(ipList []net.IP, ipsToRemove map[string]struct{}) []net.IP {
+	filtered := []net.IP{}
+
+	// If there's nothing to filter, return the original list.
+	if len(ipsToRemove) == 0 {
+		return ipList
+	}
+
+	for _, ip := range ipList {
+		if _, found := ipsToRemove[ip.String()]; found {
+			continue
+		}
+
+		// Check for CIDR matches.
+		for cidr := range ipsToRemove {
+			_, netCIDR, err := net.ParseCIDR(cidr)
+			if err == nil && netCIDR.Contains(ip) {
+				continue
+			}
+			filtered = append(filtered, ip)
+		}
+	}
+	return filtered
 }
 
 // serveEmpty handles HTTP requests to /empty/. It returns an empty body with
