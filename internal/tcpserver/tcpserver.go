@@ -23,15 +23,15 @@ const serverTimeout = 30 * time.Second
 // server. It presents custom prompts to connected clients and logs their
 // responses. This function calls the underlying startTCP function to
 // perform the actual server startup.
-func StartTCP(cfg *config.Config, srv *config.Server) {
+func StartTCP(srv *config.Server) {
 	fmt.Printf("Starting TCP server on port: %s\n", srv.Port)
-	if err := startTCP(cfg, srv); err != nil {
+	if err := startTCP(srv); err != nil {
 		fmt.Fprintln(os.Stderr, "The TCP server has terminated:", err)
 	}
 }
 
 // startTCP starts the TCP honeypot server. It handles the server's main loop.
-func startTCP(cfg *config.Config, srv *config.Server) error {
+func startTCP(srv *config.Server) error {
 	// Start the TCP server.
 	listener, err := net.Listen("tcp", ":"+srv.Port)
 	if err != nil {
@@ -46,7 +46,7 @@ func startTCP(cfg *config.Config, srv *config.Server) error {
 			continue
 		}
 
-		go handleConnection(conn, cfg, srv)
+		go handleConnection(conn, srv)
 	}
 }
 
@@ -54,7 +54,7 @@ func startTCP(cfg *config.Config, srv *config.Server) error {
 // server. It presents custom prompts to the client, records and logs their
 // responses, and then disconnects the client. This function manages the entire
 // client interaction.
-func handleConnection(conn net.Conn, cfg *config.Config, srv *config.Server) {
+func handleConnection(conn net.Conn, srv *config.Server) {
 	defer conn.Close()
 	conn.SetDeadline(time.Now().Add(serverTimeout))
 
@@ -110,7 +110,7 @@ func handleConnection(conn net.Conn, cfg *config.Config, srv *config.Server) {
 	// Log the connection along with all responses received from the client.
 	dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
 	src_ip, src_port, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+	srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 		slog.String("event_type", "tcp"),
 		slog.String("source_ip", src_ip),
 		slog.String("source_port", src_port),

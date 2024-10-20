@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/r-smith/cti-honeypot/internal/config"
@@ -57,22 +55,12 @@ func main() {
 		cfg.Servers = append(cfg.Servers, http, https, ssh)
 	}
 
-	// Initialize a structured logger to record events in a text file. This
-	// logger captures all interactions with the honeypot servers.
-	f, err := os.OpenFile(cfg.LogPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	// Initialize structured loggers for each honeypot server.
+	err := cfg.InitializeLoggers()
 	if err != nil {
-		log.Fatalln("Failed to open log file:", err)
+		log.Fatal("Shutting down. Error: ", err)
 	}
-	defer f.Close()
-	cfg.Logger = slog.New(slog.NewJSONHandler(f, &slog.HandlerOptions{
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// Remove 'message' and 'log level' fields from output.
-			if a.Key == slog.MessageKey || a.Key == slog.LevelKey {
-				return slog.Attr{}
-			}
-			return a
-		},
-	}))
+	defer cfg.CloseLogFiles()
 
 	// Initialize a WaitGroup, as each server operates in its own goroutine.
 	// The WaitGroup counter is set to the number of configured honeypot
@@ -102,15 +90,15 @@ func main() {
 
 			switch server.Type {
 			case config.HTTP:
-				httpserver.StartHTTP(&cfg, &server)
+				httpserver.StartHTTP(&server)
 			case config.HTTPS:
-				httpserver.StartHTTPS(&cfg, &server)
+				httpserver.StartHTTPS(&server)
 			case config.SSH:
-				sshserver.StartSSH(&cfg, &server)
+				sshserver.StartSSH(&server)
 			case config.TCP:
-				tcpserver.StartTCP(&cfg, &server)
+				tcpserver.StartTCP(&server)
 			case config.UDP:
-				udpserver.StartUDP(&cfg, &server)
+				udpserver.StartUDP(&server)
 			}
 		}()
 	}

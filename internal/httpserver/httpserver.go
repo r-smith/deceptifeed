@@ -24,13 +24,13 @@ import (
 
 // StartHTTP initializes and starts an HTTP honeypot server. This is a fully
 // functional HTTP server designed to log all incoming requests for analysis.
-func StartHTTP(cfg *config.Config, srv *config.Server) {
+func StartHTTP(srv *config.Server) {
 	// Get any custom headers, if provided.
 	headers := parseCustomHeaders(srv.Banner)
 
 	// Setup handler.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, srv, headers))
+	mux.HandleFunc("/", handleConnection(srv, headers))
 
 	// Start the HTTP server.
 	fmt.Printf("Starting HTTP server on port: %s\n", srv.Port)
@@ -41,13 +41,13 @@ func StartHTTP(cfg *config.Config, srv *config.Server) {
 
 // StartHTTPS initializes and starts an HTTPS honeypot server. This  is a fully
 // functional HTTPS server designed to log all incoming requests for analysis.
-func StartHTTPS(cfg *config.Config, srv *config.Server) {
+func StartHTTPS(srv *config.Server) {
 	// Get any custom headers, if provided.
 	headers := parseCustomHeaders(srv.Banner)
 
 	// Setup handler and initialize HTTPS config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, srv, headers))
+	mux.HandleFunc("/", handleConnection(srv, headers))
 	server := &http.Server{
 		Addr:    ":" + srv.Port,
 		Handler: mux,
@@ -81,13 +81,13 @@ func StartHTTPS(cfg *config.Config, srv *config.Server) {
 // HTML file specified in the configuration or a default page prompting for
 // basic HTTP authentication. Requests for any other URLs will return a 404
 // error to the client.
-func handleConnection(cfg *config.Config, srv *config.Server, customHeaders map[string]string) http.HandlerFunc {
+func handleConnection(srv *config.Server, customHeaders map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log details of the incoming HTTP request.
 		dst_ip, dst_port := getLocalAddr(r)
 		src_ip, src_port, _ := net.SplitHostPort(r.RemoteAddr)
 		username, password := decodeBasicAuthCredentials(r.Header.Get("Authorization"))
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 			slog.String("event_type", "http"),
 			slog.String("source_ip", src_ip),
 			slog.String("source_port", src_port),

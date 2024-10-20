@@ -76,7 +76,6 @@ type Config struct {
 	LogPath    string     `xml:"defaultLogPath"`
 	Servers    []Server   `xml:"honeypotServers>server"`
 	ThreatFeed ThreatFeed `xml:"threatFeed"`
-	Logger     *slog.Logger
 }
 
 // Server represents a honeypot server with its relevant settings.
@@ -89,6 +88,9 @@ type Server struct {
 	HtmlPath string     `xml:"htmlPath"`
 	Banner   string     `xml:"banner"`
 	Prompts  []Prompt   `xml:"prompt"`
+	LogPath  string     `xml:"logPath"`
+	LogFile  *os.File
+	Logger   *slog.Logger
 }
 
 // Prompt represents a text prompt that can be displayed to connecting clients
@@ -134,4 +136,53 @@ func Load(filename string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// InitializeLoggers creates structured loggers for each server. It opens log
+// files using the server's specified log path, defaulting to the global log
+// path if none is provided.
+func (c *Config) InitializeLoggers() error {
+	for i := range c.Servers {
+		// Use the global log path if the server log path is not specified.
+		var logPath string
+		if len(c.Servers[i].LogPath) > 0 {
+			logPath = c.Servers[i].LogPath
+		} else {
+			logPath = c.LogPath
+		}
+
+		// If no log path is given, set up a dummy logger to discard output.
+		if len(logPath) == 0 {
+			c.Servers[i].Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+			continue
+		}
+
+		// Open the specified log file and create a new logger.
+		logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0664)
+		if err != nil {
+			return fmt.Errorf("failed to open log file: %w", err)
+		}
+		c.Servers[i].LogFile = logFile
+		c.Servers[i].Logger = slog.New(slog.NewJSONHandler(c.Servers[i].LogFile, &slog.HandlerOptions{
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				// Remove 'message' and 'log level' fields from output.
+				if a.Key == slog.MessageKey || a.Key == slog.LevelKey {
+					return slog.Attr{}
+				}
+				return a
+			},
+		}))
+	}
+
+	return nil
+}
+
+// CloseLogFiles closes all open log file handles for the servers. This
+// function should be called when the application is shutting down.
+func (c *Config) CloseLogFiles() {
+	for i := range c.Servers {
+		if c.Servers[i].LogFile != nil {
+			c.Servers[i].LogFile.Close()
+		}
+	}
 }

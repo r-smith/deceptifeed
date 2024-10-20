@@ -21,16 +21,16 @@ import (
 // logged from the UDP server will not be added to the threat feed. This
 // function calls the underlying startUDP function to perform the actual server
 // startup.
-func StartUDP(cfg *config.Config, srv *config.Server) {
+func StartUDP(srv *config.Server) {
 	fmt.Printf("Starting UDP server on port: %s\n", srv.Port)
-	if err := startUDP(cfg, srv); err != nil {
+	if err := startUDP(srv); err != nil {
 		fmt.Fprintln(os.Stderr, "The UDP server has terminated:", err)
 	}
 }
 
 // startUDP starts the UDP honeypot server. It handles the server's main loop
 // and logging.
-func startUDP(cfg *config.Config, srv *config.Server) error {
+func startUDP(srv *config.Server) error {
 	// Convert the specified port number to an integer.
 	port, err := strconv.Atoi(srv.Port)
 	if err != nil {
@@ -68,7 +68,7 @@ func startUDP(cfg *config.Config, srv *config.Server) error {
 			// the primary goal is to log the received data.
 			_, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
 			src_ip, src_port, _ := net.SplitHostPort(remoteAddr.String())
-			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 				slog.String("event_type", "udp"),
 				slog.String("source_ip", src_ip+" [unreliable]"),
 				slog.String("source_port", src_port+" [unreliable]"),

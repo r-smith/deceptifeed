@@ -23,16 +23,16 @@ import (
 // server. Clients receive authentication failure responses for every login
 // attempt. This function calls the underlying startSSH function to perform the
 // actual server startup.
-func StartSSH(cfg *config.Config, srv *config.Server) {
+func StartSSH(srv *config.Server) {
 	fmt.Printf("Starting SSH server on port: %s\n", srv.Port)
-	if err := startSSH(cfg, srv); err != nil {
+	if err := startSSH(srv); err != nil {
 		fmt.Fprintln(os.Stderr, "The SSH server has terminated:", err)
 	}
 }
 
 // startSSH starts the SSH honeypot server. It handles the server's main loop,
 // authentication callback, and logging.
-func startSSH(cfg *config.Config, srv *config.Server) error {
+func startSSH(srv *config.Server) error {
 	// Create a new SSH server configuration.
 	sshConfig := &ssh.ServerConfig{}
 
@@ -58,7 +58,7 @@ func startSSH(cfg *config.Config, srv *config.Server) error {
 		// Log the the username and password submitted by the client.
 		dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
 		src_ip, src_port, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 			slog.String("event_type", "ssh"),
 			slog.String("source_ip", src_ip),
 			slog.String("source_port", src_port),
