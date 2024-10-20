@@ -100,9 +100,10 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	// If a custom threat file is supplied in the configuration, append the
 	// contents of the file to the HTTP response. To allow for flexibility, the
 	// contents of the file are not parsed or validated.
-	if len(configuration.CustomThreatFile) > 0 {
-		data, err := os.ReadFile(configuration.CustomThreatFile)
+	if len(configuration.CustomThreatsPath) > 0 {
+		data, err := os.ReadFile(configuration.CustomThreatsPath)
 		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to read custom threats file:", err)
 			return
 		}
 		_, err = w.Write(data)

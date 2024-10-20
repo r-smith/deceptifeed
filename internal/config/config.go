@@ -114,7 +114,7 @@ type ThreatFeed struct {
 	DatabasePath      string `xml:"databasePath"`
 	ExpiryHours       uint   `xml:"threatExpiryHours"`
 	IsPrivateIncluded bool   `xml:"isPrivateIncluded"`
-	CustomThreatFile  string `xml:"customThreatFile"`
+	CustomThreatsPath string `xml:"customThreatsPath"`
 }
 
 // Load reads an optional XML configuration file and unmarshals its contents
