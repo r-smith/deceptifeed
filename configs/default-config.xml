@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
-  <logPath>/opt/cti-honeypot/var/log/honeypot-log.txt</logPath>
+  <defaultLogPath>/opt/cti-honeypot/var/log/honeypot-log.txt</defaultLogPath>
   <honeypotServers>
     <server type="http">
       <enabled>true</enabled>

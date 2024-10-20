@@ -73,7 +73,7 @@ func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
 // logger, settings for managing a threat feed, and the collection of honeypot
 // servers that are configured to run.
 type Config struct {
-	LogPath    string     `xml:"logPath"`
+	LogPath    string     `xml:"defaultLogPath"`
 	Servers    []Server   `xml:"honeypotServers>server"`
 	ThreatFeed ThreatFeed `xml:"threatFeed"`
 	Logger     *slog.Logger
