@@ -25,9 +25,12 @@ import (
 // StartHTTP initializes and starts an HTTP honeypot server. This is a fully
 // functional HTTP server designed to log all incoming requests for analysis.
 func StartHTTP(cfg *config.Config, srv *config.Server) {
+	// Get any custom headers, if provided.
+	headers := parseCustomHeaders(srv.Banner)
+
 	// Setup handler.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, srv))
+	mux.HandleFunc("/", handleConnection(cfg, srv, headers))
 
 	// Start the HTTP server.
 	fmt.Printf("Starting HTTP server on port: %s\n", srv.Port)
@@ -39,9 +42,12 @@ func StartHTTP(cfg *config.Config, srv *config.Server) {
 // StartHTTPS initializes and starts an HTTPS honeypot server. This  is a fully
 // functional HTTPS server designed to log all incoming requests for analysis.
 func StartHTTPS(cfg *config.Config, srv *config.Server) {
+	// Get any custom headers, if provided.
+	headers := parseCustomHeaders(srv.Banner)
+
 	// Setup handler and initialize HTTPS config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, srv))
+	mux.HandleFunc("/", handleConnection(cfg, srv, headers))
 	server := &http.Server{
 		Addr:    ":" + srv.Port,
 		Handler: mux,
@@ -75,7 +81,7 @@ func StartHTTPS(cfg *config.Config, srv *config.Server) {
 // HTML file specified in the configuration or a default page prompting for
 // basic HTTP authentication. Requests for any other URLs will return a 404
 // error to the client.
-func handleConnection(cfg *config.Config, srv *config.Server) http.HandlerFunc {
+func handleConnection(cfg *config.Config, srv *config.Server, customHeaders map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log details of the incoming HTTP request.
 		dst_ip, dst_port := getLocalAddr(r)
@@ -107,12 +113,10 @@ func handleConnection(cfg *config.Config, srv *config.Server) http.HandlerFunc {
 		// Update the threat feed with the source IP address from the request.
 		threatfeed.UpdateIoC(src_ip)
 
-		// Prepare the HTTP response for the client. If a banner string is
-		// provided in the configuration, set it as the "Sever" header in the
-		// HTTP response. This allows the honeypot server to mimic the
-		// appearance of common HTTP servers, such as IIS, Nginx, or Apache.
-		if len(srv.Banner) > 0 {
-			w.Header().Set("Server", srv.Banner)
+		// If custom headers are provided, add each header and its value to the
+		// HTTP response.
+		for key, value := range customHeaders {
+			w.Header().Set(key, value)
 		}
 
 		// Serve the web content to the client based on the requested URL. If
@@ -135,6 +139,28 @@ func handleConnection(cfg *config.Config, srv *config.Server) http.HandlerFunc {
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		}
 	}
+}
+
+// parseCustomHeaders parses a string of custom headers, if provided in the
+// configuration, into a map[string]string. The keys in the map are the custom
+// header names. For example, given the input:
+// "Server: Microsoft-IIS/8.5, X-Powered-By: ASP.NET", the function would
+// return a map with "Server" and "X-Powered-By" as keys, each linked to their
+// corresponding values.
+func parseCustomHeaders(headers string) map[string]string {
+	if len(headers) == 0 {
+		return nil
+	}
+
+	result := make(map[string]string)
+	kvPairs := strings.Split(headers, ",")
+	for _, pair := range kvPairs {
+		kv := strings.Split(strings.TrimSpace(pair), ":")
+		if len(kv) == 2 {
+			result[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return result
 }
 
 // flattenHeaders converts HTTP headers from an http.Request from the format of
