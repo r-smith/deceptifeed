@@ -131,12 +131,14 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 				// Serve the default page that prompts the client for basic
 				// authentication.
 				w.Header().Set("WWW-Authenticate", "Basic")
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				w.WriteHeader(http.StatusUnauthorized)
+				fmt.Fprintln(w, http.StatusText(http.StatusUnauthorized))
 			}
 		} else {
 			// The request is outside the root or /index.html. Respond with a
 			// 404 error.
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintln(w, http.StatusText(http.StatusNotFound))
 		}
 	}
 }
