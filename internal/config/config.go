@@ -80,17 +80,18 @@ type Config struct {
 
 // Server represents a honeypot server with its relevant settings.
 type Server struct {
-	Type     ServerType `xml:"type,attr"`
-	Enabled  bool       `xml:"enabled"`
-	Port     string     `xml:"port"`
-	CertPath string     `xml:"certPath"`
-	KeyPath  string     `xml:"keyPath"`
-	HtmlPath string     `xml:"htmlPath"`
-	Banner   string     `xml:"banner"`
-	Prompts  []Prompt   `xml:"prompt"`
-	LogPath  string     `xml:"logPath"`
-	LogFile  *os.File
-	Logger   *slog.Logger
+	Type       ServerType `xml:"type,attr"`
+	Enabled    bool       `xml:"enabled"`
+	Port       string     `xml:"port"`
+	CertPath   string     `xml:"certPath"`
+	KeyPath    string     `xml:"keyPath"`
+	HtmlPath   string     `xml:"htmlPath"`
+	Banner     string     `xml:"banner"`
+	Prompts    []Prompt   `xml:"prompt"`
+	LogPath    string     `xml:"logPath"`
+	LogEnabled bool       `xml:"logEnabled"`
+	LogFile    *os.File
+	Logger     *slog.Logger
 }
 
 // Prompt represents a text prompt that can be displayed to connecting clients
@@ -143,7 +144,7 @@ func Load(filename string) (*Config, error) {
 // files using the server's specified log path, defaulting to the global log
 // path if none is provided.
 func (c *Config) InitializeLoggers() error {
-	for i := range c.Servers {
+	for i, srv := range c.Servers {
 		if !c.Servers[i].Enabled {
 			continue
 		}
@@ -156,8 +157,9 @@ func (c *Config) InitializeLoggers() error {
 			logPath = c.LogPath
 		}
 
-		// If no log path is given, set up a dummy logger to discard output.
-		if len(logPath) == 0 {
+		// If no log path is given or if logging is disabled, set up a dummy
+		// logger to discard output.
+		if len(logPath) == 0 || !srv.LogEnabled {
 			c.Servers[i].Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 			continue
 		}
