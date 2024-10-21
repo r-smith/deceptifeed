@@ -20,7 +20,7 @@ const (
 	DefaultPortThreatFeed       = "8081"
 	DefaultThreatExpiryHours    = 168
 	DefaultThreatDatabasePath   = "cti-honeypot-feed.json"
-	DefaultThreatIncludePrivate = false
+	DefaultThreatIncludePrivate = true
 	DefaultLogPath              = "cti-honeypot-log.txt"
 	DefaultHtmlPath             = ""
 	DefaultCertPathHTTPS        = "cti-honeypot-https.crt"
