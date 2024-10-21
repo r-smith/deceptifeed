@@ -53,6 +53,10 @@ func main() {
 	} else {
 		https.HtmlPath = http.HtmlPath
 		cfg.Servers = append(cfg.Servers, http, https, ssh)
+		for i := range cfg.Servers {
+			cfg.Servers[i].LogEnabled = true
+			cfg.Servers[i].SendToThreatFeed = true
+		}
 	}
 
 	// Initialize structured loggers for each honeypot server.
