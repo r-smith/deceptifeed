@@ -114,9 +114,9 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 		slog.String("event_type", "tcp"),
 		slog.String("source_ip", src_ip),
 		slog.String("source_port", src_port),
-		slog.String("sensor_ip", dst_ip),
-		slog.String("sensor_port", dst_port),
-		slog.String("sensor_name", config.GetHostname()),
+		slog.String("server_ip", dst_ip),
+		slog.String("server_port", dst_port),
+		slog.String("server_name", config.GetHostname()),
 		slog.Any("event_details", answers),
 	)
 
