@@ -3,7 +3,7 @@
 TARGET_BINARY := ./out/cti-honeypot
 SOURCE := ./cmd/cti-honeypot/
 INSTALL_SCRIPT := ./scripts/install.sh
-UNINSTALL_SCRIPT := ./scripts/install.sh uninstall
+UNINSTALL_SCRIPT := ./scripts/install.sh --uninstall
 GO := go
 CGO_ENABLED := 0
 GO111MODULE := on

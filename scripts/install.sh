@@ -3,14 +3,13 @@
 # =============================================================================
 # Variable declarations.
 # =============================================================================
-BIN_FILE="cti-honeypot"
-BIN_DIR=""
-CFG_SRC_FILE="default-config.xml"
-CFG_DST_FILE="config.xml"
-CFG_DIR=""
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 INSTALL_DIR="/opt/cti-honeypot"
 USERNAME="honeypot"
+TARGET_BIN="${INSTALL_DIR}/bin/cti-honeypot"
+TARGET_CFG="${INSTALL_DIR}/etc/config.xml"
+SOURCE_BIN="cti-honeypot"
+SOURCE_CFG="default-config.xml"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SYSTEMD_CHECK_DIR="/run/systemd/system"
 SYSTEMD_DIR="/etc/systemd/system"
 SYSTEMD_UNIT="cti-honeypot.service"
@@ -44,62 +43,159 @@ startup_checks() {
     fi
 
     #
+    # Require systemd.
+    #
+    if [[ ! -d "${SYSTEMD_CHECK_DIR}" || ! -d "${SYSTEMD_DIR}" ]] || ! command -v systemctl &>/dev/null; then
+        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}This script requires a systemd-based system.${CLEAR}" >&2
+        echo
+        exit 1
+    fi
+
+    #
     # Ensure the script is running as root.
     #
     if [ "$(id --user)" -ne 0 ]; then
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}This installation script must be run as root.${CLEAR}" 1>&2
+        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}This script must be run as root.${CLEAR}" >&2
         echo
         exit 1
     fi
 }
 
 # =============================================================================
+# upgrade_app:
+# Executes the upgrade process. This includes:
+#   1. Stop the service.
+#   2. Copy the binary to the installation directory.
+#   3. Add execute permissions to the binary.
+#   4. Run setcap on the binary to allow it to bind to ports < 1024 when
+#      running as a non-root user.
+#   5. Start the service.
+# =============================================================================
+upgrade_app() {
+    #
+    # Prompt for upgrade.
+    #
+    echo
+    echo -e "${YELLOW}CTI Honeypot is already installed to: ${BLUE}${INSTALL_DIR}/${CLEAR}"
+    echo -e "${YELLOW}Would you like to upgrade? ${WHITE}(y/N) ${CLEAR}"
+    read -r CONFIRM
+    if [[ "${CONFIRM}" != "y" && "${CONFIRM}" != "Y" ]]; then
+        echo
+        echo -e "${WHITE}Upgrade process canceled.${CLEAR}"
+        echo
+        exit 0
+    fi
+
+    #
+    # Print upgrade banner.
+    #
+    echo
+    echo -e " ${WHITE}Upgrading CTI Honeypot${CLEAR}"
+    echo -e " ${DGRAY}======================${CLEAR}"
+    echo
+    #echo -e " ${DGRAY}-  ${LGRAY}Installation path: ${CYAN}'${INSTALL_DIR}/'"
+
+    #
+    # Stop the service.
+    #
+    echo -e " ${DGRAY}-  ${LGRAY}Stopping service: ${CYAN}${SYSTEMD_UNIT}${CLEAR}"
+    systemctl stop "${SYSTEMD_UNIT}"
+
+    #
+    # Copy the binary.
+    #
+    echo -e " ${DGRAY}-  ${LGRAY}Replacing binary: ${CYAN}${TARGET_BIN}${CLEAR}"
+    cp --force "${SOURCE_BIN}" "${TARGET_BIN}"
+    if [ $? -ne 0 ]; then
+        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${SOURCE_BIN}' ${WHITE}to: ${YELLOW}'${TARGET_BIN}'${CLEAR}" >&2
+        echo
+        exit 1
+    fi
+
+    #
+    # Set file permissions.
+    #
+    echo -e " ${DGRAY}-  ${LGRAY}Adjusting file permissions.${CLEAR}"
+    if id "${USERNAME}" >/dev/null 2>&1; then
+        chown "${USERNAME}":"${USERNAME}" "${TARGET_BIN}"
+    fi
+    chmod 775 "${TARGET_BIN}"
+    setcap cap_net_bind_service=+ep "${TARGET_BIN}"
+
+    #
+    # Start the service.
+    #
+    echo -e " ${DGRAY}-  ${LGRAY}Starting the service.${CLEAR}"
+    systemctl start "${SYSTEMD_UNIT}"
+
+    #
+    # Upgrade complete.
+    #
+    echo
+    echo -e "${WHITE} Upgrade complete${BLUE}${CLEAR}"
+    echo -e "${DGRAY} ================${CLEAR}"
+    echo
+    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SYSTEMD_UNIT}${CLEAR}"
+    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/var/log/${CLEAR}"
+    echo -e "${YELLOW}  Configuration file is at: ${CYAN}${TARGET_CFG}${CLEAR}"
+    echo
+    echo
+}
+
+# =============================================================================
 # install_app:
 # Executes the installation process. This includes:
-#   1. Create the directory structure.
-#   2. Copy the binary and default config to the installation directory.
-#   3. Create a service account user for running the application.
-#   4. Assign the user ownership and write permissions on the installation
+#   1. Run the upgrade_app function if a previous installation is detected.
+#   2. Create the directory structure.
+#   3. Copy the binary and default config to the installation directory.
+#   4. Create a service account user for running the application.
+#   5. Assign the user ownership and write permissions on the installation
 #      directory.
-#   5. Run setcap on the binary to allow the user to bind to ports < 1024.
-#   6. Create a systemd service, start the service, and configure for automatic
+#   6. Run setcap on the binary to allow it to bind to ports < 1024 when
+#      running as a non-root user.
+#   7. Create a systemd service, start the service, and configure for automatic
 #      startup.
 # =============================================================================
 install_app() {
     #
     # Locate the application's binary relative to the script's path.
     #
-    if [ -f "${SCRIPT_DIR}/${BIN_FILE}" ]; then
+    if [ -f "${SCRIPT_DIR}/${SOURCE_BIN}" ]; then
         # Found in the same directory as the script.
-        BIN_DIR="${SCRIPT_DIR}"
+        SOURCE_BIN="${SCRIPT_DIR}/${SOURCE_BIN}"
+    elif [ -f "${SCRIPT_DIR}/../out/${SOURCE_BIN}" ]; then
+        # Found in ../out relative to the script.
+        SOURCE_BIN="${SCRIPT_DIR}/../out/${SOURCE_BIN}"
     else
-        if [ -f "${SCRIPT_DIR}/../out/${BIN_FILE}" ]; then
-            # Found in ../out relative to the script.
-            BIN_DIR="${SCRIPT_DIR}/../out"
-        else
-            # Could not locate.
-            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Unable to locate the file: ${YELLOW}'${BIN_FILE}'${CLEAR}" 1>&2
-            echo
-            exit 1
-        fi
+        # Could not locate.
+        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Unable to locate the file: ${YELLOW}'${SOURCE_BIN}'${CLEAR}" >&2
+        echo
+        exit 1
     fi
 
     #
     # Locate the configuration file relative to the script's path.
     #
-    if [ -f "${SCRIPT_DIR}/${CFG_SRC_FILE}" ]; then
+    if [ -f "${SCRIPT_DIR}/${SOURCE_CFG}" ]; then
         # Found in the same directory as the script.
-        CFG_DIR="${SCRIPT_DIR}"
+        SOURCE_CFG="${SCRIPT_DIR}/${SOURCE_CFG}"
+    elif [ -f "${SCRIPT_DIR}/../configs/${SOURCE_CFG}" ]; then
+        # Found in ../configs relative to the script.
+        SOURCE_CFG="${SCRIPT_DIR}/../configs/${SOURCE_CFG}"
     else
-        if [ -f "${SCRIPT_DIR}/../configs/${CFG_SRC_FILE}" ]; then
-            # Found in ../configs relative to the script.
-            CFG_DIR="${SCRIPT_DIR}/../configs"
-        else
-            # Could not locate.
-            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Unable to locate the file: ${YELLOW}'${CFG_SRC_FILE}'${CLEAR}" 1>&2
-            echo
-            exit 1
-        fi
+        # Could not locate.
+        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Unable to locate the file: ${YELLOW}'${SOURCE_CFG}'${CLEAR}" >&2
+        echo
+        exit 1
+    fi
+
+    #
+    # Upgrade check.
+    #
+    if [[ -f "${TARGET_BIN}" && -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]]; then
+        # Call the upgrade function.
+        upgrade_app
+        exit 0
     fi
 
     #
@@ -120,9 +216,9 @@ install_app() {
     #
     # Copy the binary.
     #
-    cp --force "${BIN_DIR}/${BIN_FILE}" "${INSTALL_DIR}/bin/"
+    cp --force "${SOURCE_BIN}" "${TARGET_BIN}"
     if [ $? -ne 0 ]; then
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${BIN_DIR}/${BIN_FILE}' ${WHITE}to: ${YELLOW}'${INSTALL_DIR}/bin/'${CLEAR}" 1>&2
+        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${SOURCE_BIN}' ${WHITE}to: ${YELLOW}'${TARGET_BIN}'${CLEAR}" >&2
         echo
         exit 1
     fi
@@ -130,13 +226,13 @@ install_app() {
     #
     # Copy the configuration file, if it doesn't already exist.
     #
-    if [ -f "${INSTALL_DIR}/etc/${CFG_DST_FILE}" ]; then
+    if [ -f "${TARGET_CFG}" ]; then
         # Don't copy anything. An existing configuration file already exists.
-        echo -e " ${DGRAY}-  ${LGRAY}Keeping existing configuration found at: ${CYAN}'${INSTALL_DIR}/etc/${CFG_DST_FILE}'"
+        echo -e " ${DGRAY}-  ${LGRAY}Keeping existing configuration found at: ${CYAN}'${TARGET_CFG}'"
     else
-        cp --force "${CFG_DIR}/${CFG_SRC_FILE}" "${INSTALL_DIR}/etc/${CFG_DST_FILE}"
+        cp --force "${SOURCE_CFG}" "${TARGET_CFG}"
         if [ $? -ne 0 ]; then
-            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${CFG_DIR}/${CFG_SRC_FILE}' ${WHITE}to: ${YELLOW}'${INSTALL_DIR}/etc/${CFG_DST_FILE}'${CLEAR}" 1>&2
+            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${SOURCE_CFG}' ${WHITE}to: ${YELLOW}'${TARGET_CFG}'${CLEAR}" >&2
             echo
             exit 1
         fi
@@ -157,7 +253,7 @@ install_app() {
         echo -e " ${DGRAY}-  ${LGRAY}Creating user: ${CYAN}'${USERNAME}'${CLEAR}"
         useradd --home-dir "${INSTALL_DIR}" --no-create-home --system --shell /usr/sbin/nologin --user-group "${USERNAME}"
         if [ $? -ne 0 ]; then
-            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to create user: ${YELLOW}'${USERNAME}'${CLEAR}" 1>&2
+            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to create user: ${YELLOW}'${USERNAME}'${CLEAR}" >&2
             echo
             exit 1
         fi
@@ -168,32 +264,23 @@ install_app() {
     #
     echo -e " ${DGRAY}-  ${LGRAY}Setting file and directory permissions.${CLEAR}"
     chown --recursive "${USERNAME}":"${USERNAME}" "${INSTALL_DIR}"
-    chmod 775 "${INSTALL_DIR}/bin/${BIN_FILE}"
-    chmod 664 "${INSTALL_DIR}/etc/${CFG_DST_FILE}"
+    chmod 775 "${TARGET_BIN}"
+    chmod 664 "${TARGET_CFG}"
 
     #
     # Allow cti-honeypot to bind to a port < 1024 when running as a non-root user.
     #
-    setcap cap_net_bind_service=+ep "${INSTALL_DIR}/bin/${BIN_FILE}"
+    setcap cap_net_bind_service=+ep "${TARGET_BIN}"
 
     #
-    # Detect the init system.
+    # Create a systemd unit file.
     #
-    if [ -d "${SYSTEMD_CHECK_DIR}" ] && [ -d "${SYSTEMD_DIR}" ]; then
-        #
-        # Systemd init system detected.
-        #
-        local UNIT_FILE_FULL_PATH="${SYSTEMD_DIR}/${SYSTEMD_UNIT}"
-
-        #
-        # Create a systemd unit file.
-        #
-        echo -e " ${DGRAY}-  ${LGRAY}Creating service: ${CYAN}'${UNIT_FILE_FULL_PATH}'${CLEAR}"
-        if [ ! -f "${UNIT_FILE_FULL_PATH}" ]; then
-            cat > ${UNIT_FILE_FULL_PATH} << EOF
+    echo -e " ${DGRAY}-  ${LGRAY}Creating service: ${CYAN}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
+    if [ ! -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]; then
+        cat > "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" << EOF
 [Unit]
 Description=CTI Honeypot
-ConditionPathExists="${INSTALL_DIR}/bin/${BIN_FILE}"
+ConditionPathExists=${TARGET_BIN}
 After=network.target
 
 [Service]
@@ -202,61 +289,38 @@ User=${USERNAME}
 Group=${USERNAME}
 Restart=on-failure
 RestartSec=10
-ExecStart="${INSTALL_DIR}/bin/${BIN_FILE}" -config "${INSTALL_DIR}/etc/${CFG_DST_FILE}"
+ExecStart=${TARGET_BIN} -config ${TARGET_CFG}
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-            #
-            # Reload systemd, enable, and start the service.
-            #
-            echo -e " ${DGRAY}-  ${LGRAY}Reloading systemd configuration.${CLEAR}"
-            systemctl daemon-reload
-            echo -e " ${DGRAY}-  ${LGRAY}Configuring the service to start automatically.${CLEAR}"
-            systemctl enable "${SYSTEMD_UNIT}" &>/dev/null
-            echo -e " ${DGRAY}-  ${LGRAY}Starting the service.${CLEAR}"
-            systemctl start "${SYSTEMD_UNIT}"
-        else
-            #
-            # Service already exists. Restart it.
-            #
-            echo -e " ${RED}-  ${LGRAY}Service already exists. Skipping creation.${CLEAR}"
-            echo -e " ${DGRAY}-  ${LGRAY}Restarting the service.${CLEAR}"
-            systemctl restart "${SYSTEMD_UNIT}"
-        fi
-        echo
-        echo -e "${WHITE} Installation complete${BLUE}${CLEAR}"
-        echo -e "${DGRAY} =====================${CLEAR}"
-        echo
-        echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SYSTEMD_UNIT}${CLEAR}"
-        echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/var/log/${CLEAR}"
-        echo -e "${YELLOW}  Configuration file is at: ${CYAN}${INSTALL_DIR}/etc/${CFG_DST_FILE}${CLEAR}"
-        echo
-        echo
-
+        #
+        # Reload systemd, enable, and start the service.
+        #
+        echo -e " ${DGRAY}-  ${LGRAY}Reloading systemd configuration.${CLEAR}"
+        systemctl daemon-reload
+        echo -e " ${DGRAY}-  ${LGRAY}Configuring the service to start automatically.${CLEAR}"
+        systemctl enable "${SYSTEMD_UNIT}" &>/dev/null
+        echo -e " ${DGRAY}-  ${LGRAY}Starting the service.${CLEAR}"
+        systemctl start "${SYSTEMD_UNIT}"
     else
         #
-        # Unsupported init system detected. Skip service creation.
+        # Service already exists. Restart it.
         #
-        echo
-        echo -e "${WHITE} Installation complete${BLUE}${CLEAR}"
-        echo -e "${DGRAY} =====================${CLEAR}"
-        echo
-        echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/var/log/${CLEAR}"
-        echo -e "${YELLOW}  Configuration file is at: ${CYAN}${INSTALL_DIR}/etc/${CFG_DST_FILE}${CLEAR}"
-        echo
-        echo
-        echo -e " ${RED}Unsupported init system detected${CLEAR}"
-        echo
-        echo -e " ${WHITE}You can manually run CTI Honeypot using the following command:${CLEAR}"
-        echo -e " ${GREEN}${INSTALL_DIR}/bin/${BIN_FILE} -config ${INSTALL_DIR}/etc/${CFG_DST_FILE}${CLEAR}"
-        echo
-        echo -e " ${LGRAY}If calling from a startup script, run as the user: ${CYAN}${USERNAME}${CLEAR}"
-        echo -e " ${LGRAY}Otherwise, ensure you have write permissions on: ${CYAN}${INSTALL_DIR}/${CLEAR}"
-        echo
-        echo
+        echo -e " ${RED}-  ${LGRAY}Service already exists. Skipping creation.${CLEAR}"
+        echo -e " ${DGRAY}-  ${LGRAY}Restarting the service.${CLEAR}"
+        systemctl restart "${SYSTEMD_UNIT}"
     fi
+    echo
+    echo -e "${WHITE} Installation complete${BLUE}${CLEAR}"
+    echo -e "${DGRAY} =====================${CLEAR}"
+    echo
+    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SYSTEMD_UNIT}${CLEAR}"
+    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/var/log/${CLEAR}"
+    echo -e "${YELLOW}  Configuration file is at: ${CYAN}${TARGET_CFG}${CLEAR}"
+    echo
+    echo
 }
 
 # =============================================================================
@@ -276,37 +340,37 @@ uninstall_app() {
     echo
 
     #
-    # Determine if the system has systemd.
+    # If the service exists: stop, disable, delete the service, and run daemon-reload.
     #
-    if [ -d "${SYSTEMD_CHECK_DIR}" ] && [ -d "${SYSTEMD_DIR}" ]; then
-        #
-        # If the service exists: stop, disable, delete the service, and run daemon-reload.
-        #
-        if [ -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]; then
-            # Stop the service.
-            echo -e " ${DGRAY}-  ${LGRAY}Stopping service: ${CYAN}'${SYSTEMD_UNIT}'${CLEAR}"
-            systemctl stop "${SYSTEMD_UNIT}"
-            # Disable the service.
-            echo -e " ${DGRAY}-  ${LGRAY}Disabling service: ${CYAN}'${SYSTEMD_UNIT}'${CLEAR}"
-            systemctl disable "${SYSTEMD_UNIT}" &>/dev/null
-            # Delete the service.
-            echo -e " ${DGRAY}-  ${LGRAY}Deleting: ${CYAN}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
-            rm --force "${SYSTEMD_DIR}/${SYSTEMD_UNIT}"
-            # Reload systemd configuration.
-            echo -e " ${DGRAY}-  ${LGRAY}Reloading the systemd configuration.${CLEAR}"
-            systemctl daemon-reload
-        else
-            echo -e " ${RED}-  ${LGRAY}Service does not exist: ${WHITE}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
-            echo -e "    ${LGRAY}Skipping systemd service cleanup."
-        fi
+    if [ -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]; then
+        # Stop the service.
+        echo -e " ${DGRAY}-  ${LGRAY}Stopping service: ${CYAN}'${SYSTEMD_UNIT}'${CLEAR}"
+        systemctl stop "${SYSTEMD_UNIT}"
+        # Disable the service.
+        echo -e " ${DGRAY}-  ${LGRAY}Disabling service: ${CYAN}'${SYSTEMD_UNIT}'${CLEAR}"
+        systemctl disable "${SYSTEMD_UNIT}" &>/dev/null
+        # Delete the service.
+        echo -e " ${DGRAY}-  ${LGRAY}Deleting: ${CYAN}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
+        rm --force "${SYSTEMD_DIR}/${SYSTEMD_UNIT}"
+        # Reload systemd configuration.
+        echo -e " ${DGRAY}-  ${LGRAY}Reloading the systemd configuration.${CLEAR}"
+        systemctl daemon-reload
+    else
+        echo -e " ${RED}-  ${LGRAY}Service does not exist: ${WHITE}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
+        echo -e "    ${LGRAY}Skipping systemd service cleanup."
     fi
 
     #
     # Delete the user, if it exists.
     #
     if id "${USERNAME}" &> /dev/null; then
-        echo -e " ${DGRAY}-  ${LGRAY}Deleting user: ${CYAN}'${USERNAME}'${CLEAR}"
-        userdel "${USERNAME}"
+        echo
+        echo -e "${YELLOW}Delete the user ${BLUE}'${USERNAME}' ${YELLOW}from your system? ${WHITE}(y/N) ${CLEAR}"
+        read -r CONFIRM
+        if [[ "${CONFIRM}" == "y" || "${CONFIRM}" == "Y" ]]; then
+            echo -e " ${DGRAY}-  ${LGRAY}Deleting user: ${CYAN}'${USERNAME}'${CLEAR}"
+            userdel "${USERNAME}"
+        fi
     else
         echo -e " ${RED}-  ${LGRAY}User ${WHITE}'${USERNAME}' ${LGRAY}does not exist. Skipping deletion."
     fi
@@ -315,8 +379,14 @@ uninstall_app() {
     # Delete the installation directory, if it exists.
     #
     if [ -d "${INSTALL_DIR}" ]; then
-        echo -e " ${DGRAY}-  ${LGRAY}Deleting installation directory: ${CYAN}'${INSTALL_DIR}/'${CLEAR}"
-        rm --recursive --force "${INSTALL_DIR}"
+        echo
+        echo -e "${YELLOW}The installation directory may contain log files and configuration files."
+        echo -e "${YELLOW}Are you ready to delete ${BLUE}'${INSTALL_DIR}'${YELLOW}? ${WHITE}(y/N) ${CLEAR}"
+        read -r CONFIRM
+        if [[ "${CONFIRM}" == "y" || "${CONFIRM}" == "Y" ]]; then
+            echo -e " ${DGRAY}-  ${LGRAY}Deleting installation directory: ${CYAN}'${INSTALL_DIR}/'${CLEAR}"
+            rm --recursive --force "${INSTALL_DIR}"
+        fi
     else
         echo -e " ${RED}-  ${LGRAY}Directory ${WHITE}'${INSTALL_DIR}/' ${LGRAY}does not exist. Skipping deletion."
     fi
@@ -329,7 +399,7 @@ uninstall_app() {
     echo -e " ${DGRAY}=======================${CLEAR}"
     echo
     echo -e " ${GREEN}Success${CLEAR}"
-    echo -e " ${LGRAY}CTI Honeypot has been removed from your system.${CLEAR}"
+    echo -e " ${LGRAY}CTI Honeypot uninstallation is complete.${CLEAR}"
     echo
     echo
 }
@@ -344,7 +414,7 @@ uninstall_app() {
 main() {
     startup_checks
 
-    if [[ "$1" == "uninstall" ]]; then
+    if [[ "$1" == "--uninstall" ]]; then
         uninstall_app
         exit 0
     else
