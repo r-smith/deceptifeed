@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log/slog"
@@ -86,7 +85,7 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 		// Log details of the incoming HTTP request.
 		dst_ip, dst_port := getLocalAddr(r)
 		src_ip, src_port, _ := net.SplitHostPort(r.RemoteAddr)
-		username, password := decodeBasicAuthCredentials(r.Header.Get("Authorization"))
+		username, password, _ := r.BasicAuth()
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 			slog.String("event_type", "http"),
 			slog.String("source_ip", src_ip),
@@ -184,29 +183,6 @@ func flattenHeaders(headers map[string][]string) map[string]string {
 	// Delete the User-Agent header, as it is managed separately.
 	delete(newHeaders, "User-Agent")
 	return newHeaders
-}
-
-// decodeBasicAuthCredentials takes an HTTP "Authorization" header string,
-// decodes it, and extracts the username and password. The Basic Authentication
-// header follows the format 'username:password' and is encoded in base64.
-// After decoding, the username and password is returned.
-func decodeBasicAuthCredentials(header string) (username string, password string) {
-	if !strings.HasPrefix(header, "Basic ") {
-		return "", ""
-	}
-
-	encodedCredentials := strings.TrimPrefix(header, "Basic ")
-	decoded, err := base64.StdEncoding.DecodeString(encodedCredentials)
-	if err != nil {
-		return "", ""
-	}
-
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 {
-		return "", ""
-	}
-
-	return parts[0], parts[1]
 }
 
 // getLocalAddr retrieves the local IP address and port from the given HTTP
