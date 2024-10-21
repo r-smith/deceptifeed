@@ -85,26 +85,48 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 		// Log details of the incoming HTTP request.
 		dst_ip, dst_port := getLocalAddr(r)
 		src_ip, src_port, _ := net.SplitHostPort(r.RemoteAddr)
-		username, password, _ := r.BasicAuth()
-		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
-			slog.String("event_type", "http"),
-			slog.String("source_ip", src_ip),
-			slog.String("source_port", src_port),
-			slog.String("server_ip", dst_ip),
-			slog.String("server_port", dst_port),
-			slog.String("server_name", config.GetHostname()),
-			slog.Group("event_details",
-				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
-				slog.String("query", r.URL.RawQuery),
-				slog.String("user_agent", r.UserAgent()),
-				slog.String("protocol", r.Proto),
-				slog.String("host", r.Host),
-				slog.String("basic_auth_username", username),
-				slog.String("basic_auth_password", password),
-				slog.Any("request_headers", flattenHeaders(r.Header)),
-			),
-		)
+		username, password, isAuth := r.BasicAuth()
+		if isAuth {
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+				slog.String("event_type", "http"),
+				slog.String("source_ip", src_ip),
+				slog.String("source_port", src_port),
+				slog.String("server_ip", dst_ip),
+				slog.String("server_port", dst_port),
+				slog.String("server_name", config.GetHostname()),
+				slog.Group("event_details",
+					slog.String("method", r.Method),
+					slog.String("path", r.URL.Path),
+					slog.String("query", r.URL.RawQuery),
+					slog.String("user_agent", r.UserAgent()),
+					slog.String("protocol", r.Proto),
+					slog.String("host", r.Host),
+					slog.Group("basic_auth",
+						slog.String("username", username),
+						slog.String("password", password),
+					),
+					slog.Any("request_headers", flattenHeaders(r.Header)),
+				),
+			)
+		} else {
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+				slog.String("event_type", "http"),
+				slog.String("source_ip", src_ip),
+				slog.String("source_port", src_port),
+				slog.String("server_ip", dst_ip),
+				slog.String("server_port", dst_port),
+				slog.String("server_name", config.GetHostname()),
+				slog.Group("event_details",
+					slog.String("method", r.Method),
+					slog.String("path", r.URL.Path),
+					slog.String("query", r.URL.RawQuery),
+					slog.String("user_agent", r.UserAgent()),
+					slog.String("protocol", r.Proto),
+					slog.String("host", r.Host),
+					slog.Any("request_headers", flattenHeaders(r.Header)),
+				),
+			)
+		}
 
 		// Print a simplified version of the request to the console.
 		fmt.Printf("[HTTP] %s %s %s %s\n", src_ip, r.Method, r.URL.Path, r.URL.RawQuery)
