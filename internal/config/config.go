@@ -145,7 +145,7 @@ func Load(filename string) (*Config, error) {
 // files using the server's specified log path, defaulting to the global log
 // path if none is provided.
 func (c *Config) InitializeLoggers() error {
-	for i, srv := range c.Servers {
+	for i := range c.Servers {
 		if !c.Servers[i].Enabled {
 			continue
 		}
@@ -160,7 +160,7 @@ func (c *Config) InitializeLoggers() error {
 
 		// If no log path is given or if logging is disabled, set up a dummy
 		// logger to discard output.
-		if len(logPath) == 0 || !srv.LogEnabled {
+		if len(logPath) == 0 || !c.Servers[i].LogEnabled {
 			c.Servers[i].Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 			continue
 		}
