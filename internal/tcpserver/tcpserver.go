@@ -124,7 +124,9 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	fmt.Printf("[TCP] %s %v\n", src_ip, answersToString(answers))
 
 	// Update the threat feed with the source IP address from the interaction.
-	threatfeed.UpdateIoC(src_ip)
+	if srv.SendToThreatFeed {
+		threatfeed.UpdateIoC(src_ip)
+	}
 }
 
 // answersToString converts a map of responses from custom prompts into a

@@ -80,18 +80,19 @@ type Config struct {
 
 // Server represents a honeypot server with its relevant settings.
 type Server struct {
-	Type       ServerType `xml:"type,attr"`
-	Enabled    bool       `xml:"enabled"`
-	Port       string     `xml:"port"`
-	CertPath   string     `xml:"certPath"`
-	KeyPath    string     `xml:"keyPath"`
-	HtmlPath   string     `xml:"htmlPath"`
-	Banner     string     `xml:"banner"`
-	Prompts    []Prompt   `xml:"prompt"`
-	LogPath    string     `xml:"logPath"`
-	LogEnabled bool       `xml:"logEnabled"`
-	LogFile    *os.File
-	Logger     *slog.Logger
+	Type             ServerType `xml:"type,attr"`
+	Enabled          bool       `xml:"enabled"`
+	Port             string     `xml:"port"`
+	CertPath         string     `xml:"certPath"`
+	KeyPath          string     `xml:"keyPath"`
+	HtmlPath         string     `xml:"htmlPath"`
+	Banner           string     `xml:"banner"`
+	Prompts          []Prompt   `xml:"prompt"`
+	SendToThreatFeed bool       `xml:"sendToThreatFeed"`
+	LogPath          string     `xml:"logPath"`
+	LogEnabled       bool       `xml:"logEnabled"`
+	LogFile          *os.File
+	Logger           *slog.Logger
 }
 
 // Prompt represents a text prompt that can be displayed to connecting clients

@@ -76,7 +76,9 @@ func startSSH(srv *config.Server) error {
 		fmt.Printf("[SSH] %s Username: %s Password: %s\n", src_ip, conn.User(), string(password))
 
 		// Update the threat feed with the source IP address from the request.
-		threatfeed.UpdateIoC(src_ip)
+		if srv.SendToThreatFeed {
+			threatfeed.UpdateIoC(src_ip)
+		}
 
 		// Return an invalid username or password error to the client.
 		return nil, fmt.Errorf("invalid username or password")
