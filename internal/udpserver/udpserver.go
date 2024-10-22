@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/r-smith/cti-honeypot/internal/config"
+	"github.com/r-smith/deceptifeed/internal/config"
 )
 
 // StartUDP serves as a wrapper to initialize and start a generic UDP honeypot

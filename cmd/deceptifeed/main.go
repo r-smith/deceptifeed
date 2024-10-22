@@ -5,12 +5,12 @@ import (
 	"log"
 	"sync"
 
-	"github.com/r-smith/cti-honeypot/internal/config"
-	"github.com/r-smith/cti-honeypot/internal/httpserver"
-	"github.com/r-smith/cti-honeypot/internal/sshserver"
-	"github.com/r-smith/cti-honeypot/internal/tcpserver"
-	"github.com/r-smith/cti-honeypot/internal/threatfeed"
-	"github.com/r-smith/cti-honeypot/internal/udpserver"
+	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/httpserver"
+	"github.com/r-smith/deceptifeed/internal/sshserver"
+	"github.com/r-smith/deceptifeed/internal/tcpserver"
+	"github.com/r-smith/deceptifeed/internal/threatfeed"
+	"github.com/r-smith/deceptifeed/internal/udpserver"
 )
 
 func main() {

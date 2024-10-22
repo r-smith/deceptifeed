@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
 
-  <defaultLogPath>/opt/cti-honeypot/var/log/honeypot-log.txt</defaultLogPath>
+  <defaultLogPath>/opt/deceptifeed/var/log/honeypot-log.txt</defaultLogPath>
 
   <honeypotServers>
     <server type="http">
@@ -16,8 +16,8 @@
       <port>8443</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
-      <certPath>/opt/cti-honeypot/certs/https-cert.pem</certPath>
-      <keyPath>/opt/cti-honeypot/certs/https-key.pem</keyPath>
+      <certPath>/opt/deceptifeed/certs/https-cert.pem</certPath>
+      <keyPath>/opt/deceptifeed/certs/https-key.pem</keyPath>
     </server>
 
     <server type="ssh">
@@ -25,7 +25,7 @@
       <port>2022</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
-      <keyPath>/opt/cti-honeypot/certs/ssh-key.pem</keyPath>
+      <keyPath>/opt/deceptifeed/certs/ssh-key.pem</keyPath>
       <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
     </server>
   </honeypotServers>
@@ -33,7 +33,7 @@
   <threatFeed>
     <enabled>true</enabled>
     <port>8081</port>
-    <databasePath>/opt/cti-honeypot/var/log/threatfeed.json</databasePath>
+    <databasePath>/opt/deceptifeed/var/log/threatfeed.json</databasePath>
     <threatExpiryHours>168</threatExpiryHours>
     <isPrivateIncluded>false</isPrivateIncluded>
   </threatFeed>

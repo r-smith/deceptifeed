@@ -3,16 +3,16 @@
 # =============================================================================
 # Variable declarations.
 # =============================================================================
-INSTALL_DIR="/opt/cti-honeypot"
-USERNAME="honeypot"
-TARGET_BIN="${INSTALL_DIR}/bin/cti-honeypot"
+INSTALL_DIR="/opt/deceptifeed"
+USERNAME="deceptifeed"
+TARGET_BIN="${INSTALL_DIR}/bin/deceptifeed"
 TARGET_CFG="${INSTALL_DIR}/etc/config.xml"
-SOURCE_BIN="cti-honeypot"
+SOURCE_BIN="deceptifeed"
 SOURCE_CFG="default-config.xml"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SYSTEMD_CHECK_DIR="/run/systemd/system"
 SYSTEMD_DIR="/etc/systemd/system"
-SYSTEMD_UNIT="cti-honeypot.service"
+SYSTEMD_UNIT="deceptifeed.service"
 
 # =============================================================================
 # startup_checks:
@@ -76,7 +76,7 @@ upgrade_app() {
     # Prompt for upgrade.
     #
     echo
-    echo -e "${YELLOW}CTI Honeypot is already installed to: ${BLUE}${INSTALL_DIR}/${CLEAR}"
+    echo -e "${YELLOW}Deceptifeed is already installed to: ${BLUE}${INSTALL_DIR}/${CLEAR}"
     echo -e "${YELLOW}Would you like to upgrade? ${WHITE}(y/N) ${CLEAR}"
     read -r CONFIRM
     if [[ "${CONFIRM}" != "y" && "${CONFIRM}" != "Y" ]]; then
@@ -90,8 +90,8 @@ upgrade_app() {
     # Print upgrade banner.
     #
     echo
-    echo -e " ${WHITE}Upgrading CTI Honeypot${CLEAR}"
-    echo -e " ${DGRAY}======================${CLEAR}"
+    echo -e " ${WHITE}Upgrading Deceptifeed${CLEAR}"
+    echo -e " ${DGRAY}=====================${CLEAR}"
     echo
     #echo -e " ${DGRAY}-  ${LGRAY}Installation path: ${CYAN}'${INSTALL_DIR}/'"
 
@@ -202,8 +202,8 @@ install_app() {
     # Print install banner.
     #
     echo
-    echo -e " ${WHITE}Installing CTI Honeypot${CLEAR}"
-    echo -e " ${DGRAY}=======================${CLEAR}"
+    echo -e " ${WHITE}Installing Deceptifeed${CLEAR}"
+    echo -e " ${DGRAY}======================${CLEAR}"
     echo
     echo -e " ${DGRAY}-  ${LGRAY}Installing to: ${CYAN}'${INSTALL_DIR}/'"
 
@@ -268,7 +268,7 @@ install_app() {
     chmod 664 "${TARGET_CFG}"
 
     #
-    # Allow cti-honeypot to bind to a port < 1024 when running as a non-root user.
+    # Allow the app to bind to a port < 1024 when running as a non-root user.
     #
     setcap cap_net_bind_service=+ep "${TARGET_BIN}"
 
@@ -279,7 +279,7 @@ install_app() {
     if [ ! -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]; then
         cat > "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" << EOF
 [Unit]
-Description=CTI Honeypot
+Description=Deceptifeed
 ConditionPathExists=${TARGET_BIN}
 After=network.target
 
@@ -335,7 +335,7 @@ uninstall_app() {
     # Print uninstall banner.
     #
     echo
-    echo -e " ${WHITE}Unnstalling CTI Honeypot${CLEAR}"
+    echo -e " ${WHITE}Uninstalling Deceptifeed${CLEAR}"
     echo -e " ${DGRAY}========================${CLEAR}"
     echo
 
@@ -399,7 +399,7 @@ uninstall_app() {
     echo -e " ${DGRAY}=======================${CLEAR}"
     echo
     echo -e " ${GREEN}Success${CLEAR}"
-    echo -e " ${LGRAY}CTI Honeypot uninstallation is complete.${CLEAR}"
+    echo -e " ${LGRAY}Deceptifeed uninstallation is complete.${CLEAR}"
     echo
     echo
 }

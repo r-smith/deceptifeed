@@ -1,7 +1,7 @@
-# Makefile for CTI Honeypot
+# Makefile for Deceptifeed
 
-TARGET_BINARY := ./out/cti-honeypot
-SOURCE := ./cmd/cti-honeypot/
+TARGET_BINARY := ./out/deceptifeed
+SOURCE := ./cmd/deceptifeed/
 INSTALL_SCRIPT := ./scripts/install.sh
 UNINSTALL_SCRIPT := ./scripts/install.sh --uninstall
 GO := go

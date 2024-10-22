@@ -1,4 +1,4 @@
-module github.com/r-smith/cti-honeypot
+module github.com/r-smith/deceptifeed
 
 go 1.23
 

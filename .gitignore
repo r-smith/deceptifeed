@@ -19,16 +19,12 @@ go.work.sum
 .env
 
 # Ignore Linux binary, but allow folder of same name.
-cti-honeypot
-!cti-honeypot/
+deceptifeed
+!deceptifeed/
 
-# Ignore default user configuration and log files used by cti-honeypot.
-cti-honeypot.xml
-cti-honeypot-log.txt
-cti-honeypot-feed.json
-cti-honeypot-https.crt
-cti-honeypot-https.key
-cti-honeypot-ssh.key
+# Ignore default user configuration and log files used by Deceptifeed.
+deceptifeed.*
+deceptifeed-*.*
 
 # Ignore build output directory used by Makefile.
 out/

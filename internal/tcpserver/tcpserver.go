@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/r-smith/cti-honeypot/internal/config"
-	"github.com/r-smith/cti-honeypot/internal/threatfeed"
+	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
 // serverTimeout defines the duration after which connected clients are
