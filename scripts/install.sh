@@ -12,7 +12,8 @@ SOURCE_CFG="default-config.xml"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SYSTEMD_CHECK_DIR="/run/systemd/system"
 SYSTEMD_DIR="/etc/systemd/system"
-SYSTEMD_UNIT="deceptifeed.service"
+SERVICE_SHORT_NAME="deceptifeed"
+SYSTEMD_UNIT="${SERVICE_SHORT_NAME}.service"
 
 # =============================================================================
 # startup_checks:
@@ -93,7 +94,6 @@ upgrade_app() {
     echo -e " ${WHITE}Upgrading Deceptifeed${CLEAR}"
     echo -e " ${DGRAY}=====================${CLEAR}"
     echo
-    #echo -e " ${DGRAY}-  ${LGRAY}Installation path: ${CYAN}'${INSTALL_DIR}/'"
 
     #
     # Stop the service.
@@ -135,8 +135,8 @@ upgrade_app() {
     echo -e "${WHITE} Upgrade complete${BLUE}${CLEAR}"
     echo -e "${DGRAY} ================${CLEAR}"
     echo
-    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SYSTEMD_UNIT}${CLEAR}"
-    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/var/log/${CLEAR}"
+    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SERVICE_SHORT_NAME}${CLEAR}"
+    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/logs/${CLEAR}"
     echo -e "${YELLOW}  Configuration file is at: ${CYAN}${TARGET_CFG}${CLEAR}"
     echo
     echo
@@ -211,7 +211,7 @@ install_app() {
     # Create the directory structure.
     #
     umask 002
-    mkdir --parents "${INSTALL_DIR}/bin/" "${INSTALL_DIR}/var/log/" "${INSTALL_DIR}/etc/" "${INSTALL_DIR}/certs/"
+    mkdir --parents "${INSTALL_DIR}/bin/" "${INSTALL_DIR}/certs/" "${INSTALL_DIR}/etc/" "${INSTALL_DIR}/logs/"
 
     #
     # Copy the binary.
@@ -316,8 +316,8 @@ EOF
     echo -e "${WHITE} Installation complete${BLUE}${CLEAR}"
     echo -e "${DGRAY} =====================${CLEAR}"
     echo
-    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SYSTEMD_UNIT}${CLEAR}"
-    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/var/log/${CLEAR}"
+    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SERVICE_SHORT_NAME}${CLEAR}"
+    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/logs/${CLEAR}"
     echo -e "${YELLOW}  Configuration file is at: ${CYAN}${TARGET_CFG}${CLEAR}"
     echo
     echo
