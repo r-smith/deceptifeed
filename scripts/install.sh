@@ -119,7 +119,7 @@ upgrade_app() {
     if id "${USERNAME}" >/dev/null 2>&1; then
         chown "${USERNAME}":"${USERNAME}" "${TARGET_BIN}"
     fi
-    chmod 775 "${TARGET_BIN}"
+    chmod 755 "${TARGET_BIN}"
     setcap cap_net_bind_service=+ep "${TARGET_BIN}"
 
     #
@@ -210,7 +210,6 @@ install_app() {
     #
     # Create the directory structure.
     #
-    umask 002
     mkdir --parents "${INSTALL_DIR}/bin/" "${INSTALL_DIR}/certs/" "${INSTALL_DIR}/etc/" "${INSTALL_DIR}/logs/"
 
     #
@@ -264,8 +263,8 @@ install_app() {
     #
     echo -e " ${DGRAY}-  ${LGRAY}Setting file and directory permissions.${CLEAR}"
     chown --recursive "${USERNAME}":"${USERNAME}" "${INSTALL_DIR}"
-    chmod 775 "${TARGET_BIN}"
-    chmod 664 "${TARGET_CFG}"
+    chmod 755 "${TARGET_BIN}"
+    chmod 644 "${TARGET_CFG}"
 
     #
     # Allow the app to bind to a port < 1024 when running as a non-root user.
