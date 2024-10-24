@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
 # =============================================================================
-# Variable declarations.
+# Variables.
 # =============================================================================
-INSTALL_DIR="/opt/deceptifeed"
-USERNAME="deceptifeed"
-TARGET_BIN="${INSTALL_DIR}/bin/deceptifeed"
-TARGET_CFG="${INSTALL_DIR}/etc/config.xml"
-SOURCE_BIN="deceptifeed"
-SOURCE_CFG="default-config.xml"
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-SYSTEMD_CHECK_DIR="/run/systemd/system"
-SYSTEMD_DIR="/etc/systemd/system"
-SERVICE_SHORT_NAME="deceptifeed"
-SYSTEMD_UNIT="${SERVICE_SHORT_NAME}.service"
+install_dir="/opt/deceptifeed"
+username="deceptifeed"
+target_bin="${install_dir}/bin/deceptifeed"
+target_cfg="${install_dir}/etc/config.xml"
+source_bin="deceptifeed"
+source_cfg="default-config.xml"
+script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+systemd_check_dir="/run/systemd/system"
+systemd_dir="/etc/systemd/system"
+service_short_name="deceptifeed"
+systemd_unit="${service_short_name}.service"
 
 # =============================================================================
 # startup_checks:
@@ -22,44 +22,56 @@ SYSTEMD_UNIT="${SERVICE_SHORT_NAME}.service"
 #   2. Ensure the script is running as root. If not, exit with an error.
 # =============================================================================
 startup_checks() {
-    #
     # If supported, enable colored output.
-    #
-    if [ -t 1 ]; then
+    if [[ -t 1 ]]; then
         # Detect color support.
-        local NCOLORS=$(tput colors 2>/dev/null)
-        if [ -n "${NCOLORS}" ] && [ ${NCOLORS} -ge 8 ]; then
+        n_colors=$(tput colors 2>/dev/null)
+        if [[ -n "${n_colors}" ]] && [[ "${n_colors}" -ge 8 ]]; then
             # Color support detected. Enable colored output.
-            RED='\033[1;31m'
-            GREEN='\033[1;32m'
-            YELLOW='\033[1;33m'
-            BLUE='\033[1;34m'
-            MAGENTA='\033[1;35m'
-            CYAN='\033[1;36m'
-            WHITE='\033[1;37m'
-            DGRAY='\033[1;30m'
-            LGRAY='\033[0;37m'
-            CLEAR='\033[m'
+            red='\033[1;31m'
+            green='\033[1;32m'
+            yellow='\033[1;33m'
+            blue='\033[1;34m'
+            magenta='\033[1;35m'
+            dmagenta='\033[0;35m'
+            cyan='\033[1;36m'
+            white='\033[1;37m'
+            gray='\033[0;37m'
+            dgray='\033[1;30m'
+            clear='\033[m'
         fi
     fi
 
-    #
+    # Output aids.
+    msg_error="${dgray}[${red}Error${dgray}]${clear}"
+    msg_info="${dgray}${magenta}‣${dgray}${clear}"
+
     # Require systemd.
-    #
-    if [[ ! -d "${SYSTEMD_CHECK_DIR}" || ! -d "${SYSTEMD_DIR}" ]] || ! command -v systemctl &>/dev/null; then
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}This script requires a systemd-based system.${CLEAR}" >&2
-        echo
+    if [[ ! -d "${systemd_check_dir}" || ! -d "${systemd_dir}" ]] || ! command -v systemctl &>/dev/null; then
+        echo -e "\n${msg_error} ${white}This script requires a systemd-based system.${clear}\n" >&2
         exit 1
     fi
 
-    #
     # Ensure the script is running as root.
-    #
-    if [ "$(id --user)" -ne 0 ]; then
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}This script must be run as root.${CLEAR}" >&2
-        echo
+    if [[ "$(id --user)" -ne 0 ]]; then
+        echo -e "\n${msg_error} ${white}This script must be run as root.${clear}\n" >&2
         exit 1
     fi
+}
+
+# =============================================================================
+# print_banner:
+# Prints the application's banner.
+# =============================================================================
+print_banner() {
+    echo -e "${yellow}         __                     __  _ ${green}______              __"
+    echo -e "${yellow}    ____/ /__  ________  ____  / /_(_)${green} ____/__  ___  ____/ /"
+    echo -e "${yellow}   / __  / _ \/ ___/ _ \/ __ \/ __/ /${green} /_  / _ \/ _ \/ __  / "
+    echo -e "${yellow}  / /_/ /  __/ /__/  __/ /_/ / /_/ /${green} __/ /  __/  __/ /_/ /  "
+    echo -e "${yellow}  \____/\___/\___/\___/ .___/\__/_/${green}_/    \___/\___/\____/   "
+    echo -e "${dmagenta} ::::::::::::::::::::${yellow}/_/${dmagenta}::::::::::::::::::::::::::::::::::"
+    echo -e "${clear}"
+    echo
 }
 
 # =============================================================================
@@ -73,71 +85,54 @@ startup_checks() {
 #   5. Start the service.
 # =============================================================================
 upgrade_app() {
-    #
     # Prompt for upgrade.
-    #
     echo
-    echo -e "${YELLOW}Deceptifeed is already installed to: ${BLUE}${INSTALL_DIR}/${CLEAR}"
-    echo -e "${YELLOW}Would you like to upgrade? ${WHITE}(y/N) ${CLEAR}"
-    read -r CONFIRM
-    if [[ "${CONFIRM}" != "y" && "${CONFIRM}" != "Y" ]]; then
+    echo -e " ${red}Deceptifeed is already installed to${gray}: ${blue}${install_dir}/${clear}"
+    echo -e " ${red}Would you like to upgrade?${clear}"
+    echo -en " ${gray}(${white}yes${gray}/${white}no${gray}) ${gray}[${yellow}no${gray}]${white}: ${green}"
+    read -r response
+    echo -en "${clear}"
+    if [[ ! "${response}" =~ ^[yY][eE][sS]$ && ! "${response}" =~ ^[yY]$ ]]; then
         echo
-        echo -e "${WHITE}Upgrade process canceled.${CLEAR}"
+        echo -e " ${white}Upgrade canceled${clear}"
+        echo
         echo
         exit 0
     fi
 
-    #
     # Print upgrade banner.
-    #
-    echo
-    echo -e " ${WHITE}Upgrading Deceptifeed${CLEAR}"
-    echo -e " ${DGRAY}=====================${CLEAR}"
-    echo
+    print_banner
 
-    #
     # Stop the service.
-    #
-    echo -e " ${DGRAY}-  ${LGRAY}Stopping service: ${CYAN}${SYSTEMD_UNIT}${CLEAR}"
-    systemctl stop "${SYSTEMD_UNIT}"
+    echo -e " ${msg_info}  ${gray}Stopping service: ${cyan}${systemd_unit}${clear}"
+    systemctl stop "${systemd_unit}"
 
-    #
     # Copy the binary.
-    #
-    echo -e " ${DGRAY}-  ${LGRAY}Replacing binary: ${CYAN}${TARGET_BIN}${CLEAR}"
-    cp --force "${SOURCE_BIN}" "${TARGET_BIN}"
-    if [ $? -ne 0 ]; then
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${SOURCE_BIN}' ${WHITE}to: ${YELLOW}'${TARGET_BIN}'${CLEAR}" >&2
+    echo -e " ${msg_info}  ${gray}Replacing binary: ${cyan}${target_bin}${clear}"
+    if ! cp --force "${source_bin}" "${target_bin}"; then
+        echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}" >&2
         echo
         exit 1
     fi
 
-    #
     # Set file permissions.
-    #
-    echo -e " ${DGRAY}-  ${LGRAY}Adjusting file permissions.${CLEAR}"
-    if id "${USERNAME}" >/dev/null 2>&1; then
-        chown "${USERNAME}":"${USERNAME}" "${TARGET_BIN}"
+    if id "${username}" >/dev/null 2>&1; then
+        chown "${username}":"${username}" "${target_bin}"
     fi
-    chmod 755 "${TARGET_BIN}"
-    setcap cap_net_bind_service=+ep "${TARGET_BIN}"
+    chmod 755 "${target_bin}"
+    setcap cap_net_bind_service=+ep "${target_bin}"
 
-    #
     # Start the service.
-    #
-    echo -e " ${DGRAY}-  ${LGRAY}Starting the service.${CLEAR}"
-    systemctl start "${SYSTEMD_UNIT}"
+    echo -e " ${msg_info}  ${gray}Starting the service.${clear}"
+    systemctl start "${systemd_unit}"
 
-    #
     # Upgrade complete.
-    #
     echo
-    echo -e "${WHITE} Upgrade complete${BLUE}${CLEAR}"
-    echo -e "${DGRAY} ================${CLEAR}"
+    echo -e " ${green}✓  ${white}Upgrade complete${clear}"
     echo
-    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SERVICE_SHORT_NAME}${CLEAR}"
-    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/logs/${CLEAR}"
-    echo -e "${YELLOW}  Configuration file is at: ${CYAN}${TARGET_CFG}${CLEAR}"
+    echo -e "${yellow} Check service status: ${cyan}systemctl status ${service_short_name}${clear}"
+    echo -e "${yellow}         Log location: ${cyan}${install_dir}/logs/${clear}"
+    echo -e "${yellow}   Configuration file: ${cyan}${target_cfg}${clear}"
     echo
     echo
 }
@@ -157,167 +152,130 @@ upgrade_app() {
 #      startup.
 # =============================================================================
 install_app() {
-    #
     # Locate the application's binary relative to the script's path.
-    #
-    if [ -f "${SCRIPT_DIR}/${SOURCE_BIN}" ]; then
+    if [[ -f "${script_dir}/${source_bin}" ]]; then
         # Found in the same directory as the script.
-        SOURCE_BIN="${SCRIPT_DIR}/${SOURCE_BIN}"
-    elif [ -f "${SCRIPT_DIR}/../out/${SOURCE_BIN}" ]; then
+        source_bin="${script_dir}/${source_bin}"
+    elif [[ -f "${script_dir}/../out/${source_bin}" ]]; then
         # Found in ../out relative to the script.
-        SOURCE_BIN="${SCRIPT_DIR}/../out/${SOURCE_BIN}"
+        source_bin="${script_dir}/../out/${source_bin}"
     else
         # Could not locate.
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Unable to locate the file: ${YELLOW}'${SOURCE_BIN}'${CLEAR}" >&2
+        echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_bin}'${clear}" >&2
         echo
         exit 1
     fi
 
-    #
     # Locate the configuration file relative to the script's path.
-    #
-    if [ -f "${SCRIPT_DIR}/${SOURCE_CFG}" ]; then
+    if [[ -f "${script_dir}/${source_cfg}" ]]; then
         # Found in the same directory as the script.
-        SOURCE_CFG="${SCRIPT_DIR}/${SOURCE_CFG}"
-    elif [ -f "${SCRIPT_DIR}/../configs/${SOURCE_CFG}" ]; then
+        source_cfg="${script_dir}/${source_cfg}"
+    elif [[ -f "${script_dir}/../configs/${source_cfg}" ]]; then
         # Found in ../configs relative to the script.
-        SOURCE_CFG="${SCRIPT_DIR}/../configs/${SOURCE_CFG}"
+        source_cfg="${script_dir}/../configs/${source_cfg}"
     else
         # Could not locate.
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Unable to locate the file: ${YELLOW}'${SOURCE_CFG}'${CLEAR}" >&2
+        echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_cfg}'${clear}" >&2
         echo
         exit 1
     fi
 
-    #
     # Upgrade check.
-    #
-    if [[ -f "${TARGET_BIN}" && -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]]; then
+    if [[ -f "${target_bin}" && -f "${systemd_dir}/${systemd_unit}" ]]; then
         # Call the upgrade function.
         upgrade_app
         exit 0
     fi
 
-    #
     # Print install banner.
-    #
-    echo
-    echo -e " ${WHITE}Installing Deceptifeed${CLEAR}"
-    echo -e " ${DGRAY}======================${CLEAR}"
-    echo
-    echo -e " ${DGRAY}-  ${LGRAY}Installing to: ${CYAN}'${INSTALL_DIR}/'"
+    print_banner
+    echo -e " ${msg_info}  ${gray}Installing to: ${cyan}${install_dir}/"
 
-    #
     # Create the directory structure.
-    #
-    mkdir --parents "${INSTALL_DIR}/bin/" "${INSTALL_DIR}/certs/" "${INSTALL_DIR}/etc/" "${INSTALL_DIR}/logs/"
+    mkdir --parents "${install_dir}/bin/" "${install_dir}/certs/" "${install_dir}/etc/" "${install_dir}/logs/"
 
-    #
     # Copy the binary.
-    #
-    cp --force "${SOURCE_BIN}" "${TARGET_BIN}"
-    if [ $? -ne 0 ]; then
-        echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${SOURCE_BIN}' ${WHITE}to: ${YELLOW}'${TARGET_BIN}'${CLEAR}" >&2
+    if ! cp --force "${source_bin}" "${target_bin}"; then
+        echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}" >&2
         echo
         exit 1
     fi
 
-    #
     # Copy the configuration file, if it doesn't already exist.
-    #
-    if [ -f "${TARGET_CFG}" ]; then
+    if [[ -f "${target_cfg}" ]]; then
         # Don't copy anything. An existing configuration file already exists.
-        echo -e " ${DGRAY}-  ${LGRAY}Keeping existing configuration found at: ${CYAN}'${TARGET_CFG}'"
+        echo -e " ${msg_info}  ${gray}Keeping existing configuration found at: ${cyan}${target_cfg}"
     else
-        cp --force "${SOURCE_CFG}" "${TARGET_CFG}"
-        if [ $? -ne 0 ]; then
-            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to copy file: ${YELLOW}'${SOURCE_CFG}' ${WHITE}to: ${YELLOW}'${TARGET_CFG}'${CLEAR}" >&2
+        if ! cp --force "${source_cfg}" "${target_cfg}"; then
+            echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_cfg}' ${white}to: ${yellow}'${target_cfg}'${clear}" >&2
             echo
             exit 1
         fi
     fi
 
-    #
     # Create a new user for running the application.
-    #
-    if id "${USERNAME}" >/dev/null 2>&1; then
-        #
+    if id "${username}" >/dev/null 2>&1; then
         # User already exists.
-        #
-        echo -e " ${RED}-  ${LGRAY}User ${WHITE}'${USERNAME}' ${LGRAY}already exists. Skipping creation.${CLEAR}"
+        echo -e " ${msg_info}  ${gray}User ${white}'${username}' ${gray}already exists. Skipping creation.${clear}"
     else
-        #
         # Create the user.
-        #
-        echo -e " ${DGRAY}-  ${LGRAY}Creating user: ${CYAN}'${USERNAME}'${CLEAR}"
-        useradd --home-dir "${INSTALL_DIR}" --no-create-home --system --shell /usr/sbin/nologin --user-group "${USERNAME}"
-        if [ $? -ne 0 ]; then
-            echo -e "${DGRAY}[${RED}Error${DGRAY}] ${WHITE}Failed to create user: ${YELLOW}'${USERNAME}'${CLEAR}" >&2
+        echo -e " ${msg_info}  ${gray}Creating user: ${cyan}${username}${clear}"
+        if ! useradd --home-dir "${install_dir}" \
+                     --no-create-home \
+                     --system \
+                     --shell /usr/sbin/nologin \
+                     --user-group "${username}"; then
+            echo -e " ${msg_error} ${white}Failed to create user: ${yellow}${username}${clear}" >&2
             echo
             exit 1
         fi
     fi
 
-    #
     # Set file and directory permissions.
-    #
-    echo -e " ${DGRAY}-  ${LGRAY}Setting file and directory permissions.${CLEAR}"
-    chown --recursive "${USERNAME}":"${USERNAME}" "${INSTALL_DIR}"
-    chmod 755 "${TARGET_BIN}"
-    chmod 644 "${TARGET_CFG}"
+    echo -e " ${msg_info}  ${gray}Setting file and directory permissions.${clear}"
+    chown --recursive "${username}":"${username}" "${install_dir}"
+    chmod 755 "${target_bin}"
+    chmod 644 "${target_cfg}"
 
-    #
     # Allow the app to bind to a port < 1024 when running as a non-root user.
-    #
-    setcap cap_net_bind_service=+ep "${TARGET_BIN}"
+    setcap cap_net_bind_service=+ep "${target_bin}"
 
-    #
     # Create a systemd unit file.
-    #
-    echo -e " ${DGRAY}-  ${LGRAY}Creating service: ${CYAN}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
-    if [ ! -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]; then
-        cat > "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" << EOF
+    echo -e " ${msg_info}  ${gray}Creating service: ${cyan}${systemd_dir}/${systemd_unit}${clear}"
+    if [[ ! -f "${systemd_dir}/${systemd_unit}" ]]; then
+        cat > "${systemd_dir}/${systemd_unit}" << EOF
 [Unit]
 Description=Deceptifeed
-ConditionPathExists=${TARGET_BIN}
+ConditionPathExists=${target_bin}
 After=network.target
 
 [Service]
 Type=simple
-User=${USERNAME}
-Group=${USERNAME}
+User=${username}
+Group=${username}
 Restart=on-failure
 RestartSec=10
-ExecStart=${TARGET_BIN} -config ${TARGET_CFG}
+ExecStart=${target_bin} -config ${target_cfg}
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-        #
         # Reload systemd, enable, and start the service.
-        #
-        echo -e " ${DGRAY}-  ${LGRAY}Reloading systemd configuration.${CLEAR}"
         systemctl daemon-reload
-        echo -e " ${DGRAY}-  ${LGRAY}Configuring the service to start automatically.${CLEAR}"
-        systemctl enable "${SYSTEMD_UNIT}" &>/dev/null
-        echo -e " ${DGRAY}-  ${LGRAY}Starting the service.${CLEAR}"
-        systemctl start "${SYSTEMD_UNIT}"
+        systemctl enable "${systemd_unit}" &>/dev/null
+        systemctl start "${systemd_unit}"
     else
-        #
         # Service already exists. Restart it.
-        #
-        echo -e " ${RED}-  ${LGRAY}Service already exists. Skipping creation.${CLEAR}"
-        echo -e " ${DGRAY}-  ${LGRAY}Restarting the service.${CLEAR}"
-        systemctl restart "${SYSTEMD_UNIT}"
+        echo -e " ${msg_info}  ${gray}Restarting the service.${clear}"
+        systemctl restart "${systemd_unit}"
     fi
     echo
-    echo -e "${WHITE} Installation complete${BLUE}${CLEAR}"
-    echo -e "${DGRAY} =====================${CLEAR}"
+    echo -e " ${green}✓  ${white}Installation complete${clear}"
     echo
-    echo -e "${YELLOW} Check service status with: ${CYAN}systemctl status ${SERVICE_SHORT_NAME}${CLEAR}"
-    echo -e "${YELLOW}       Logs are located at: ${CYAN}${INSTALL_DIR}/logs/${CLEAR}"
-    echo -e "${YELLOW}  Configuration file is at: ${CYAN}${TARGET_CFG}${CLEAR}"
+    echo -e "${yellow} Check service status: ${cyan}systemctl status ${service_short_name}${clear}"
+    echo -e "${yellow}         Log location: ${cyan}${install_dir}/logs/${clear}"
+    echo -e "${yellow}   Configuration file: ${cyan}${target_cfg}${clear}"
     echo
     echo
 }
@@ -330,75 +288,61 @@ EOF
 #   3. Delete the installation directory.
 # =============================================================================
 uninstall_app() {
-    #
     # Print uninstall banner.
-    #
     echo
-    echo -e " ${WHITE}Uninstalling Deceptifeed${CLEAR}"
-    echo -e " ${DGRAY}========================${CLEAR}"
+    echo -e " ${white}Uninstalling Deceptifeed${clear}"
+    echo -e " ${dgray}========================${clear}"
     echo
 
-    #
     # If the service exists: stop, disable, delete the service, and run daemon-reload.
-    #
-    if [ -f "${SYSTEMD_DIR}/${SYSTEMD_UNIT}" ]; then
-        # Stop the service.
-        echo -e " ${DGRAY}-  ${LGRAY}Stopping service: ${CYAN}'${SYSTEMD_UNIT}'${CLEAR}"
-        systemctl stop "${SYSTEMD_UNIT}"
-        # Disable the service.
-        echo -e " ${DGRAY}-  ${LGRAY}Disabling service: ${CYAN}'${SYSTEMD_UNIT}'${CLEAR}"
-        systemctl disable "${SYSTEMD_UNIT}" &>/dev/null
-        # Delete the service.
-        echo -e " ${DGRAY}-  ${LGRAY}Deleting: ${CYAN}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
-        rm --force "${SYSTEMD_DIR}/${SYSTEMD_UNIT}"
-        # Reload systemd configuration.
-        echo -e " ${DGRAY}-  ${LGRAY}Reloading the systemd configuration.${CLEAR}"
+    if [[ -f "${systemd_dir}/${systemd_unit}" ]]; then
+        echo -e " ${msg_info}  ${gray}Stopping service: ${cyan}${systemd_unit}${clear}"
+        systemctl stop "${systemd_unit}"
+        echo -e " ${msg_info}  ${gray}Disabling service: ${cyan}${systemd_unit}${clear}"
+        systemctl disable "${systemd_unit}" &>/dev/null
+        echo -e " ${msg_info}  ${gray}Deleting: ${cyan}${systemd_dir}/${systemd_unit}${clear}"
+        rm --force "${systemd_dir}/${systemd_unit}"
+        echo -e " ${msg_info}  ${gray}Reloading the systemd configuration.${clear}"
         systemctl daemon-reload
     else
-        echo -e " ${RED}-  ${LGRAY}Service does not exist: ${WHITE}'${SYSTEMD_DIR}/${SYSTEMD_UNIT}'${CLEAR}"
-        echo -e "    ${LGRAY}Skipping systemd service cleanup."
+        echo -e " ${msg_info}  ${gray}Service does not exist: ${white}${systemd_dir}/${systemd_unit}${clear}"
+        echo -e " ${msg_info}  ${gray}Skipping systemd service cleanup."
     fi
 
-    #
     # Delete the user, if it exists.
-    #
-    if id "${USERNAME}" &> /dev/null; then
-        echo
-        echo -e "${YELLOW}Delete the user ${BLUE}'${USERNAME}' ${YELLOW}from your system? ${WHITE}(y/N) ${CLEAR}"
-        read -r CONFIRM
-        if [[ "${CONFIRM}" == "y" || "${CONFIRM}" == "Y" ]]; then
-            echo -e " ${DGRAY}-  ${LGRAY}Deleting user: ${CYAN}'${USERNAME}'${CLEAR}"
-            userdel "${USERNAME}"
-        fi
+    if id "${username}" &> /dev/null; then
+        echo -e " ${msg_info}  ${gray}Deleting user: ${cyan}${username}${clear}"
+        userdel "${username}"
     else
-        echo -e " ${RED}-  ${LGRAY}User ${WHITE}'${USERNAME}' ${LGRAY}does not exist. Skipping deletion."
+        echo -e " ${msg_info}  ${gray}User ${white}'${username}' ${gray}does not exist. Skipping deletion."
     fi
 
-    #
     # Delete the installation directory, if it exists.
-    #
-    if [ -d "${INSTALL_DIR}" ]; then
+    if [[ -d "${install_dir}" ]]; then
+        # Directory exists. Prompt for comfirmation to delete.
         echo
-        echo -e "${YELLOW}The installation directory may contain log files and configuration files."
-        echo -e "${YELLOW}Are you ready to delete ${BLUE}'${INSTALL_DIR}'${YELLOW}? ${WHITE}(y/N) ${CLEAR}"
-        read -r CONFIRM
-        if [[ "${CONFIRM}" == "y" || "${CONFIRM}" == "Y" ]]; then
-            echo -e " ${DGRAY}-  ${LGRAY}Deleting installation directory: ${CYAN}'${INSTALL_DIR}/'${CLEAR}"
-            rm --recursive --force "${INSTALL_DIR}"
+        echo -e " ${red}The installation directory may contain logs and configuration files."
+        echo -e " ${red}Are you ready to delete ${blue}'${install_dir}'${red}?${clear}"
+        echo -en " ${gray}(${white}yes${gray}/${white}no${gray}) ${gray}[${yellow}no${gray}]${white}: ${green}"
+        read -r response
+        echo -en "${clear}"
+        if [[ "${response}" =~ ^[yY][eE][sS]$ || "${response}" =~ ^[yY]$ ]]; then
+            # Confirmed. Delete directory.
+            echo
+            echo -e " ${msg_info}  ${gray}Deleting installation directory: ${cyan}${install_dir}/${clear}"
+            rm --recursive --force "${install_dir}"
+        else
+            # Skip deleteion.
+            echo
+            echo -e " ${msg_info}  ${gray}Skipping deletion.${clear}"
         fi
     else
-        echo -e " ${RED}-  ${LGRAY}Directory ${WHITE}'${INSTALL_DIR}/' ${LGRAY}does not exist. Skipping deletion."
+        echo -e " ${msg_info}  ${gray}Directory ${white}'${install_dir}/' ${gray}does not exist. Skipping deletion."
     fi
 
-    #
     # Uninstall complete.
-    #
     echo
-    echo -e " ${WHITE}Uninstallation complete${CLEAR}"
-    echo -e " ${DGRAY}=======================${CLEAR}"
-    echo
-    echo -e " ${GREEN}Success${CLEAR}"
-    echo -e " ${LGRAY}Deceptifeed uninstallation is complete.${CLEAR}"
+    echo -e " ${green}✓  ${white}Uninstallation complete${clear}"
     echo
     echo
 }
