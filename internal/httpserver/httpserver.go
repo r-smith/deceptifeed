@@ -9,6 +9,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
+	"log"
 	"log/slog"
 	"math/big"
 	"net"
@@ -48,8 +50,9 @@ func StartHTTPS(srv *config.Server) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(srv, headers))
 	server := &http.Server{
-		Addr:    ":" + srv.Port,
-		Handler: mux,
+		Addr:     ":" + srv.Port,
+		Handler:  mux,
+		ErrorLog: log.New(io.Discard, "", log.LstdFlags),
 	}
 
 	// If the cert and key aren't found, generate a self-signed certificate.
