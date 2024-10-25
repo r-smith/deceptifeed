@@ -50,8 +50,8 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 
 	// Setup handlers.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection)
-	mux.HandleFunc("/empty/", serveEmpty)
+	mux.HandleFunc("/", enforcePrivateIP(handleConnection))
+	mux.HandleFunc("/empty/", enforcePrivateIP(serveEmpty))
 
 	// Start the threat feed HTTP server.
 	fmt.Printf("Starting Threat Feed server on port: %s\n", cfg.Port)
@@ -127,6 +127,26 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, "Falled to write response", http.StatusInternalServerError)
 		}
+	}
+}
+
+// enforcePrivateIP is a middleware that restricts access to the HTTP server
+// based on the client's IP address. It allows only requests from private IP
+// addresses. Any other requests are denied with a 403 Forbidden error.
+func enforcePrivateIP(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			http.Error(w, "Could not get IP", http.StatusInternalServerError)
+			return
+		}
+
+		if !net.ParseIP(ip).IsPrivate() {
+			http.Error(w, "", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	}
 }
 
