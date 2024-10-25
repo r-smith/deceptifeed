@@ -182,6 +182,9 @@ func writePrivateKey(path string, privateKey *rsa.PrivateKey) error {
 	}
 	defer file.Close()
 
+	// Limit key access to the owner only.
+	file.Chmod(0600)
+
 	if err := pem.Encode(file, privPem); err != nil {
 		return err
 	}

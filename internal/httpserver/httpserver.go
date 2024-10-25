@@ -300,6 +300,9 @@ func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath s
 	}
 	defer keyFile.Close()
 
+	// Limit key access to the owner only.
+	keyFile.Chmod(0600)
+
 	if err := pem.Encode(keyFile, key); err != nil {
 		return err
 	}

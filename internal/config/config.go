@@ -166,7 +166,7 @@ func (c *Config) InitializeLoggers() error {
 		}
 
 		// Open the specified log file and create a new logger.
-		logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0664)
+		logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}
