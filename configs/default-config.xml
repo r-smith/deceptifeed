@@ -33,7 +33,7 @@
   <threatFeed>
     <enabled>true</enabled>
     <port>8081</port>
-    <databasePath>/opt/deceptifeed/logs/threatfeed.json</databasePath>
+    <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
     <threatExpiryHours>168</threatExpiryHours>
     <isPrivateIncluded>false</isPrivateIncluded>
   </threatFeed>

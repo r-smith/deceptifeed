@@ -19,7 +19,7 @@ const (
 	DefaultPortSSH              = "2022"
 	DefaultPortThreatFeed       = "8081"
 	DefaultThreatExpiryHours    = 168
-	DefaultThreatDatabasePath   = "deceptifeed-database.json"
+	DefaultThreatDatabasePath   = "deceptifeed-database.csv"
 	DefaultThreatIncludePrivate = true
 	DefaultLogPath              = "deceptifeed-log.txt"
 	DefaultHtmlPath             = ""

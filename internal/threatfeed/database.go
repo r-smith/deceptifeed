@@ -1,36 +1,32 @@
 package threatfeed
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/csv"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
 // IoC represents an Indicator of Compromise (IoC) entry in the threat feed
-// database. The database is formatted as JSON, where each IP address serves as
-// a key. Each IP entry includes the date the IP was last seen.
-//
-// Example database:
-//
-// {
-// "127.0.14.54":
-// {
-// "last_seen": "2024-10-16T08:07:17.6370403-00:00"
-// },
-// "127.19.201.8":
-// {
-// "last_seen": "2024-10-16T05:57:37.646377358-00:00"
-// }
-// }
+// database. The database is in CSV format, with each row containing an IP
+// address and its associated IoC data.
 type IoC struct {
-	LastSeen time.Time `json:"last_seen"`
+	LastSeen time.Time
 }
 
-// loadIoC reads IoC data from an existing JSON database. If found, it
+const (
+	// csvHeader defines the header row for the threat feed database.
+	csvHeader = "ip,last_seen"
+
+	// dateFormat specifies the timestamp format used for CSV data.
+	dateFormat = time.RFC3339
+)
+
+// loadIoC reads IoC data from an existing CSV database. If found, it
 // populates iocMap. This function is called once during the initialization of
 // the threat feed server.
 func loadIoC() error {
@@ -43,15 +39,24 @@ func loadIoC() error {
 	}
 	defer file.Close()
 
-	jsonBytes, err := io.ReadAll(file)
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
 	if err != nil {
 		return err
 	}
-	if len(jsonBytes) == 0 {
+	if len(records) < 2 {
 		return nil
 	}
 
-	return json.Unmarshal(jsonBytes, &iocMap)
+	var lastSeen time.Time
+	for _, record := range records[1:] {
+		ip := record[0]
+		if len(record) > 1 && record[1] != "" {
+			lastSeen, _ = time.Parse(dateFormat, record[1])
+		}
+		iocMap[ip] = &IoC{LastSeen: lastSeen}
+	}
+	return nil
 }
 
 // UpdateIoC updates the IoC map. This function is called by honeypot servers
@@ -85,7 +90,7 @@ func UpdateIoC(ip string) {
 	// Remove expired entries from iocMap.
 	removeExpired()
 
-	// Write the updated map back to the JSON file.
+	// Write the updated map back to the CSV file.
 	if err := saveIoC(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error saving Threat Feed database:", err)
 	}
@@ -116,18 +121,17 @@ func removeExpired() {
 	}
 }
 
-// saveIoC writes the current IoC map to the JSON file. This function is called
-// after modifications to the IoC map. The file ensures the threat feed
-// database persists across server restarts. This function should be called
-// exclusively by UpdateIoC, which manages the mutex lock.
+// saveIoC writes the current IoC map to a CSV file, ensuring the threat feed
+// database persists across application restarts. It should only be called by
+// UpdateIoC, which manages the mutex lock.
 func saveIoC() error {
-	file, err := os.Create(configuration.DatabasePath)
-	if err != nil {
-		return err
+	buf := new(bytes.Buffer)
+	writer := csv.NewWriter(buf)
+	writer.Write(strings.Split(csvHeader, ","))
+	for ip, ioc := range iocMap {
+		writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat)})
 	}
-	defer file.Close()
+	writer.Flush()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(iocMap)
+	return os.WriteFile(configuration.DatabasePath, buf.Bytes(), 0644)
 }
