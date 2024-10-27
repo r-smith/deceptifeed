@@ -136,7 +136,7 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 
 		// Update the threat feed with the source IP address from the request.
 		if srv.SendToThreatFeed {
-			threatfeed.UpdateIoC(src_ip)
+			threatfeed.UpdateIoC(src_ip, srv.ConfidenceLevel)
 		}
 
 		// If custom headers are provided, add each header and its value to the

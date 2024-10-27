@@ -125,7 +125,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 
 	// Update the threat feed with the source IP address from the interaction.
 	if srv.SendToThreatFeed {
-		threatfeed.UpdateIoC(src_ip)
+		threatfeed.UpdateIoC(src_ip, srv.ConfidenceLevel)
 	}
 }
 

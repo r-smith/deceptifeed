@@ -77,7 +77,7 @@ func startSSH(srv *config.Server) error {
 
 		// Update the threat feed with the source IP address from the request.
 		if srv.SendToThreatFeed {
-			threatfeed.UpdateIoC(src_ip)
+			threatfeed.UpdateIoC(src_ip, srv.ConfidenceLevel)
 		}
 
 		// Return an invalid username or password error to the client.

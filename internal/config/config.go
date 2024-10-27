@@ -89,6 +89,7 @@ type Server struct {
 	Banner           string     `xml:"banner"`
 	Prompts          []Prompt   `xml:"prompt"`
 	SendToThreatFeed bool       `xml:"sendToThreatFeed"`
+	ConfidenceLevel  int        `xml:"confidenceLevel"`
 	LogPath          string     `xml:"logPath"`
 	LogEnabled       bool       `xml:"logEnabled"`
 	LogFile          *os.File
@@ -136,6 +137,13 @@ func Load(filename string) (*Config, error) {
 	err = xml.Unmarshal(xmlBytes, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode XML file: %w", err)
+	}
+
+	// Ensure a minimum confidence level of 1.
+	for i := range config.Servers {
+		if config.Servers[i].ConfidenceLevel < 1 {
+			config.Servers[i].ConfidenceLevel = 1
+		}
 	}
 
 	return &config, nil
