@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
 
-  <defaultLogPath>/opt/deceptifeed/logs/honeypot-log.txt</defaultLogPath>
+  <defaultLogPath>/opt/deceptifeed/logs/honeypot.log</defaultLogPath>
 
   <honeypotServers>
     <server type="http">
