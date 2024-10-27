@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/csv"
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -60,8 +59,7 @@ func loadIoC() error {
 }
 
 // UpdateIoC updates the IoC map. This function is called by honeypot servers
-// each time a client interacts with the honeypot. The modified IoC map is then
-// saved back to the JSON database.
+// each time a client interacts with the honeypot.
 func UpdateIoC(ip string) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -77,6 +75,7 @@ func UpdateIoC(ip string) {
 	}
 
 	now := time.Now()
+	hasMapChanged = true
 	if ioc, exists := iocMap[ip]; exists {
 		// Update existing entry.
 		ioc.LastSeen = now
@@ -89,11 +88,6 @@ func UpdateIoC(ip string) {
 
 	// Remove expired entries from iocMap.
 	removeExpired()
-
-	// Write the updated map back to the CSV file.
-	if err := saveIoC(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error saving Threat Feed database:", err)
-	}
 }
 
 // removeExpired checks the IoC map for entries that have expired based on
@@ -122,9 +116,11 @@ func removeExpired() {
 }
 
 // saveIoC writes the current IoC map to a CSV file, ensuring the threat feed
-// database persists across application restarts. It should only be called by
-// UpdateIoC, which manages the mutex lock.
+// database persists across application restarts.
 func saveIoC() error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
 	writer.Write(strings.Split(csvHeader, ","))
@@ -133,5 +129,8 @@ func saveIoC() error {
 	}
 	writer.Flush()
 
-	return os.WriteFile(configuration.DatabasePath, buf.Bytes(), 0644)
+	if err := os.WriteFile(configuration.DatabasePath, buf.Bytes(), 0644); err != nil {
+		return err
+	}
+	return nil
 }

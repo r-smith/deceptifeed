@@ -16,9 +16,14 @@ import (
 )
 
 var (
+	// configuration holds the global configuration for the threat feed server.
+	// This variable is assigned the config.ThreatFeed value that's passed in
+	// during the server's startup.
+	configuration config.ThreatFeed
+
 	// iocMap stores the Indicator of Compromise (IoC) entries which makes up
 	// the threat feed database. It is initially populated by loadIoC if an
-	// existing JSON database file is provided. The map is subsequently updated
+	// existing CSV database file is provided. The map is subsequently updated
 	// by UpdateIoC whenever a client interacts with a honeypot server. This
 	// map is accessed and served by the threat feed HTTP server.
 	iocMap = make(map[string]*IoC)
@@ -26,10 +31,13 @@ var (
 	// mutex is to ensure thread-safe access to iocMap.
 	mutex sync.Mutex
 
-	// configuration holds the global configuration for the threat feed server.
-	// This variable is assigned the config.ThreatFeed value that's passed in
-	// during the server's startup.
-	configuration config.ThreatFeed
+	// ticker creates a new ticker for periodically writing the IoC map to
+	// disk.
+	ticker = time.NewTicker(10 * time.Second)
+
+	// hasMapChanged indicates whether the IoC map has been modified since the
+	// last time it was saved to disk.
+	hasMapChanged = false
 )
 
 // StartThreatFeed initializes and starts the threat feed server. The server
@@ -41,12 +49,24 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	// variable.
 	configuration = *cfg
 
-	// Check for and open an existing threat feed JSON database, if available.
+	// Check for and open an existing threat feed CSV database, if available.
 	err := loadIoC()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has terminated: Failed to open Threat Feed database:", err)
 		return
 	}
+
+	// Periodically save the current iocMap to disk.
+	go func() {
+		for range ticker.C {
+			if hasMapChanged {
+				if err := saveIoC(); err != nil {
+					fmt.Fprintln(os.Stderr, "Error saving Threat Feed database:", err)
+				}
+				hasMapChanged = false
+			}
+		}
+	}()
 
 	// Setup handlers.
 	mux := http.NewServeMux()
