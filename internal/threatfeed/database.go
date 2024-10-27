@@ -12,25 +12,21 @@ import (
 
 // IoC represents an Indicator of Compromise (IoC) entry in the threat feed
 // database. The database is formatted as JSON, where each IP address serves as
-// a key. Each IP entry includes the date the IP was added and the date it was
-// last seen.
+// a key. Each IP entry includes the date the IP was last seen.
 //
 // Example database:
 //
 // {
 // "127.0.14.54":
 // {
-// "added": "2024-10-13T17:35:04.8199165-00:00",
 // "last_seen": "2024-10-16T08:07:17.6370403-00:00"
 // },
 // "127.19.201.8":
 // {
-// "added": "2024-10-16T04:27:58.301360933-00:00",
 // "last_seen": "2024-10-16T05:57:37.646377358-00:00"
 // }
 // }
 type IoC struct {
-	Added    time.Time `json:"added"`
 	LastSeen time.Time `json:"last_seen"`
 }
 
@@ -82,7 +78,6 @@ func UpdateIoC(ip string) {
 	} else {
 		// Create a new entry.
 		iocMap[ip] = &IoC{
-			Added:    now,
 			LastSeen: now,
 		}
 	}
