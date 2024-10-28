@@ -20,15 +20,15 @@ type IoC struct {
 	// honeypot server.
 	LastSeen time.Time
 
-	// ConfidenceLevel represents a score for a given IP address. It is
-	// incremented based on the configured confidence level of the honeypot
-	// server that the IP interacted with.
-	ConfidenceLevel int
+	// ThreatScore represents a score for a given IP address. It is incremented
+	// based on the configured threat score of the honeypot server that the IP
+	// interacted with.
+	ThreatScore int
 }
 
 const (
 	// csvHeader defines the header row for the threat feed database.
-	csvHeader = "ip,last_seen,confidence_level"
+	csvHeader = "ip,last_seen,threat_score"
 
 	// dateFormat specifies the timestamp format used for CSV data.
 	dateFormat = time.RFC3339
@@ -58,7 +58,7 @@ func loadIoC() error {
 	}
 
 	var lastSeen time.Time
-	var confLevel int
+	var threatScore int
 	for _, record := range records[1:] {
 		ip := record[0]
 
@@ -67,22 +67,22 @@ func loadIoC() error {
 			lastSeen, _ = time.Parse(dateFormat, record[1])
 		}
 
-		// Parse confidence level, defaulting to 1.
-		confLevel = 1
+		// Parse threat score, defaulting to 1.
+		threatScore = 1
 		if len(record) > 2 && record[2] != "" {
 			if parsedLevel, err := strconv.Atoi(record[2]); err == nil {
-				confLevel = parsedLevel
+				threatScore = parsedLevel
 			}
 		}
 
-		iocMap[ip] = &IoC{LastSeen: lastSeen, ConfidenceLevel: confLevel}
+		iocMap[ip] = &IoC{LastSeen: lastSeen, ThreatScore: threatScore}
 	}
 	return nil
 }
 
 // UpdateIoC updates the IoC map. This function is called by honeypot servers
 // each time a client interacts with the honeypot.
-func UpdateIoC(ip string, confLevel int) {
+func UpdateIoC(ip string, threatScore int) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -101,14 +101,14 @@ func UpdateIoC(ip string, confLevel int) {
 	if ioc, exists := iocMap[ip]; exists {
 		// Update existing entry.
 		ioc.LastSeen = now
-		if ioc.ConfidenceLevel+confLevel <= math.MaxInt {
-			ioc.ConfidenceLevel += confLevel
+		if ioc.ThreatScore+threatScore <= math.MaxInt {
+			ioc.ThreatScore += threatScore
 		}
 	} else {
 		// Create a new entry.
 		iocMap[ip] = &IoC{
-			LastSeen:        now,
-			ConfidenceLevel: confLevel,
+			LastSeen:    now,
+			ThreatScore: threatScore,
 		}
 	}
 
@@ -151,7 +151,7 @@ func saveIoC() error {
 	writer := csv.NewWriter(buf)
 	writer.Write(strings.Split(csvHeader, ","))
 	for ip, ioc := range iocMap {
-		writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat), strconv.Itoa(ioc.ConfidenceLevel)})
+		writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat), strconv.Itoa(ioc.ThreatScore)})
 	}
 	writer.Flush()
 
