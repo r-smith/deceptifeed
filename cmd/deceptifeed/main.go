@@ -45,17 +45,21 @@ func main() {
 	// ignored. The 'cfg' variable will contain all settings parsed from the
 	// configuration file.
 	if *configFile != "" {
+		// Load the specified config file.
 		cfgFromFile, err := config.Load(*configFile)
 		if err != nil {
 			log.Fatalln("Failed to load config:", err)
 		}
 		cfg = *cfgFromFile
 	} else {
+		// No config file. Use command line args.
 		https.HtmlPath = http.HtmlPath
 		cfg.Servers = append(cfg.Servers, http, https, ssh)
+		// Set defaults.
 		for i := range cfg.Servers {
 			cfg.Servers[i].LogEnabled = true
 			cfg.Servers[i].SendToThreatFeed = true
+			cfg.Servers[i].ConfidenceLevel = 1
 		}
 	}
 
