@@ -68,7 +68,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Present the prompts from the server configuration to the connected
 	// client and record their responses.
 	scanner := bufio.NewScanner(conn)
-	answers := make(map[string]string)
+	responses := make(map[string]string)
 	for i, prompt := range srv.Prompts {
 		conn.Write([]byte(strings.ReplaceAll(prompt.Text, "\\n", "\r\n")))
 		scanner.Scan()
@@ -76,28 +76,28 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 		// Each prompt includes an optional Log field that serves as the key
 		// for logging. If Log is set to "none", the prompt is displayed, but
 		// the response will not be logged. If Log is omitted, the default key
-		// "answer00" is used, where "00" is the index plus one.
+		// "data00" is used, where "00" is the index plus one.
 		if prompt.Log == "none" {
 			// Skip logging for this entry.
 			continue
 		} else if len(prompt.Log) > 0 {
 			key = prompt.Log
 		} else {
-			key = fmt.Sprintf("answer%02d", i+1)
+			key = fmt.Sprintf("data%02d", i+1)
 		}
-		answers[key] = scanner.Text()
+		responses[key] = scanner.Text()
 	}
 
 	// If no prompts are provided in the configuration, wait for the client to
 	// send data then record the received input.
 	if len(srv.Prompts) == 0 {
 		scanner.Scan()
-		answers["data"] = scanner.Text()
+		responses["data"] = scanner.Text()
 	}
 
 	// Check if the client sent any data. If not, exit without logging.
 	didProvideData := false
-	for _, v := range answers {
+	for _, v := range responses {
 		if len(v) > 0 {
 			didProvideData = true
 			break
@@ -117,11 +117,11 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 		slog.String("server_ip", dst_ip),
 		slog.String("server_port", dst_port),
 		slog.String("server_name", config.GetHostname()),
-		slog.Any("event_details", answers),
+		slog.Any("event_details", responses),
 	)
 
 	// Print a simplified version of the interaction to the console.
-	fmt.Printf("[TCP] %s %v\n", src_ip, answersToString(answers))
+	fmt.Printf("[TCP] %s %v\n", src_ip, responsesToString(responses))
 
 	// Update the threat feed with the source IP address from the interaction.
 	if srv.SendToThreatFeed {
@@ -129,24 +129,24 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	}
 }
 
-// answersToString converts a map of responses from custom prompts into a
+// responsesToString converts a map of responses from custom prompts into a
 // single string formatted as "key:value key:value ...". Each key-value pair
 // represents a prompt and its corresponding response.
-func answersToString(answers map[string]string) string {
-	var keys, simpleAnswers []string
+func responsesToString(responses map[string]string) string {
+	var keys, result []string
 
 	// Collect and sort the keys.
-	for key := range answers {
+	for key := range responses {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
 	// For each key-value pair, convert to the string "key:value".
 	for _, key := range keys {
-		simpleAnswers = append(simpleAnswers, fmt.Sprintf("%s:%s", key, answers[key]))
+		result = append(result, fmt.Sprintf("%s:%s", key, responses[key]))
 	}
 
-	// Combine all the answers into a single string. For example, the result
+	// Combine the responses into a single string. For example, the result
 	// would be formatted as: "key01:value key02:value key03:value".
-	return strings.Join(simpleAnswers, " ")
+	return strings.Join(result, " ")
 }
