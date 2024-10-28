@@ -9,6 +9,7 @@
       <port>8080</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
     </server>
 
     <server type="https">
@@ -16,6 +17,7 @@
       <port>8443</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
       <certPath>/opt/deceptifeed/certs/https-cert.pem</certPath>
       <keyPath>/opt/deceptifeed/certs/https-key.pem</keyPath>
     </server>
@@ -25,6 +27,7 @@
       <port>2022</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
       <keyPath>/opt/deceptifeed/certs/ssh-key.pem</keyPath>
       <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
     </server>
@@ -35,6 +38,7 @@
     <port>8081</port>
     <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
     <threatExpiryHours>168</threatExpiryHours>
+    <minimumThreatScore>0</minimumThreatScore>
     <isPrivateIncluded>false</isPrivateIncluded>
   </threatFeed>
 
