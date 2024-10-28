@@ -92,10 +92,10 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	expiryTime := now.Add(-time.Hour * time.Duration(configuration.ExpiryHours))
 
 	// Parse IPs from the iocMap to net.IP for filtering and sorting. Skip any
-	// IPs that have expired.
+	// IPs that have expired or don't meet the minimum threat score.
 	var netIPs []net.IP
 	for ip, ioc := range iocMap {
-		if ioc.LastSeen.After(expiryTime) {
+		if ioc.LastSeen.After(expiryTime) && ioc.ThreatScore >= configuration.MinimumThreatScore {
 			netIPs = append(netIPs, net.ParseIP(ip))
 		}
 	}
