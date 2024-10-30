@@ -1,6 +1,6 @@
 ## Deceptifeed
 
-Deceptifeed is a network defense tool that creates fake network services, or **honeypots**, to detect potential threats. It also provides a real-time **threat feed** that integrates with most enterprise firewalls. This feed lists the IP addresses that accessed your honeypots, allowing firewalls to automatically block them from reaching your legitimate services.
+`Deceptifeed` is a network defense tool that creates fake network services, or **honeypots**, to detect potential threats. It also provides a real-time **threat feed** that integrates with most enterprise firewalls. This feed lists the IP addresses that accessed your honeypots, allowing firewalls to automatically block them from reaching your legitimate services.
 
 Unlike conventional honeypots that provide attackers with rich simulated environments, Deceptifeed is intentionally minimal. Simply the act of interacting with a fake service on your network is reason to trigger a defensive response. The integrated threat feed enables immediate action without needing a SIEM or additional tools.
 
@@ -27,7 +27,7 @@ sudo ./install.sh
 
 ### Option 2: Build from source
 
-Go version 1.22+ is required to build from source.
+**Go** version **1.22+** is required to build from source.
 
 ```shell
 # Clone the repository.
@@ -42,14 +42,14 @@ make
 sudo make install
 ```
 
-## Getting started
+## Usage
 
 ### Option 1: Use the installation script
 
 If you're on a supported system, run `install.sh` or `make install`, as described in the previous section.
 
-- Deceptifeed is set up to run as a background service. Use `sudo systemctl status deceptifeed` to check its status.
-- To change the configuration, edit `/opt/deceptifeed/etc/config.xml`, then restart the service using `sudo systemctl restart deceptifeed`.
+- Deceptifeed runs as a background service. Use `sudo systemctl status deceptifeed` to check its status.
+- To modify the configuration, edit `/opt/deceptifeed/etc/config.xml`, then restart the service with `sudo systemctl restart deceptifeed`.
 
 ```
 /opt/deceptifeed/
@@ -68,7 +68,17 @@ If you're on a supported system, run `install.sh` or `make install`, as describe
 
 ### Option 2: Run directly
 
-You can run Deceptifeed directly. Use `deceptifeed -help` to view the command line options. By default, Deceptifeed starts an SSH server on port 2022, an HTTP server on port 8080, an HTTPS server on port 8443, and a threat feed server on port 8081. Logs are saved to `deceptifeed-log.txt` and the threat feed database is saved to `deceptifeed-database.csv`.
+You can run Deceptifeed directly without installation.
+
+- Use `deceptifeed -help` to view the command-line options.
+- By default, Deceptifeed starts the following network services:
+  - SSH honeypot server on port 2022
+  - HTTP honeypot server on port 8080
+  - HTTPS honeypot server on port 8443
+  - Threat feed server on port 8081
+- Logs are saved to `deceptifeed-log.txt`.
+- The threat feed database is saved to `deceptifeed-database.csv`.
+- Certificates and keys are generated and saved as `deceptifeed-*.crt` and `deceptifeed-*.key`.
 
 ```shell
 $ ./deceptifeed
@@ -144,7 +154,7 @@ The SSH honeypot server responds to SSH authentication requests. Each attempt is
   "source_port": "48212",
   "server_ip": "192.168.0.15",
   "server_port": "22",
-  "server_name": "honeypot02",
+  "server_name": "honeypot01",
   "event_details": {
     "username": "root",
     "password": "Password1",
@@ -234,52 +244,50 @@ Due to the connectionless nature of UDP and the possibility of spoofed source in
 ```
 
 
-## Configuration
+## Upgrading
 
-> [!NOTE]
-> If you installed Deceptifeed using the installation script, your configuration file is at `/opt/deceptifeed/etc/config.xml`. After making changes, restart the service with `sudo systemctl restart deceptifeed`, and verify it started using `systemctl status deceptifeed`.
->
-> If running Deceptifeed directly, use the `-config` option to specify a configuration file: `./deceptifeed -config myconfig.xml`. A configuration file isn't required, but it helps maintain a persistent setup.
+To upgrade Deceptifeed, follow the same steps you used for installation:
 
-### XML configuration file
+#### If you installed from the binary:
 
-View the default configuration file [here](https://github.com/r-smith/deceptifeed/blob/main/configs/default-config.xml). Below is the basic structure:
+1. Download the latest package from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
+2. If you originally installed using the installation script, extract the latest package and re-run `install.sh`.
+3. If you did not use the installation script, simply replace the existing `deceptifeed` binary with the new version.
 
-```xml
-<config>
+#### If you installed from source:
 
-  <!--
-  The defaultLogPath specifies the location where your honeypot logs are
-  stored. Each honeypot server can use a different log file if desired;
-  otherwise, they'll default to this path.
-  -->
-  <defaultLogPath>/opt/deceptifeed/logs/honeypot.log</defaultLogPath>
+```shell
+# Navigate to the directory where you cloned the `deceptifeed` repository:
+cd #/path/to/deceptifeed/repository
 
-  <!--
-  The honeypotServers section contains all the honeypot servers you want to
-  run. Define servers by adding any number of <server> elements within this
-  section.
-  -->
-  <honeypotServers>
+# Update your local repository:
+git pull origin main
 
-    <!-- This defines an SSH honeypot server. -->
-    <server type="ssh">
-      <!-- Place the server settings here. -->
-    </server>
+# Compile the code:
+make
 
-    <!-- This defines an HTTP honeypot server. -->
-    <server type="http">
-      <!-- Place the server settings here. -->
-    </server>
-  </honeypotServers>
-
-  <!--
-  The threatFeed section is where you configure the threat feed server.
-  -->
-  <threatFeed>
-    <!-- Place the threat feed settings here. -->
-  </threatFeed>
-
-</config>
+# Install the updated version:
+sudo make install
 ```
 
+
+## Uninstalling
+
+#### If you installed from the binary:
+
+- If you used the installation script, re-run it with the `--uninstall` option.
+```shell
+sudo ./install.sh --uninstall
+```
+
+- If you did not use the installation script, simply delete the `deceptifeed` binary and any generated files. When running the binary directly, any generated files will be named `deceptifeed-*` in the same directory where you ran the `deceptifeed` binary.
+
+#### If you installed from source:
+
+```shell
+# Navigate to the directory where you cloned the `deceptifeed` repository:
+cd #/path/to/deceptifeed/repository
+
+# Uninstall Deceptifeed:
+sudo make uninstall
+```
