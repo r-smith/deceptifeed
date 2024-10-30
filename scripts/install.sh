@@ -14,6 +14,7 @@ systemd_check_dir="/run/systemd/system"
 systemd_dir="/etc/systemd/system"
 service_short_name="deceptifeed"
 systemd_unit="${service_short_name}.service"
+auto_confirm_prompts=false
 
 # =============================================================================
 # startup_checks:
@@ -24,10 +25,8 @@ systemd_unit="${service_short_name}.service"
 startup_checks() {
     # If supported, enable colored output.
     if [[ -t 1 ]]; then
-        # Detect color support.
         n_colors=$(tput colors 2>/dev/null)
         if [[ -n "${n_colors}" ]] && [[ "${n_colors}" -ge 8 ]]; then
-            # Color support detected. Enable colored output.
             red='\033[1;31m'
             green='\033[1;32m'
             yellow='\033[1;33m'
@@ -42,7 +41,7 @@ startup_checks() {
         fi
     fi
 
-    # Output aids.
+    # Output helper messages.
     msg_error="${dgray}[${red}Error${dgray}]${clear}"
     msg_info="${dgray}${magenta}‣${dgray}${clear}"
 
@@ -52,7 +51,7 @@ startup_checks() {
         exit 1
     fi
 
-    # Ensure the script is running as root.
+    # Require root privileges.
     if [[ "$(id --user)" -ne 0 ]]; then
         echo -e "\n${msg_error} ${white}This script must be run as root.${clear}\n" >&2
         exit 1
@@ -70,8 +69,7 @@ print_banner() {
     echo -e "${yellow}  / /_/ /  __/ /__/  __/ /_/ / /_/ /${green} __/ /  __/  __/ /_/ /  "
     echo -e "${yellow}  \____/\___/\___/\___/ .___/\__/_/${green}_/    \___/\___/\____/   "
     echo -e "${dmagenta} ::::::::::::::::::::${yellow}/_/${dmagenta}::::::::::::::::::::::::::::::::::"
-    echo -e "${clear}"
-    echo
+    echo -e "${clear}\n"
 }
 
 # =============================================================================
@@ -90,13 +88,15 @@ upgrade_app() {
     echo -e " ${red}Deceptifeed is already installed to${gray}: ${blue}${install_dir}/${clear}"
     echo -e " ${red}Would you like to upgrade?${clear}"
     echo -en " ${gray}(${white}yes${gray}/${white}no${gray}) ${gray}[${yellow}no${gray}]${white}: ${green}"
-    read -r response
+    if [[ "${auto_confirm_prompts}" = true ]]; then
+        echo "yes"
+        response="yes"
+    else
+        read -r response
+    fi
     echo -en "${clear}"
     if [[ ! "${response}" =~ ^[yY][eE][sS]$ && ! "${response}" =~ ^[yY]$ ]]; then
-        echo
-        echo -e " ${white}Upgrade canceled${clear}"
-        echo
-        echo
+        echo -e "\n ${white}Upgrade canceled${clear}\n\n"
         exit 0
     fi
 
@@ -110,8 +110,7 @@ upgrade_app() {
     # Copy the binary.
     echo -e " ${msg_info}  ${gray}Replacing binary: ${cyan}${target_bin}${clear}"
     if ! cp --force "${source_bin}" "${target_bin}"; then
-        echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}" >&2
-        echo
+        echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}\n" >&2
         exit 1
     fi
 
@@ -128,13 +127,10 @@ upgrade_app() {
 
     # Upgrade complete.
     echo
-    echo -e " ${green}✓  ${white}Upgrade complete${clear}"
-    echo
+    echo -e " ${green}✓  ${white}Upgrade complete${clear}\n"
     echo -e "${yellow} Check service status: ${cyan}systemctl status ${service_short_name}${clear}"
     echo -e "${yellow}         Log location: ${cyan}${install_dir}/logs/${clear}"
-    echo -e "${yellow}   Configuration file: ${cyan}${target_cfg}${clear}"
-    echo
-    echo
+    echo -e "${yellow}   Configuration file: ${cyan}${target_cfg}${clear}\n\n"
 }
 
 # =============================================================================
@@ -161,8 +157,7 @@ install_app() {
         source_bin="${script_dir}/../out/${source_bin}"
     else
         # Could not locate.
-        echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_bin}'${clear}" >&2
-        echo
+        echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_bin}'${clear}\n" >&2
         exit 1
     fi
 
@@ -175,14 +170,12 @@ install_app() {
         source_cfg="${script_dir}/../configs/${source_cfg}"
     else
         # Could not locate.
-        echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_cfg}'${clear}" >&2
-        echo
+        echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_cfg}'${clear}\n" >&2
         exit 1
     fi
 
     # Upgrade check.
     if [[ -f "${target_bin}" && -f "${systemd_dir}/${systemd_unit}" ]]; then
-        # Call the upgrade function.
         upgrade_app
         exit 0
     fi
@@ -196,8 +189,7 @@ install_app() {
 
     # Copy the binary.
     if ! cp --force "${source_bin}" "${target_bin}"; then
-        echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}" >&2
-        echo
+        echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}\n" >&2
         exit 1
     fi
 
@@ -207,8 +199,7 @@ install_app() {
         echo -e " ${msg_info}  ${gray}Keeping existing configuration found at: ${cyan}${target_cfg}"
     else
         if ! cp --force "${source_cfg}" "${target_cfg}"; then
-            echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_cfg}' ${white}to: ${yellow}'${target_cfg}'${clear}" >&2
-            echo
+            echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_cfg}' ${white}to: ${yellow}'${target_cfg}'${clear}\n" >&2
             exit 1
         fi
     fi
@@ -225,8 +216,7 @@ install_app() {
                      --system \
                      --shell /usr/sbin/nologin \
                      --user-group "${username}"; then
-            echo -e " ${msg_error} ${white}Failed to create user: ${yellow}${username}${clear}" >&2
-            echo
+            echo -e " ${msg_error} ${white}Failed to create user: ${yellow}${username}${clear}\n" >&2
             exit 1
         fi
     fi
@@ -242,8 +232,7 @@ install_app() {
 
     # Create a systemd unit file.
     echo -e " ${msg_info}  ${gray}Creating service: ${cyan}${systemd_dir}/${systemd_unit}${clear}"
-    if [[ ! -f "${systemd_dir}/${systemd_unit}" ]]; then
-        cat > "${systemd_dir}/${systemd_unit}" << EOF
+    cat > "${systemd_dir}/${systemd_unit}" << EOF
 [Unit]
 Description=Deceptifeed
 ConditionPathExists=${target_bin}
@@ -261,23 +250,17 @@ ExecStart=${target_bin} -config ${target_cfg}
 WantedBy=multi-user.target
 EOF
 
-        # Reload systemd, enable, and start the service.
-        systemctl daemon-reload
-        systemctl enable "${systemd_unit}" &>/dev/null
-        systemctl start "${systemd_unit}"
-    else
-        # Service already exists. Restart it.
-        echo -e " ${msg_info}  ${gray}Restarting the service.${clear}"
-        systemctl restart "${systemd_unit}"
-    fi
+    # Reload systemd, enable, and start the service.
+    systemctl daemon-reload
+    systemctl enable "${systemd_unit}" &>/dev/null
+    systemctl start "${systemd_unit}"
+
+    # Installation complete.
     echo
-    echo -e " ${green}✓  ${white}Installation complete${clear}"
-    echo
+    echo -e " ${green}✓  ${white}Installation complete${clear}\n"
     echo -e "${yellow} Check service status: ${cyan}systemctl status ${service_short_name}${clear}"
     echo -e "${yellow}         Log location: ${cyan}${install_dir}/logs/${clear}"
-    echo -e "${yellow}   Configuration file: ${cyan}${target_cfg}${clear}"
-    echo
-    echo
+    echo -e "${yellow}   Configuration file: ${cyan}${target_cfg}${clear}\n\n"
 }
 
 # =============================================================================
@@ -289,10 +272,8 @@ EOF
 # =============================================================================
 uninstall_app() {
     # Print uninstall banner.
-    echo
-    echo -e " ${white}Uninstalling Deceptifeed${clear}"
-    echo -e " ${dgray}========================${clear}"
-    echo
+    echo -e "\n ${white}Uninstalling Deceptifeed${clear}"
+    echo -e " ${dgray}========================${clear}\n"
 
     # If the service exists: stop, disable, delete the service, and run daemon-reload.
     if [[ -f "${systemd_dir}/${systemd_unit}" ]]; then
@@ -324,7 +305,12 @@ uninstall_app() {
         echo -e " ${red}The installation directory may contain logs and configuration files."
         echo -e " ${red}Are you ready to delete ${blue}'${install_dir}'${red}?${clear}"
         echo -en " ${gray}(${white}yes${gray}/${white}no${gray}) ${gray}[${yellow}no${gray}]${white}: ${green}"
-        read -r response
+        if [[ "${auto_confirm_prompts}" = true ]]; then
+            echo "yes"
+            response="yes"
+        else
+            read -r response
+        fi
         echo -en "${clear}"
         if [[ "${response}" =~ ^[yY][eE][sS]$ || "${response}" =~ ^[yY]$ ]]; then
             # Confirmed. Delete directory.
@@ -341,26 +327,66 @@ uninstall_app() {
     fi
 
     # Uninstall complete.
+    echo -e "\n ${green}✓  ${white}Uninstallation complete${clear}\n\n"
+}
+
+# =============================================================================
+# print_usage:
+# Show usage information.
+# =============================================================================
+print_usage() {
+    echo "Usage: install.sh [options]"
+    echo "Install, upgrade, or uninstall Deceptifeed"
     echo
-    echo -e " ${green}✓  ${white}Uninstallation complete${clear}"
+    echo "Options:"
+    echo "  -h, --help          Display this help and exit"
+    echo "  -y, --yes           Automatically confirm actions without prompting"
+    echo "      --uninstall     Uninstall Deceptifeed"
     echo
+    echo "Description:"
+    echo "Run the script without options to install Deceptifeed or upgrade if it's"
+    echo "already installed."
     echo
 }
 
 # =============================================================================
 # main:
 # The primary entry point of the script. This function:
-#   1. Calls the startup_checks function to perform initial setup and checks.
-#   2. Checks command-line arguments to determine whether to install (default)
+#   1. Checks command-line arguments to determine whether to install (default)
 #      or uninstall the application.
+#   2. Calls the startup_checks function to perform initial setup and checks.
 # =============================================================================
 main() {
-    startup_checks
+    if [[ "$#" -gt 2 ]]; then
+        print_usage
+        exit 0
+    fi
 
-    if [[ "$1" == "--uninstall" ]]; then
+    local uninstall_flag=false
+    
+    while [[ -n "$1" ]]; do
+        case "$1" in
+            -y | --yes)
+                auto_confirm_prompts=true
+                shift
+                ;;
+            --uninstall)
+                uninstall_flag=true
+                shift
+                ;;
+            *)
+                print_usage
+                exit 0
+                ;;
+        esac
+    done
+
+    if [ "${uninstall_flag}" == true ]; then
+        startup_checks
         uninstall_app
         exit 0
     else
+        startup_checks
         install_app
         exit 0
     fi
