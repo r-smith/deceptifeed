@@ -28,7 +28,7 @@ func main() {
 	flag.BoolVar(&cfg.ThreatFeed.Enabled, "enable-threatfeed", config.DefaultEnableThreatFeed, "Enable threat feed server")
 	flag.StringVar(&cfg.LogPath, "log", config.DefaultLogPath, "Path to log file")
 	flag.StringVar(&cfg.ThreatFeed.DatabasePath, "threat-database", config.DefaultThreatDatabasePath, "Path to threat feed database file")
-	flag.UintVar(&cfg.ThreatFeed.ExpiryHours, "threat-expiry-hours", config.DefaultThreatExpiryHours, "Remove inactive IPs from threat feed after specified hours")
+	flag.IntVar(&cfg.ThreatFeed.ExpiryHours, "threat-expiry-hours", config.DefaultThreatExpiryHours, "Remove inactive IPs from threat feed after specified hours")
 	flag.BoolVar(&cfg.ThreatFeed.IsPrivateIncluded, "threat-include-private", config.DefaultThreatIncludePrivate, "Include private IPs in threat feed")
 	flag.StringVar(&http.HtmlPath, "html", config.DefaultHtmlPath, "Path to optional HTML file to serve")
 	flag.StringVar(&http.Port, "port-http", config.DefaultPortHTTP, "Port number to listen on for HTTP server")

@@ -115,7 +115,7 @@ type ThreatFeed struct {
 	Enabled            bool   `xml:"enabled"`
 	Port               string `xml:"port"`
 	DatabasePath       string `xml:"databasePath"`
-	ExpiryHours        uint   `xml:"threatExpiryHours"`
+	ExpiryHours        int    `xml:"threatExpiryHours"`
 	IsPrivateIncluded  bool   `xml:"isPrivateIncluded"`
 	MinimumThreatScore int    `xml:"minimumThreatScore"`
 	CustomThreatsPath  string `xml:"customThreatsPath"`
