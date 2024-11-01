@@ -122,7 +122,7 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 // handleChannels processes SSH channels for the connected client.
 func handleChannels(chans <-chan ssh.NewChannel) {
 	for newChannel := range chans {
-		newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
+		_ = newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
 		continue
 	}
 }
@@ -183,7 +183,7 @@ func writePrivateKey(path string, privateKey *rsa.PrivateKey) error {
 	defer file.Close()
 
 	// Limit key access to the owner only.
-	file.Chmod(0600)
+	_ = file.Chmod(0600)
 
 	if err := pem.Encode(file, privPem); err != nil {
 		return err

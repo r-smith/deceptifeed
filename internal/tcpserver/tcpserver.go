@@ -23,19 +23,19 @@ const serverTimeout = 30 * time.Second
 // server. It presents custom prompts to connected clients and logs their
 // responses. This function calls the underlying startTCP function to
 // perform the actual server startup.
-func StartTCP(srv *config.Server) {
-	fmt.Printf("Starting TCP server on port: %s\n", srv.Port)
-	if err := startTCP(srv); err != nil {
+func StartTCP(cfg *config.Server) {
+	fmt.Printf("Starting TCP server on port: %s\n", cfg.Port)
+	if err := startTCP(cfg); err != nil {
 		fmt.Fprintln(os.Stderr, "The TCP server has terminated:", err)
 	}
 }
 
 // startTCP starts the TCP honeypot server. It handles the server's main loop.
-func startTCP(srv *config.Server) error {
+func startTCP(cfg *config.Server) error {
 	// Start the TCP server.
-	listener, err := net.Listen("tcp", ":"+srv.Port)
+	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
-		return fmt.Errorf("failed to listen on port '%s': %w", srv.Port, err)
+		return fmt.Errorf("failed to listen on port '%s': %w", cfg.Port, err)
 	}
 	defer listener.Close()
 
@@ -46,7 +46,7 @@ func startTCP(srv *config.Server) error {
 			continue
 		}
 
-		go handleConnection(conn, srv)
+		go handleConnection(conn, cfg)
 	}
 }
 
@@ -54,23 +54,23 @@ func startTCP(srv *config.Server) error {
 // server. It presents custom prompts to the client, records and logs their
 // responses, and then disconnects the client. This function manages the entire
 // client interaction.
-func handleConnection(conn net.Conn, srv *config.Server) {
+func handleConnection(conn net.Conn, cfg *config.Server) {
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(serverTimeout))
+	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
 	// Print an optional banner. Replace any occurrences of the newline escape
 	// sequence "\\n" with "\r\n" (carriage return, line feed), used by
 	// protocols such as Telnet and SMTP.
-	if len(srv.Banner) > 0 {
-		conn.Write([]byte(strings.ReplaceAll(srv.Banner, "\\n", "\r\n")))
+	if len(cfg.Banner) > 0 {
+		_, _ = conn.Write([]byte(strings.ReplaceAll(cfg.Banner, "\\n", "\r\n")))
 	}
 
 	// Present the prompts from the server configuration to the connected
 	// client and record their responses.
 	scanner := bufio.NewScanner(conn)
 	responses := make(map[string]string)
-	for i, prompt := range srv.Prompts {
-		conn.Write([]byte(strings.ReplaceAll(prompt.Text, "\\n", "\r\n")))
+	for i, prompt := range cfg.Prompts {
+		_, _ = conn.Write([]byte(strings.ReplaceAll(prompt.Text, "\\n", "\r\n")))
 		scanner.Scan()
 		var key string
 		// Each prompt includes an optional Log field that serves as the key
@@ -90,7 +90,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 
 	// If no prompts are provided in the configuration, wait for the client to
 	// send data then record the received input.
-	if len(srv.Prompts) == 0 {
+	if len(cfg.Prompts) == 0 {
 		scanner.Scan()
 		responses["data"] = scanner.Text()
 	}
@@ -110,7 +110,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Log the connection along with all responses received from the client.
 	dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
 	src_ip, src_port, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 		slog.String("event_type", "tcp"),
 		slog.String("source_ip", src_ip),
 		slog.String("source_port", src_port),
@@ -124,8 +124,8 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	fmt.Printf("[TCP] %s %v\n", src_ip, responsesToString(responses))
 
 	// Update the threat feed with the source IP address from the interaction.
-	if srv.SendToThreatFeed {
-		threatfeed.UpdateIoC(src_ip, srv.ThreatScore)
+	if cfg.SendToThreatFeed {
+		threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
 	}
 }
 

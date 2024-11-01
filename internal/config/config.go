@@ -199,7 +199,7 @@ func (c *Config) InitializeLoggers() error {
 func (c *Config) CloseLogFiles() {
 	for i := range c.Servers {
 		if c.Servers[i].LogFile != nil {
-			c.Servers[i].LogFile.Close()
+			_ = c.Servers[i].LogFile.Close()
 		}
 	}
 }

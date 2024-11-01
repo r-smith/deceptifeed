@@ -149,9 +149,15 @@ func saveIoC() error {
 
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
-	writer.Write(strings.Split(csvHeader, ","))
+	err := writer.Write(strings.Split(csvHeader, ","))
+	if err != nil {
+		return err
+	}
 	for ip, ioc := range iocMap {
-		writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat), strconv.Itoa(ioc.ThreatScore)})
+		err := writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat), strconv.Itoa(ioc.ThreatScore)})
+		if err != nil {
+			return err
+		}
 	}
 	writer.Flush()
 
