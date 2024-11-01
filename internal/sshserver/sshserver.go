@@ -23,21 +23,21 @@ import (
 // server. Clients receive authentication failure responses for every login
 // attempt. This function calls the underlying startSSH function to perform the
 // actual server startup.
-func StartSSH(srv *config.Server) {
-	fmt.Printf("Starting SSH server on port: %s\n", srv.Port)
-	if err := startSSH(srv); err != nil {
+func StartSSH(cfg *config.Server) {
+	fmt.Printf("Starting SSH server on port: %s\n", cfg.Port)
+	if err := startSSH(cfg); err != nil {
 		fmt.Fprintln(os.Stderr, "The SSH server has terminated:", err)
 	}
 }
 
 // startSSH starts the SSH honeypot server. It handles the server's main loop,
 // authentication callback, and logging.
-func startSSH(srv *config.Server) error {
+func startSSH(cfg *config.Server) error {
 	// Create a new SSH server configuration.
 	sshConfig := &ssh.ServerConfig{}
 
 	// Load or generate a private key and add it to the SSH configuration.
-	privateKey, err := loadOrGeneratePrivateKey(srv.KeyPath)
+	privateKey, err := loadOrGeneratePrivateKey(cfg.KeyPath)
 	if err != nil {
 		return err
 	}
@@ -47,8 +47,8 @@ func startSSH(srv *config.Server) error {
 	// server version string advertised to connecting clients. This allows
 	// the honeypot server to mimic the appearance of other common SSH servers,
 	// such as OpenSSH on Debian, Ubuntu, FreeBSD, or Raspberry Pi.
-	if len(srv.Banner) > 0 {
-		sshConfig.ServerVersion = srv.Banner
+	if len(cfg.Banner) > 0 {
+		sshConfig.ServerVersion = cfg.Banner
 	} else {
 		sshConfig.ServerVersion = config.DefaultBannerSSH
 	}
@@ -58,7 +58,7 @@ func startSSH(srv *config.Server) error {
 		// Log the the username and password submitted by the client.
 		dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
 		src_ip, src_port, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 			slog.String("event_type", "ssh"),
 			slog.String("source_ip", src_ip),
 			slog.String("source_port", src_port),
@@ -76,8 +76,8 @@ func startSSH(srv *config.Server) error {
 		fmt.Printf("[SSH] %s Username: %s Password: %s\n", src_ip, conn.User(), string(password))
 
 		// Update the threat feed with the source IP address from the request.
-		if srv.SendToThreatFeed {
-			threatfeed.UpdateIoC(src_ip, srv.ThreatScore)
+		if cfg.SendToThreatFeed {
+			threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
 		}
 
 		// Return an invalid username or password error to the client.
@@ -85,9 +85,9 @@ func startSSH(srv *config.Server) error {
 	}
 
 	// Start the SSH server.
-	listener, err := net.Listen("tcp", ":"+srv.Port)
+	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
-		return fmt.Errorf("failed to listen on port '%s': %w", srv.Port, err)
+		return fmt.Errorf("failed to listen on port '%s': %w", cfg.Port, err)
 	}
 	defer listener.Close()
 
