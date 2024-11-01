@@ -94,9 +94,11 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// Calculate expiry time.
-	now := time.Now()
-	expiryTime := now.Add(-time.Hour * time.Duration(configuration.ExpiryHours))
+	// Calculate expiry time, defaulting to Go's zero time.
+	expiryTime := time.Time{}
+	if configuration.ExpiryHours > 0 {
+		expiryTime = time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours))
+	}
 
 	// Parse IPs from the iocMap to net.IP for filtering and sorting. Skip any
 	// IPs that have expired or don't meet the minimum threat score.
