@@ -68,14 +68,21 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 		}
 	}()
 
-	// Setup handlers.
+	// Setup handlers and server config.
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", enforcePrivateIP(handleConnection))
 	mux.HandleFunc("/empty/", enforcePrivateIP(serveEmpty))
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  0,
+	}
 
 	// Start the threat feed HTTP server.
 	fmt.Printf("Starting Threat Feed server on port: %s\n", cfg.Port)
-	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has terminated:", err)
 	}
 }

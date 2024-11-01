@@ -25,54 +25,65 @@ import (
 
 // StartHTTP initializes and starts an HTTP honeypot server. This is a fully
 // functional HTTP server designed to log all incoming requests for analysis.
-func StartHTTP(srv *config.Server) {
+func StartHTTP(cfg *config.Server) {
 	// Get any custom headers, if provided.
-	headers := parseCustomHeaders(srv.Banner)
+	headers := parseCustomHeaders(cfg.Banner)
 
-	// Setup handler.
+	// Setup handler and server config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(srv, headers))
+	mux.HandleFunc("/", handleConnection(cfg, headers))
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      mux,
+		ErrorLog:     log.New(io.Discard, "", log.LstdFlags),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  0,
+	}
 
 	// Start the HTTP server.
-	fmt.Printf("Starting HTTP server on port: %s\n", srv.Port)
-	if err := http.ListenAndServe(":"+srv.Port, mux); err != nil {
+	fmt.Printf("Starting HTTP server on port: %s\n", cfg.Port)
+	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintln(os.Stderr, "The HTTP server has terminated:", err)
 	}
 }
 
 // StartHTTPS initializes and starts an HTTPS honeypot server. This  is a fully
 // functional HTTPS server designed to log all incoming requests for analysis.
-func StartHTTPS(srv *config.Server) {
+func StartHTTPS(cfg *config.Server) {
 	// Get any custom headers, if provided.
-	headers := parseCustomHeaders(srv.Banner)
+	headers := parseCustomHeaders(cfg.Banner)
 
 	// Setup handler and initialize HTTPS config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(srv, headers))
-	server := &http.Server{
-		Addr:     ":" + srv.Port,
-		Handler:  mux,
-		ErrorLog: log.New(io.Discard, "", log.LstdFlags),
+	mux.HandleFunc("/", handleConnection(cfg, headers))
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      mux,
+		ErrorLog:     log.New(io.Discard, "", log.LstdFlags),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  0,
 	}
 
 	// If the cert and key aren't found, generate a self-signed certificate.
-	if _, err := os.Stat(srv.CertPath); os.IsNotExist(err) {
-		if _, err := os.Stat(srv.KeyPath); os.IsNotExist(err) {
+	if _, err := os.Stat(cfg.CertPath); os.IsNotExist(err) {
+		if _, err := os.Stat(cfg.KeyPath); os.IsNotExist(err) {
 			// Generate a self-signed certificate.
-			cert, err := generateSelfSignedCert(srv.CertPath, srv.KeyPath)
+			cert, err := generateSelfSignedCert(cfg.CertPath, cfg.KeyPath)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Failed to generate HTTPS certificate:", err)
 				return
 			}
 
 			// Add cert to server config.
-			server.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+			srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 		}
 	}
 
 	// Start the HTTPS server.
-	fmt.Printf("Starting HTTPS server on port: %s\n", srv.Port)
-	if err := server.ListenAndServeTLS(srv.CertPath, srv.KeyPath); err != nil {
+	fmt.Printf("Starting HTTPS server on port: %s\n", cfg.Port)
+	if err := srv.ListenAndServeTLS(cfg.CertPath, cfg.KeyPath); err != nil {
 		fmt.Fprintln(os.Stderr, "The HTTPS server has terminated:", err)
 	}
 }
@@ -83,14 +94,14 @@ func StartHTTPS(srv *config.Server) {
 // HTML file specified in the configuration or a default page prompting for
 // basic HTTP authentication. Requests for any other URLs will return a 404
 // error to the client.
-func handleConnection(srv *config.Server, customHeaders map[string]string) http.HandlerFunc {
+func handleConnection(cfg *config.Server, customHeaders map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log details of the incoming HTTP request.
 		dst_ip, dst_port := getLocalAddr(r)
 		src_ip, src_port, _ := net.SplitHostPort(r.RemoteAddr)
 		username, password, isAuth := r.BasicAuth()
 		if isAuth {
-			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 				slog.String("event_type", "http"),
 				slog.String("source_ip", src_ip),
 				slog.String("source_port", src_port),
@@ -112,7 +123,7 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 				),
 			)
 		} else {
-			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 				slog.String("event_type", "http"),
 				slog.String("source_ip", src_ip),
 				slog.String("source_port", src_port),
@@ -135,8 +146,8 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 		fmt.Printf("[HTTP] %s %s %s %s\n", src_ip, r.Method, r.URL.Path, r.URL.RawQuery)
 
 		// Update the threat feed with the source IP address from the request.
-		if srv.SendToThreatFeed {
-			threatfeed.UpdateIoC(src_ip, srv.ThreatScore)
+		if cfg.SendToThreatFeed {
+			threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
 		}
 
 		// If custom headers are provided, add each header and its value to the
@@ -150,9 +161,9 @@ func handleConnection(srv *config.Server, customHeaders map[string]string) http.
 		// For any other requests, return a '404 Not Found' response.
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			// The request is for the root or /index.html.
-			if len(srv.HtmlPath) > 0 {
+			if len(cfg.HtmlPath) > 0 {
 				// Serve the custom HTML file specified in the configuration.
-				http.ServeFile(w, r, srv.HtmlPath)
+				http.ServeFile(w, r, cfg.HtmlPath)
 			} else {
 				// Serve the default page that prompts the client for basic
 				// authentication.
