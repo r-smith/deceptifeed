@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
@@ -53,7 +54,20 @@ func startSSH(cfg *config.Server) error {
 		sshConfig.ServerVersion = config.DefaultBannerSSH
 	}
 
-	// Define the password callback function for the SSH server.
+	// Define the public key authentication callback function.
+	sshConfig.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+		// This public key authentication function rejects all requests.
+		// Currently, no data is logged. Useful information may include:
+		// `key.Type()` and `ssh.FingerprintSHA256(key)`.
+
+		// Short, intentional delay.
+		time.Sleep(200 * time.Millisecond)
+
+		// Reject the authentication request.
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	// Define the password authentication callback function.
 	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		// Log the the username and password submitted by the client.
 		dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
@@ -80,7 +94,7 @@ func startSSH(cfg *config.Server) error {
 			threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
 		}
 
-		// Return an invalid username or password error to the client.
+		// Reject the authentication request.
 		return nil, fmt.Errorf("invalid username or password")
 	}
 
