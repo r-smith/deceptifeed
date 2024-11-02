@@ -17,6 +17,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// serverTimeout defines the duration after which connected clients are
+// automatically disconnected, set to 30 seconds.
+const serverTimeout = 30 * time.Second
+
 // StartSSH serves as a wrapper to initialize and start an SSH honeypot server.
 // The SSH server is designed to log the usernames and passwords submitted in
 // authentication requests. It is not possible for clients to log in to the
@@ -94,6 +98,9 @@ func startSSH(cfg *config.Server) error {
 			threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
 		}
 
+		// Insert fixed delay to mimic PAM.
+		time.Sleep(2 * time.Second)
+
 		// Reject the authentication request.
 		return nil, fmt.Errorf("invalid username or password")
 	}
@@ -120,6 +127,7 @@ func startSSH(cfg *config.Server) error {
 // handshake and handles authentication callbacks.
 func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
 	// Perform handshake and authentication. Authentication callbacks are
 	// defined in the SSH server configuration. Since authentication requests
