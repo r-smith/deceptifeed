@@ -67,11 +67,10 @@ func startUDP(cfg *config.Server) error {
 			// received the UDP data. However, this limitation is acceptable as
 			// the primary goal is to log the received data.
 			_, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
-			src_ip, src_port, _ := net.SplitHostPort(remoteAddr.String())
+			src_ip, _, _ := net.SplitHostPort(remoteAddr.String())
 			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 				slog.String("event_type", "udp"),
 				slog.String("source_ip", src_ip+" [unreliable]"),
-				slog.String("source_port", src_port+" [unreliable]"),
 				slog.String("source_reliability", "unreliable"),
 				slog.String("server_ip", config.GetHostIP()),
 				slog.String("server_port", dst_port),

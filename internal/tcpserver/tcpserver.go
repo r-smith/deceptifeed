@@ -109,11 +109,10 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 
 	// Log the connection along with all responses received from the client.
 	dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
-	src_ip, src_port, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	src_ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 		slog.String("event_type", "tcp"),
 		slog.String("source_ip", src_ip),
-		slog.String("source_port", src_port),
 		slog.String("server_ip", dst_ip),
 		slog.String("server_port", dst_port),
 		slog.String("server_name", config.GetHostname()),
