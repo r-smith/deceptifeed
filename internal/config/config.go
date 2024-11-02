@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"regexp"
 )
 
-// This block of constants defines the application default settings.
+// This block of constants defines the default application settings when no
+// configuration file is provided.
 const (
 	DefaultEnableHTTP           = true
 	DefaultEnableHTTPS          = true
@@ -90,10 +92,21 @@ type Server struct {
 	Prompts          []Prompt   `xml:"prompt"`
 	SendToThreatFeed bool       `xml:"sendToThreatFeed"`
 	ThreatScore      int        `xml:"threatScore"`
+	Rules            Rules      `xml:"rules"`
 	LogPath          string     `xml:"logPath"`
 	LogEnabled       bool       `xml:"logEnabled"`
 	LogFile          *os.File
 	Logger           *slog.Logger
+}
+
+type Rules struct {
+	Matches  []Rule `xml:"match"`
+	Excludes []Rule `xml:"exclude"`
+}
+
+type Rule struct {
+	Target  string `xml:"target,attr"`
+	Pattern string `xml:",chardata"`
 }
 
 // Prompt represents a text prompt that can be displayed to connecting clients
@@ -140,14 +153,34 @@ func Load(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to decode XML file: %w", err)
 	}
 
-	// Ensure a minimum threat score of 1.
 	for i := range config.Servers {
+		// Ensure a minimum threat score of 1.
 		if config.Servers[i].ThreatScore < 1 {
 			config.Servers[i].ThreatScore = 1
+		}
+
+		// Validate regex rules.
+		if err := validateRegexRules(config.Servers[i].Rules); err != nil {
+			return nil, err
 		}
 	}
 
 	return &config, nil
+}
+
+// validateRegexRules checks the validity of regex patterns in the rules.
+func validateRegexRules(rules Rules) error {
+	for _, rule := range rules.Matches {
+		if _, err := regexp.Compile(rule.Pattern); err != nil {
+			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
+		}
+	}
+	for _, rule := range rules.Excludes {
+		if _, err := regexp.Compile(rule.Pattern); err != nil {
+			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
+		}
+	}
+	return nil
 }
 
 // InitializeLoggers creates structured loggers for each server. It opens log

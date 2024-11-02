@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -146,7 +147,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 		fmt.Printf("[HTTP] %s %s %s %s\n", src_ip, r.Method, r.URL.Path, r.URL.RawQuery)
 
 		// Update the threat feed with the source IP address from the request.
-		if cfg.SendToThreatFeed {
+		if shouldUpdateThreatFeed(cfg, r) {
 			threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
 		}
 
@@ -178,6 +179,57 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 			fmt.Fprintln(w, http.StatusText(http.StatusNotFound))
 		}
 	}
+}
+
+// shouldUpdateThreatFeed determines if the threat feed should be updated based
+// on the server's configured rules.
+func shouldUpdateThreatFeed(cfg *config.Server, r *http.Request) bool {
+	// Return false if `sendToThreatFeed`` is disabled, or if the request
+	// matches an `exclude` rule.
+	if !cfg.SendToThreatFeed || checkRuleMatches(cfg.Rules.Excludes, r) {
+		return false
+	}
+
+	// Return true if no `match` rules are defined. Otherwise, return whether
+	// the request matches any of the `match` rules.
+	return len(cfg.Rules.Matches) == 0 || checkRuleMatches(cfg.Rules.Matches, r)
+}
+
+// checkRuleMatches checks if a request matches any of the specified rules.
+func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
+	match := false
+	for _, rule := range rules {
+		// Ignore errors - regex patterns are validated at application startup.
+		rx, _ := regexp.Compile(rule.Pattern)
+
+		switch strings.ToLower(rule.Target) {
+		case "path":
+			match = rx.MatchString(r.URL.Path)
+		case "query":
+			match = rx.MatchString(r.URL.RawQuery)
+		case "method":
+			match = rx.MatchString(r.Method)
+		case "host":
+			match = rx.MatchString(r.Host)
+		case "user-agent":
+			match = rx.MatchString(r.UserAgent())
+		default:
+			header, ok := r.Header[http.CanonicalHeaderKey(rule.Target)]
+			if ok {
+				for _, v := range header {
+					if rx.MatchString(v) {
+						match = true
+						break
+					}
+				}
+			}
+		}
+
+		if match {
+			return true
+		}
+	}
+	return false
 }
 
 // parseCustomHeaders parses a string of custom headers, if provided in the
