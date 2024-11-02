@@ -103,28 +103,19 @@ func startSSH(cfg *config.Server) error {
 }
 
 // handleConnection manages incoming SSH client connections. It performs the
-// handshake and establishes communication channels.
+// handshake and handles authentication callbacks.
 func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 	defer conn.Close()
 
-	// Perform handshake on incoming connection.
-	sshConn, chans, reqs, err := ssh.NewServerConn(conn, config)
+	// Perform handshake and authentication. Authentication callbacks are
+	// defined in the SSH server configuration. Since authentication requests
+	// are always rejected, this function will consistently return an error,
+	// and no further connection handling is necessary.
+	sshConn, _, _, err := ssh.NewServerConn(conn, config)
 	if err != nil {
 		return
 	}
 	defer sshConn.Close()
-
-	// Handle SSH requests and channels.
-	go ssh.DiscardRequests(reqs)
-	go handleChannels(chans)
-}
-
-// handleChannels processes SSH channels for the connected client.
-func handleChannels(chans <-chan ssh.NewChannel) {
-	for newChannel := range chans {
-		_ = newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
-		continue
-	}
 }
 
 // loadOrGeneratePrivateKey attempts to load a private key from the specified
