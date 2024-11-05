@@ -1,4 +1,10 @@
-## Deceptifeed
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.svg">
+    <img alt="Deceptifeed logo" src="assets/logo-light.svg">
+  </picture>
+</p>
 
 `Deceptifeed` is a network defense tool that creates fake network services, or **honeypots**, to detect potential threats. It also provides a real-time **threat feed** that integrates with most enterprise firewalls. This feed lists the IP addresses that accessed your honeypots, allowing firewalls to automatically block them from reaching your legitimate services.
 
