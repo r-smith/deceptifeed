@@ -100,8 +100,8 @@ type Server struct {
 }
 
 type Rules struct {
-	Matches  []Rule `xml:"match"`
-	Excludes []Rule `xml:"exclude"`
+	Include []Rule `xml:"include"`
+	Exclude []Rule `xml:"exclude"`
 }
 
 type Rule struct {
@@ -170,12 +170,12 @@ func Load(filename string) (*Config, error) {
 
 // validateRegexRules checks the validity of regex patterns in the rules.
 func validateRegexRules(rules Rules) error {
-	for _, rule := range rules.Matches {
+	for _, rule := range rules.Include {
 		if _, err := regexp.Compile(rule.Pattern); err != nil {
 			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
 		}
 	}
-	for _, rule := range rules.Excludes {
+	for _, rule := range rules.Exclude {
 		if _, err := regexp.Compile(rule.Pattern); err != nil {
 			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
 		}

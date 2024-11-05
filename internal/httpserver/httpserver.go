@@ -184,20 +184,21 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 func shouldUpdateThreatFeed(cfg *config.Server, r *http.Request) bool {
 	// Return false if `sendToThreatFeed`` is disabled, or if the request
 	// matches an `exclude` rule.
-	if !cfg.SendToThreatFeed || checkRuleMatches(cfg.Rules.Excludes, r) {
+	if !cfg.SendToThreatFeed || checkRuleMatches(cfg.Rules.Exclude, r) {
 		return false
 	}
 
-	// Return true if no `match` rules are defined. Otherwise, return whether
-	// the request matches any of the `match` rules.
-	return len(cfg.Rules.Matches) == 0 || checkRuleMatches(cfg.Rules.Matches, r)
+	// Return true if no `include` rules are defined. Otherwise, return whether
+	// the request matches any of the `include` rules.
+	return len(cfg.Rules.Include) == 0 || checkRuleMatches(cfg.Rules.Include, r)
 }
 
 // checkRuleMatches checks if a request matches any of the specified rules.
 func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 	match := false
 	for _, rule := range rules {
-		// Ignore errors - regex patterns are validated at application startup.
+		// Ignore errors from regexp.Compile. Regular expression patterns are
+		// validated at application startup.
 		rx, _ := regexp.Compile(rule.Pattern)
 
 		switch strings.ToLower(rule.Target) {
@@ -222,7 +223,6 @@ func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 				}
 			}
 		}
-
 		if match {
 			return true
 		}
