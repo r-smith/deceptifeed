@@ -223,6 +223,10 @@ func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 				}
 			}
 		}
+
+		if rule.Negate {
+			match = !match
+		}
 		if match {
 			return true
 		}

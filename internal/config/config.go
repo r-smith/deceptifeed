@@ -107,6 +107,7 @@ type Rules struct {
 type Rule struct {
 	Target  string `xml:"target,attr"`
 	Pattern string `xml:",chardata"`
+	Negate  bool   `xml:"negate,attr"`
 }
 
 // Prompt represents a text prompt that can be displayed to connecting clients
