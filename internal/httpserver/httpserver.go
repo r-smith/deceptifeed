@@ -145,8 +145,17 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 		fmt.Printf("[HTTP] %s %s %s %s\n", src_ip, r.Method, r.URL.Path, r.URL.RawQuery)
 
 		// Update the threat feed with the source IP address from the request.
+		// If the configuration specifies an HTTP header to be used for the
+		// source IP, retrieve the header value and use it instead of the
+		// connecting IP.
 		if shouldUpdateThreatFeed(cfg, r) {
-			threatfeed.UpdateIoC(src_ip, cfg.ThreatScore)
+			src := src_ip
+			if len(cfg.SourceIPHeader) > 0 {
+				if header := r.Header.Get(cfg.SourceIPHeader); len(header) > 0 {
+					src = header
+				}
+			}
+			threatfeed.UpdateIoC(src, cfg.ThreatScore)
 		}
 
 		// If custom headers are provided, add each header and its value to the

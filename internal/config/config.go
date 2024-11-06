@@ -93,6 +93,7 @@ type Server struct {
 	SendToThreatFeed bool       `xml:"sendToThreatFeed"`
 	ThreatScore      int        `xml:"threatScore"`
 	Rules            Rules      `xml:"rules"`
+	SourceIPHeader   string     `xml:"sourceIpHeader"`
 	LogPath          string     `xml:"logPath"`
 	LogEnabled       bool       `xml:"logEnabled"`
 	LogFile          *os.File
