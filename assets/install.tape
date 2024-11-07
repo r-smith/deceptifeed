@@ -21,12 +21,13 @@
 # =====
 Output install.gif
 
-Set FontSize 20
-Set Width 940
-Set Height 620
+Set FontSize 16
+Set Width 735
+Set Height 509
 Set Padding 50
-Set Theme "CGA"
+Set PlaybackSpeed 1.1
 Set LoopOffset 80%
+Set Theme { "name": "CGA Custom", "black": "#000000", "red": "#aa0000", "green": "#00aa00", "yellow": "#aa5500", "blue": "#0000aa", "magenta": "#aa00aa", "cyan": "#00aaaa", "white": "#aaaaaa", "brightBlack": "#555555", "brightRed": "#EF2929", "brightGreen": "#55ff55", "brightYellow": "#FCE94F", "brightBlue": "#5555ff", "brightMagenta": "#ff55ff", "brightCyan": "#55ffff", "brightWhite": "#ffffff", "background": "#000000", "foreground": "#aaaaaa", "cursor": "#b8b8b8", "selection": "#c1deff" }
 
 # ====
 # Hide

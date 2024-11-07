@@ -32,7 +32,6 @@ startup_checks() {
             yellow='\033[1;33m'
             blue='\033[1;34m'
             magenta='\033[1;35m'
-            dmagenta='\033[0;35m'
             cyan='\033[1;36m'
             white='\033[1;37m'
             gray='\033[0;37m'
@@ -59,16 +58,16 @@ startup_checks() {
 }
 
 # =============================================================================
-# print_banner:
-# Prints the application's banner.
+# print_logo:
+# Prints the application's logo.
 # =============================================================================
-print_banner() {
-    echo -e "${yellow}         __                     __  _ ${green}______              __"
-    echo -e "${yellow}    ____/ /__  ________  ____  / /_(_)${green} ____/__  ___  ____/ /"
-    echo -e "${yellow}   / __  / _ \/ ___/ _ \/ __ \/ __/ /${green} /_  / _ \/ _ \/ __  / "
-    echo -e "${yellow}  / /_/ /  __/ /__/  __/ /_/ / /_/ /${green} __/ /  __/  __/ /_/ /  "
-    echo -e "${yellow}  \____/\___/\___/\___/ .___/\__/_/${green}_/    \___/\___/\____/   "
-    echo -e "${dmagenta} ::::::::::::::::::::${yellow}/_/${dmagenta}::::::::::::::::::::::::::::::::::"
+print_logo() {
+    echo -e "${red}         __                     __  _ ${yellow}______              __"
+    echo -e "${red}    ____/ /__  ________  ____  / /_(_)${yellow} ____/__  ___  ____/ /"
+    echo -e "${red}   / __  / _ \/ ___/ _ \/ __ \/ __/ /${yellow} /_  / _ \/ _ \/ __  /"
+    echo -e "${red}  / /_/ /  __/ /__/  __/ /_/ / /_/ /${yellow} __/ /  __/  __/ /_/ /"
+    echo -e "${red}  \____/\___/\___/\___/ .___/\__/_/${yellow}_/    \___/\___/\____/"
+    echo -e "${blue}  ═══════════════════${red}/_/${blue}══════════════════════════════════"
     echo -e "${clear}\n"
 }
 
@@ -100,8 +99,8 @@ upgrade_app() {
         exit 0
     fi
 
-    # Print upgrade banner.
-    print_banner
+    # Print the application logo.
+    print_logo
 
     # Stop the service.
     echo -e " ${msg_info}  ${gray}Stopping service: ${cyan}${systemd_unit}${clear}"
@@ -180,8 +179,8 @@ install_app() {
         exit 0
     fi
 
-    # Print install banner.
-    print_banner
+    # Print the application logo.
+    print_logo
     echo -e " ${msg_info}  ${gray}Installing to: ${cyan}${install_dir}/"
 
     # Create the directory structure.
