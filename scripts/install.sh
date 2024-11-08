@@ -106,6 +106,13 @@ upgrade_app() {
     echo -e " ${msg_info}  ${gray}Stopping service: ${cyan}${systemd_unit}${clear}"
     systemctl stop "${systemd_unit}"
 
+    # Backup (rename) the original binary.
+    echo -e " ${msg_info}  ${gray}Moving old binary to: ${cyan}${target_bin}.bak${clear}"
+    if ! mv -f "${target_bin}" "${target_bin}.bak"; then
+        echo -e " ${msg_error} ${white}Failed to move file: ${yellow}'${target_bin}' ${white}to: ${yellow}'${target_bin}.bak'${clear}\n" >&2
+        exit 1
+    fi
+
     # Copy the binary.
     echo -e " ${msg_info}  ${gray}Replacing binary: ${cyan}${target_bin}${clear}"
     if ! cp --force "${source_bin}" "${target_bin}"; then
