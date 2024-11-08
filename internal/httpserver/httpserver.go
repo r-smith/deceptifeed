@@ -177,13 +177,11 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 				// authentication.
 				w.Header().Set("WWW-Authenticate", "Basic")
 				w.WriteHeader(http.StatusUnauthorized)
-				fmt.Fprintln(w, http.StatusText(http.StatusUnauthorized))
 			}
 		} else {
 			// The request is outside the root or /index.html. Respond with a
 			// 404 error.
 			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintln(w, http.StatusText(http.StatusNotFound))
 		}
 	}
 }
