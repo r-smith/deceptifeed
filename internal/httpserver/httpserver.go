@@ -27,12 +27,9 @@ import (
 // StartHTTP initializes and starts an HTTP honeypot server. This is a fully
 // functional HTTP server designed to log all incoming requests for analysis.
 func StartHTTP(cfg *config.Server) {
-	// Get any custom headers, if provided.
-	headers := parseCustomHeaders(cfg.Banner)
-
 	// Setup handler and server config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, headers))
+	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers)))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
@@ -52,12 +49,9 @@ func StartHTTP(cfg *config.Server) {
 // StartHTTPS initializes and starts an HTTPS honeypot server. This  is a fully
 // functional HTTPS server designed to log all incoming requests for analysis.
 func StartHTTPS(cfg *config.Server) {
-	// Get any custom headers, if provided.
-	headers := parseCustomHeaders(cfg.Banner)
-
 	// Setup handler and initialize HTTPS config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, headers))
+	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers)))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
@@ -158,10 +152,9 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 			threatfeed.UpdateIoC(src, cfg.ThreatScore)
 		}
 
-		// If custom headers are provided, add each header and its value to the
-		// HTTP response.
-		for key, value := range customHeaders {
-			w.Header().Set(key, value)
+		// Apply any custom HTTP response headers.
+		for header, value := range customHeaders {
+			w.Header().Set(header, value)
 		}
 
 		// Serve the web content to the client based on the requested URL. If
@@ -241,21 +234,17 @@ func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 	return false
 }
 
-// parseCustomHeaders parses a string of custom headers, if provided in the
-// configuration, into a map[string]string. The keys in the map are the custom
-// header names. For example, given the input:
-// "Server: Microsoft-IIS/8.5, X-Powered-By: ASP.NET", the function would
-// return a map with "Server" and "X-Powered-By" as keys, each linked to their
-// corresponding values.
-func parseCustomHeaders(headers string) map[string]string {
-	if len(headers) == 0 {
-		return nil
-	}
-
+// parseCustomHeaders takes a slice of header strings in the format of
+// "Name: Value", and returns a map of the Name-Value pairs. For example, given
+// the input:
+// `[]{"Server: Microsoft-IIS/8.5", "X-Powered-By: ASP.NET"}`, the function
+// would return a map with "Server" and "X-Powered-By" as keys, each linked to
+// their corresponding values.
+func parseCustomHeaders(headers []string) map[string]string {
 	result := make(map[string]string)
-	kvPairs := strings.Split(headers, ",")
-	for _, pair := range kvPairs {
-		kv := strings.Split(strings.TrimSpace(pair), ":")
+
+	for _, header := range headers {
+		kv := strings.SplitN(header, ":", 2)
 		if len(kv) == 2 {
 			result[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
 		}

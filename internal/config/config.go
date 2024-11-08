@@ -89,6 +89,7 @@ type Server struct {
 	KeyPath          string     `xml:"keyPath"`
 	HtmlPath         string     `xml:"htmlPath"`
 	Banner           string     `xml:"banner"`
+	Headers          []string   `xml:"headers>header"`
 	Prompts          []Prompt   `xml:"prompts>prompt"`
 	SendToThreatFeed bool       `xml:"sendToThreatFeed"`
 	ThreatScore      int        `xml:"threatScore"`
