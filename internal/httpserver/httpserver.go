@@ -175,7 +175,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 			} else {
 				// Serve the default page that prompts the client for basic
 				// authentication.
-				w.Header().Set("WWW-Authenticate", "Basic")
+				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			}
 		} else {
