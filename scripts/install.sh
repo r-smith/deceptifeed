@@ -42,7 +42,7 @@ startup_checks() {
 
     # Output helper messages.
     msg_error="${dgray}[${red}Error${dgray}]${clear}"
-    msg_info="${dgray}${magenta}‣${dgray}${clear}"
+    msg_info="${dgray}${magenta}•${dgray}${clear}"
 
     # Require systemd.
     if [[ ! -d "${systemd_check_dir}" || ! -d "${systemd_dir}" ]] || ! command -v systemctl &>/dev/null; then
@@ -51,7 +51,7 @@ startup_checks() {
     fi
 
     # Require root privileges.
-    if [[ "$(id --user)" -ne 0 ]]; then
+    if [[ "$(id -u)" -ne 0 ]]; then
         echo -e "\n${msg_error} ${white}This script must be run as root.${clear}\n" >&2
         exit 1
     fi
@@ -114,8 +114,8 @@ upgrade_app() {
     fi
 
     # Copy the binary.
-    echo -e " ${msg_info}  ${gray}Replacing binary: ${cyan}${target_bin}${clear}"
-    if ! cp --force "${source_bin}" "${target_bin}"; then
+    echo -e " ${msg_info}  ${gray}Copying new binary to: ${cyan}${target_bin}${clear}"
+    if ! cp -f "${source_bin}" "${target_bin}"; then
         echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}\n" >&2
         exit 1
     fi
@@ -191,10 +191,10 @@ install_app() {
     echo -e " ${msg_info}  ${gray}Installing to: ${cyan}${install_dir}/"
 
     # Create the directory structure.
-    mkdir --parents "${install_dir}/bin/" "${install_dir}/certs/" "${install_dir}/etc/" "${install_dir}/logs/"
+    mkdir -p "${install_dir}/bin/" "${install_dir}/certs/" "${install_dir}/etc/" "${install_dir}/logs/"
 
     # Copy the binary.
-    if ! cp --force "${source_bin}" "${target_bin}"; then
+    if ! cp -f "${source_bin}" "${target_bin}"; then
         echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_bin}' ${white}to: ${yellow}'${target_bin}'${clear}\n" >&2
         exit 1
     fi
@@ -204,7 +204,7 @@ install_app() {
         # Don't copy anything. An existing configuration file already exists.
         echo -e " ${msg_info}  ${gray}Keeping existing configuration found at: ${cyan}${target_cfg}"
     else
-        if ! cp --force "${source_cfg}" "${target_cfg}"; then
+        if ! cp -f "${source_cfg}" "${target_cfg}"; then
             echo -e " ${msg_error} ${white}Failed to copy file: ${yellow}'${source_cfg}' ${white}to: ${yellow}'${target_cfg}'${clear}\n" >&2
             exit 1
         fi
@@ -229,7 +229,7 @@ install_app() {
 
     # Set file and directory permissions.
     echo -e " ${msg_info}  ${gray}Setting file and directory permissions.${clear}"
-    chown --recursive "${username}":"${username}" "${install_dir}"
+    chown -R "${username}":"${username}" "${install_dir}"
     chmod 755 "${target_bin}"
     chmod 644 "${target_cfg}"
 
@@ -288,7 +288,7 @@ uninstall_app() {
         echo -e " ${msg_info}  ${gray}Disabling service: ${cyan}${systemd_unit}${clear}"
         systemctl disable "${systemd_unit}" &>/dev/null
         echo -e " ${msg_info}  ${gray}Deleting: ${cyan}${systemd_dir}/${systemd_unit}${clear}"
-        rm --force "${systemd_dir}/${systemd_unit}"
+        rm -f "${systemd_dir}/${systemd_unit}"
         echo -e " ${msg_info}  ${gray}Reloading the systemd configuration.${clear}"
         systemctl daemon-reload
     else
@@ -322,7 +322,7 @@ uninstall_app() {
             # Confirmed. Delete directory.
             echo
             echo -e " ${msg_info}  ${gray}Deleting installation directory: ${cyan}${install_dir}/${clear}"
-            rm --recursive --force "${install_dir}"
+            rm -rf "${install_dir}"
         else
             # Skip deleteion.
             echo

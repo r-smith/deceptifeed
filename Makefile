@@ -11,7 +11,7 @@ GO111MODULE := on
 .PHONY: build
 build:
 	@echo "Building to: ./out/"
-	@mkdir --parents ./out/
+	@mkdir -p ./out/
 	GO111MODULE=$(GO111MODULE) CGO_ENABLED=$(CGO_ENABLED) $(GO) build -o $(TARGET_BINARY) $(SOURCE)
 	@echo "Build complete."
 
