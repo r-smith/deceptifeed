@@ -267,16 +267,17 @@ func parseCustomHeaders(headers string) map[string]string {
 
 // flattenHeaders converts HTTP headers from an http.Request from the format of
 // map[string][]string to map[string]string. This results in a cleaner format
-// for logging, where each headers values are represented as a single string
+// for logging, where each header's values are represented as a single string
 // instead of a slice. When a header contains multiple values, they are
-// combined into a single string, separated by commas.
+// combined into a single string, separated by commas. Additionally, header
+// names are converted to lowercase.
 func flattenHeaders(headers map[string][]string) map[string]string {
 	newHeaders := make(map[string]string, len(headers))
 	for header, values := range headers {
 		if len(values) == 1 {
-			newHeaders[header] = values[0]
+			newHeaders[strings.ToLower(header)] = values[0]
 		} else {
-			newHeaders[header] = "[" + strings.Join(values, ", ") + "]"
+			newHeaders[strings.ToLower(header)] = "[" + strings.Join(values, ", ") + "]"
 		}
 	}
 	// Delete the User-Agent header, as it is managed separately.
