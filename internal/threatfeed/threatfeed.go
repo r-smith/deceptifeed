@@ -170,7 +170,7 @@ func enforcePrivateIP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if !net.ParseIP(ip).IsPrivate() {
+		if netIP := net.ParseIP(ip); !netIP.IsPrivate() && !netIP.IsLoopback() {
 			http.Error(w, "", http.StatusForbidden)
 			return
 		}
