@@ -113,7 +113,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 						slog.String("username", username),
 						slog.String("password", password),
 					),
-					slog.Any("request_headers", flattenHeaders(r.Header)),
+					slog.Any("headers", flattenHeaders(r.Header)),
 				),
 			)
 		} else {
@@ -130,7 +130,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 					slog.String("user_agent", r.UserAgent()),
 					slog.String("protocol", r.Proto),
 					slog.String("host", r.Host),
-					slog.Any("request_headers", flattenHeaders(r.Header)),
+					slog.Any("headers", flattenHeaders(r.Header)),
 				),
 			)
 		}

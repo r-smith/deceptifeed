@@ -189,7 +189,7 @@ The HTTP honeypot server responds to all HTTP requests. Requests to the *root* o
     "user_agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko",
     "protocol": "HTTP/1.1",
     "host": "www.example.com",
-    "request_headers": {
+    "headers": {
       "accept-encoding": "gzip, br",
       "x-forwarded-for":"10.254.33.179",
     }
