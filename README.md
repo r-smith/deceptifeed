@@ -190,8 +190,8 @@ The HTTP honeypot server responds to all HTTP requests. Requests to the *root* o
     "protocol": "HTTP/1.1",
     "host": "www.example.com",
     "request_headers": {
-      "Accept-Encoding": "gzip, br",
-      "X-Forwarded-For":"10.254.33.179",
+      "accept-encoding": "gzip, br",
+      "x-forwarded-for":"10.254.33.179",
     }
   }
 }
