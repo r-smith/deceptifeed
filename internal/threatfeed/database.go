@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -27,11 +26,13 @@ type IoC struct {
 }
 
 const (
-	// csvHeader defines the header row for the threat feed database.
-	csvHeader = "ip,last_seen,threat_score"
-
 	// dateFormat specifies the timestamp format used for CSV data.
 	dateFormat = time.RFC3339
+)
+
+var (
+	// csvHeader defines the header row for the threat feed database.
+	csvHeader = []string{"ip,last_seen,threat_score"}
 )
 
 // loadIoC reads IoC data from an existing CSV database. If found, it
@@ -99,8 +100,12 @@ func UpdateIoC(ip string, threatScore int) {
 	if ioc, exists := iocMap[ip]; exists {
 		// Update existing entry.
 		ioc.LastSeen = now
-		if uint(ioc.ThreatScore+threatScore) <= math.MaxInt {
-			ioc.ThreatScore += threatScore
+		if threatScore > 0 {
+			if ioc.ThreatScore > math.MaxInt-threatScore {
+				ioc.ThreatScore = math.MaxInt
+			} else {
+				ioc.ThreatScore += threatScore
+			}
 		}
 	} else {
 		// Create a new entry.
@@ -140,15 +145,18 @@ func (ioc *IoC) expired() bool {
 func saveIoC() error {
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
-	err := writer.Write(strings.Split(csvHeader, ","))
+	err := writer.Write(csvHeader)
 	if err != nil {
 		return err
 	}
 
 	mutex.Lock()
 	for ip, ioc := range iocMap {
-		err := writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat), strconv.Itoa(ioc.ThreatScore)})
-		if err != nil {
+		if err := writer.Write([]string{
+			ip,
+			ioc.LastSeen.Format(dateFormat),
+			strconv.Itoa(ioc.ThreatScore),
+		}); err != nil {
 			return err
 		}
 	}
