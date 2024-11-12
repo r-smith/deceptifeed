@@ -70,8 +70,8 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 
 	// Setup handlers and server config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", enforcePrivateIP(handleConnection))
-	mux.HandleFunc("/empty/", enforcePrivateIP(serveEmpty))
+	mux.HandleFunc("GET /", enforcePrivateIP(handlePlain))
+	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
@@ -87,58 +87,15 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	}
 }
 
-// handleConnection processes incoming HTTP requests for the threat feed
-// server. It serves the sorted list of IP addresses observed interacting with
-// the honeypot servers.
-func handleConnection(w http.ResponseWriter, r *http.Request) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	// Calculate expiry time, defaulting to Go's zero time.
-	expiryTime := time.Time{}
-	if configuration.ExpiryHours > 0 {
-		expiryTime = time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours))
-	}
-
-	// Parse IPs from the iocMap to net.IP for filtering and sorting. Skip any
-	// IPs that have expired or don't meet the minimum threat score.
-	var netIPs []net.IP
-	for ip, ioc := range iocMap {
-		if ioc.LastSeen.After(expiryTime) && ioc.ThreatScore >= configuration.MinimumThreatScore {
-			netIPs = append(netIPs, net.ParseIP(ip))
-		}
-	}
-
-	// If an exclude list is provided, filter the original IP list.
-	var filteredIPList []net.IP
-	if len(configuration.ExcludeListPath) > 0 {
-		ipsToRemove, err := readIPsFromFile(configuration.ExcludeListPath)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to read threat feed exclude list:", err)
-			filteredIPList = netIPs
-		} else {
-			filteredIPList = filterIPs(netIPs, ipsToRemove)
-		}
-	} else {
-		filteredIPList = netIPs
-	}
-
-	// Sort the IP addresses.
-	sort.Slice(filteredIPList, func(i, j int) bool {
-		return bytes.Compare(filteredIPList[i], filteredIPList[j]) < 0
-	})
-
-	// Serve the sorted list of IP addresses.
+// handlePlain processes HTTP requests for the threat feed server. It serves a
+// plain text list of IP addresses that have interacted with the honeypot
+// servers.
+func handlePlain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	for _, ip := range filteredIPList {
-		if ip == nil || (!configuration.IsPrivateIncluded && ip.IsPrivate()) {
-			// Skip IP addresses that failed parsing or are private, based on
-			// the configuration.
-			continue
-		}
+	for _, ip := range prepareThreatFeed() {
 		_, err := w.Write([]byte(ip.String() + "\n"))
 		if err != nil {
-			http.Error(w, "Falled to write response", http.StatusInternalServerError)
+			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
 			return
 		}
 	}
@@ -154,9 +111,58 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		}
 		_, err = w.Write(data)
 		if err != nil {
-			http.Error(w, "Falled to write response", http.StatusInternalServerError)
+			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
 		}
 	}
+}
+
+// prepareThreatFeed filters, processes, and sorts IP addresses from the IoC
+// map. The resulting slice of `net.IP` represents the current threat feed to
+// be served to clients.
+func prepareThreatFeed() []net.IP {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	// Calculate expiry time, defaulting to Go's zero time.
+	expiryTime := time.Time{}
+	if configuration.ExpiryHours > 0 {
+		expiryTime = time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours))
+	}
+
+	// Parse IPs from the iocMap to net.IP. Skip IPs that are expired, below
+	// the minimum threat score, or are private, based on the configuration.
+	netIPs := make([]net.IP, 0, len(iocMap))
+	for ip, ioc := range iocMap {
+		if !ioc.LastSeen.After(expiryTime) || ioc.ThreatScore < configuration.MinimumThreatScore {
+			continue
+		}
+
+		ipParsed := net.ParseIP(ip)
+		if ipParsed == nil {
+			continue
+		}
+		if !configuration.IsPrivateIncluded && ipParsed.IsPrivate() {
+			continue
+		}
+		netIPs = append(netIPs, ipParsed)
+	}
+
+	// If an exclude list is provided, filter the IP list.
+	if len(configuration.ExcludeListPath) > 0 {
+		ipsToRemove, err := readIPsFromFile(configuration.ExcludeListPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to read threat feed exclude list:", err)
+		} else {
+			netIPs = filterIPs(netIPs, ipsToRemove)
+		}
+	}
+
+	// Sort the IP addresses.
+	sort.Slice(netIPs, func(i, j int) bool {
+		return bytes.Compare(netIPs[i], netIPs[j]) < 0
+	})
+
+	return netIPs
 }
 
 // enforcePrivateIP is a middleware that restricts access to the HTTP server
@@ -240,13 +246,10 @@ func filterIPs(ipList []net.IP, ipsToRemove map[string]struct{}) []net.IP {
 	return ipList[:i]
 }
 
-// serveEmpty handles HTTP requests to /empty/. It returns an empty body with
-// status code 200. This endpoint is useful for clearing the threat feed in
-// firewalls, as many firewalls retain the last ingested feed. Firewalls can be
-// configured to point to this endpoint, effectively clearing all previous
-// threat feed data.
-func serveEmpty(w http.ResponseWriter, r *http.Request) {
-	// Serve an empty body with status code 200.
+// handleEmpty handles HTTP requests to /empty. It returns an empty body with
+// status code 200. This endpoint is useful for temporarily clearing the threat
+// feed data in firewalls.
+func handleEmpty(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 }
