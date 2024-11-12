@@ -74,7 +74,7 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", enforcePrivateIP(disableCache(handlePlain)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
-	mux.HandleFunc("GET /json/detailed", enforcePrivateIP(disableCache(handleJSONDetailed)))
+	mux.HandleFunc("GET /json/ips", enforcePrivateIP(disableCache(handleJSONSimple)))
 	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -120,7 +120,7 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleJSON(w http.ResponseWriter, r *http.Request) {
+func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
@@ -129,7 +129,7 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleJSONDetailed(w http.ResponseWriter, r *http.Request) {
+func handleJSON(w http.ResponseWriter, r *http.Request) {
 	type iocDetailed struct {
 		IP          string    `json:"ip"`
 		LastSeen    time.Time `json:"last_seen"`
