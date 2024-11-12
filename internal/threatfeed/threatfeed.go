@@ -3,6 +3,7 @@ package threatfeed
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -71,6 +72,8 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	// Setup handlers and server config.
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", enforcePrivateIP(disableCache(handlePlain)))
+	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
+	mux.HandleFunc("GET /json/detailed", enforcePrivateIP(disableCache(handleJSONDetailed)))
 	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -113,6 +116,42 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
 		}
+	}
+}
+
+func handleJSON(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(map[string]interface{}{"threat_feed": prepareThreatFeed()}); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
+	}
+}
+
+func handleJSONDetailed(w http.ResponseWriter, r *http.Request) {
+	type iocDetailed struct {
+		IP          string    `json:"ip"`
+		LastSeen    time.Time `json:"last_seen"`
+		ThreatScore int       `json:"threat_score"`
+	}
+
+	ipData := prepareThreatFeed()
+	result := make([]iocDetailed, 0, len(ipData))
+	for _, ip := range prepareThreatFeed() {
+		if ioc, found := iocMap[ip.String()]; found {
+			result = append(result, iocDetailed{
+				IP:          ip.String(),
+				LastSeen:    ioc.LastSeen,
+				ThreatScore: ioc.ThreatScore,
+			})
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(map[string]interface{}{"threat_feed": result}); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
 	}
 }
 
