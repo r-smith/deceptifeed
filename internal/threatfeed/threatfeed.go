@@ -3,12 +3,14 @@ package threatfeed
 import (
 	"bufio"
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -75,6 +77,8 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	mux.HandleFunc("GET /", enforcePrivateIP(disableCache(handlePlain)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
 	mux.HandleFunc("GET /json/ips", enforcePrivateIP(disableCache(handleJSONSimple)))
+	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
+	mux.HandleFunc("GET /csv/ips", enforcePrivateIP(disableCache(handleCSVSimple)))
 	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -91,9 +95,9 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	}
 }
 
-// handlePlain processes HTTP requests for the threat feed server. It serves a
-// plain text list of IP addresses that have interacted with the honeypot
-// servers.
+// handlePlain handles HTTP requests to serve the threat feed in plain text. It
+// returns a list of IP addresses that interacted with the honeypot servers.
+// This is the default catch-all route handler.
 func handlePlain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	for _, ip := range prepareThreatFeed() {
@@ -120,15 +124,9 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	e := json.NewEncoder(w)
-	e.SetIndent("", "  ")
-	if err := e.Encode(map[string]interface{}{"threat_feed": prepareThreatFeed()}); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
-	}
-}
-
+// handleJSON handles HTTP requests to serve the full threat feed in JSON
+// format. It returns a JSON array containing the entire IoC database (IP
+// addresses and their associated data).
 func handleJSON(w http.ResponseWriter, r *http.Request) {
 	type iocDetailed struct {
 		IP          string    `json:"ip"`
@@ -156,15 +154,83 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleJSONSimple handles HTTP requests to serve a simplified version of the
+// threat feed in JSON format. It returns a JSON array containing only the IP
+// addresses from the threat feed.
+func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(map[string]interface{}{"threat_feed": prepareThreatFeed()}); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
+	}
+}
+
+// handleCSV handles HTTP requests to serve the full threat feed in CSV format.
+// It returns a CSV file containing the entire IoC database (IP addresses and
+// their associated data).
+func handleCSV(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"threat-feed-"+time.Now().Format("20060102-150405")+".csv\"")
+
+	c := csv.NewWriter(w)
+	if err := c.Write(csvHeader); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+		return
+	}
+
+	for _, ip := range prepareThreatFeed() {
+		if ioc, found := iocMap[ip.String()]; found {
+			if err := c.Write([]string{
+				ip.String(),
+				ioc.LastSeen.Format(time.RFC3339),
+				strconv.Itoa(ioc.ThreatScore),
+			}); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+				return
+			}
+		}
+	}
+
+	c.Flush()
+	if err := c.Error(); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+	}
+}
+
+// handleCSVSimple handles HTTP requests to serve a simplified version of the
+// threat feed in CSV format. It returns a CSV file containing only the IP
+// addresses of the threat feed.
+func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"threat-feed-ips-"+time.Now().Format("20060102-150405")+".csv\"")
+
+	c := csv.NewWriter(w)
+	if err := c.Write([]string{"ip"}); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+		return
+	}
+
+	for _, ip := range prepareThreatFeed() {
+		if err := c.Write([]string{ip.String()}); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+			return
+		}
+	}
+
+	c.Flush()
+	if err := c.Error(); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+	}
+}
+
 // prepareThreatFeed filters, processes, and sorts IP addresses from the IoC
 // map. The resulting slice of `net.IP` represents the current threat feed to
 // be served to clients.
 func prepareThreatFeed() []net.IP {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	// Parse IPs from the iocMap to net.IP. Skip IPs that are expired, below
 	// the minimum threat score, or are private, based on the configuration.
+	mutex.Lock()
 	netIPs := make([]net.IP, 0, len(iocMap))
 	for ip, ioc := range iocMap {
 		if ioc.expired() || ioc.ThreatScore < configuration.MinimumThreatScore {
@@ -180,6 +246,7 @@ func prepareThreatFeed() []net.IP {
 		}
 		netIPs = append(netIPs, ipParsed)
 	}
+	mutex.Unlock()
 
 	// If an exclude list is provided, filter the IP list.
 	if len(configuration.ExcludeListPath) > 0 {
