@@ -70,7 +70,7 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 
 	// Setup handlers and server config.
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", enforcePrivateIP(handlePlain))
+	mux.HandleFunc("GET /", enforcePrivateIP(disableCache(handlePlain)))
 	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -180,6 +180,18 @@ func enforcePrivateIP(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "", http.StatusForbidden)
 			return
 		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+// disableCache is a middleware that sets HTTP response headers to prevent
+// clients from caching the threat feed.
+func disableCache(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 
 		next.ServeHTTP(w, r)
 	}
