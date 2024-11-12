@@ -77,19 +77,17 @@ func loadIoC() error {
 
 		iocMap[ip] = &IoC{LastSeen: lastSeen, ThreatScore: threatScore}
 	}
+	deleteExpired()
 	return nil
 }
 
 // UpdateIoC updates the IoC map. This function is called by honeypot servers
 // each time a client interacts with the honeypot.
 func UpdateIoC(ip string, threatScore int) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	// Check if the given IP string is a private address. The threat feed may
 	// be configured to include or exclude private IPs.
 	netIP := net.ParseIP(ip)
-	if netIP == nil {
+	if netIP == nil || netIP.IsLoopback() {
 		return
 	}
 	if !configuration.IsPrivateIncluded && netIP.IsPrivate() {
@@ -97,11 +95,11 @@ func UpdateIoC(ip string, threatScore int) {
 	}
 
 	now := time.Now()
-	hasMapChanged = true
+	mutex.Lock()
 	if ioc, exists := iocMap[ip]; exists {
 		// Update existing entry.
 		ioc.LastSeen = now
-		if ioc.ThreatScore+threatScore <= math.MaxInt {
+		if uint(ioc.ThreatScore+threatScore) <= math.MaxInt {
 			ioc.ThreatScore += threatScore
 		}
 	} else {
@@ -111,54 +109,50 @@ func UpdateIoC(ip string, threatScore int) {
 			ThreatScore: threatScore,
 		}
 	}
+	mutex.Unlock()
 
-	// Remove expired entries from iocMap.
-	removeExpired()
+	hasMapChanged = true
 }
 
-// removeExpired checks the IoC map for entries that have expired based on
-// their last seen date and the configured expiry hours. It deletes any expired
-// entries from the map. This function should be called exclusively by
-// UpdateIoC, which manages the mutex lock.
-func removeExpired() {
-	// If expiryHours is set to 0, entries never expire and will remain
-	// indefinitely.
-	if configuration.ExpiryHours <= 0 {
-		return
-	}
-
-	var iocToRemove []string
-	expirtyTime := time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours))
+// deleteExpired deletes expired entries from the IoC map.
+func deleteExpired() {
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	for key, value := range iocMap {
-		if value.LastSeen.Before(expirtyTime) {
-			iocToRemove = append(iocToRemove, key)
+		if value.expired() {
+			delete(iocMap, key)
 		}
 	}
+}
 
-	for _, key := range iocToRemove {
-		delete(iocMap, key)
+// expired returns whether an IoC is considered expired based on the last
+// seen date and the configured expiry hours.
+func (ioc *IoC) expired() bool {
+	if configuration.ExpiryHours <= 0 {
+		return false
 	}
+	return ioc.LastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
 }
 
 // saveIoC writes the current IoC map to a CSV file, ensuring the threat feed
 // database persists across application restarts.
 func saveIoC() error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
 	err := writer.Write(strings.Split(csvHeader, ","))
 	if err != nil {
 		return err
 	}
+
+	mutex.Lock()
 	for ip, ioc := range iocMap {
 		err := writer.Write([]string{ip, ioc.LastSeen.Format(dateFormat), strconv.Itoa(ioc.ThreatScore)})
 		if err != nil {
 			return err
 		}
 	}
+	mutex.Unlock()
 	writer.Flush()
 
 	if err := os.WriteFile(configuration.DatabasePath, buf.Bytes(), 0644); err != nil {

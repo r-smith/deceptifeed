@@ -34,7 +34,7 @@ var (
 
 	// ticker creates a new ticker for periodically writing the IoC map to
 	// disk.
-	ticker = time.NewTicker(10 * time.Second)
+	ticker = time.NewTicker(20 * time.Second)
 
 	// hasMapChanged indicates whether the IoC map has been modified since the
 	// last time it was saved to disk.
@@ -61,6 +61,7 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	go func() {
 		for range ticker.C {
 			if hasMapChanged {
+				deleteExpired()
 				if err := saveIoC(); err != nil {
 					fmt.Fprintln(os.Stderr, "Error saving Threat Feed database:", err)
 				}
@@ -162,17 +163,11 @@ func prepareThreatFeed() []net.IP {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// Calculate expiry time, defaulting to Go's zero time.
-	expiryTime := time.Time{}
-	if configuration.ExpiryHours > 0 {
-		expiryTime = time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours))
-	}
-
 	// Parse IPs from the iocMap to net.IP. Skip IPs that are expired, below
 	// the minimum threat score, or are private, based on the configuration.
 	netIPs := make([]net.IP, 0, len(iocMap))
 	for ip, ioc := range iocMap {
-		if !ioc.LastSeen.After(expiryTime) || ioc.ThreatScore < configuration.MinimumThreatScore {
+		if ioc.expired() || ioc.ThreatScore < configuration.MinimumThreatScore {
 			continue
 		}
 
