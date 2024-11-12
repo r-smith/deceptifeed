@@ -208,28 +208,36 @@ func readIPsFromFile(filepath string) (map[string]struct{}, error) {
 // keys in ipsToRemove may be single IP addresses or CIDR ranges. If a key is a
 // CIDR range, an IP will be removed if it falls within that range.
 func filterIPs(ipList []net.IP, ipsToRemove map[string]struct{}) []net.IP {
-	filtered := []net.IP{}
-
-	// If there's nothing to filter, return the original list.
 	if len(ipsToRemove) == 0 {
 		return ipList
 	}
 
+	cidrNetworks := []*net.IPNet{}
+	for cidr := range ipsToRemove {
+		if _, ipnet, err := net.ParseCIDR(cidr); err == nil {
+			cidrNetworks = append(cidrNetworks, ipnet)
+		}
+	}
+
+	i := 0
 	for _, ip := range ipList {
 		if _, found := ipsToRemove[ip.String()]; found {
 			continue
 		}
 
-		// Check for CIDR matches.
-		for cidr := range ipsToRemove {
-			_, netCIDR, err := net.ParseCIDR(cidr)
-			if err == nil && netCIDR.Contains(ip) {
-				continue
+		contains := false
+		for _, ipnet := range cidrNetworks {
+			if ipnet.Contains(ip) {
+				contains = true
+				break
 			}
-			filtered = append(filtered, ip)
+		}
+		if !contains {
+			ipList[i] = ip
+			i++
 		}
 	}
-	return filtered
+	return ipList[:i]
 }
 
 // serveEmpty handles HTTP requests to /empty/. It returns an empty body with
