@@ -84,7 +84,7 @@ func main() {
 			return
 		}
 
-		threatfeed.StartThreatFeed(&cfg.ThreatFeed)
+		threatfeed.Start(&cfg.ThreatFeed)
 	}()
 
 	// Start the honeypot servers.
@@ -97,16 +97,14 @@ func main() {
 			}
 
 			switch server.Type {
-			case config.HTTP:
-				httpserver.StartHTTP(&server)
-			case config.HTTPS:
-				httpserver.StartHTTPS(&server)
+			case config.HTTP, config.HTTPS:
+				httpserver.Start(&server)
 			case config.SSH:
-				sshserver.StartSSH(&server)
+				sshserver.Start(&server)
 			case config.TCP:
-				tcpserver.StartTCP(&server)
+				tcpserver.Start(&server)
 			case config.UDP:
-				udpserver.StartUDP(&server)
+				udpserver.Start(&server)
 			}
 		}()
 	}

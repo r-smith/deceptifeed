@@ -24,10 +24,22 @@ import (
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
-// StartHTTP initializes and starts an HTTP honeypot server. This is a fully
-// functional HTTP server designed to log all incoming requests for analysis.
-func StartHTTP(cfg *config.Server) {
-	// Setup handler and server config.
+// Start initializes and starts an HTTP or HTTPS honeypot server. The server
+// is a simple HTTP server designed to log all details from incoming requests.
+// Optionally, a single static HTML file can be served as the homepage,
+// otherwise, the server will return only HTTP status codes to clients.
+// Interactions with the HTTP server are sent to the threat feed.
+func Start(cfg *config.Server) {
+	switch cfg.Type {
+	case config.HTTP:
+		listenHTTP(cfg)
+	case config.HTTPS:
+		listenHTTPS(cfg)
+	}
+}
+
+// listenHTTP initializes and starts an HTTP (plaintext) honeypot server.
+func listenHTTP(cfg *config.Server) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers)))
 	srv := &http.Server{
@@ -42,14 +54,12 @@ func StartHTTP(cfg *config.Server) {
 	// Start the HTTP server.
 	fmt.Printf("Starting HTTP server on port: %s\n", cfg.Port)
 	if err := srv.ListenAndServe(); err != nil {
-		fmt.Fprintln(os.Stderr, "The HTTP server has terminated:", err)
+		fmt.Fprintf(os.Stderr, "The HTTP server on port %s has stopped: %v\n", cfg.Port, err)
 	}
 }
 
-// StartHTTPS initializes and starts an HTTPS honeypot server. This  is a fully
-// functional HTTPS server designed to log all incoming requests for analysis.
-func StartHTTPS(cfg *config.Server) {
-	// Setup handler and initialize HTTPS config.
+// listenHTTP initializes and starts an HTTPS (encrypted) honeypot server.
+func listenHTTPS(cfg *config.Server) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers)))
 	srv := &http.Server{
@@ -79,7 +89,7 @@ func StartHTTPS(cfg *config.Server) {
 	// Start the HTTPS server.
 	fmt.Printf("Starting HTTPS server on port: %s\n", cfg.Port)
 	if err := srv.ListenAndServeTLS(cfg.CertPath, cfg.KeyPath); err != nil {
-		fmt.Fprintln(os.Stderr, "The HTTPS server has terminated:", err)
+		fmt.Fprintf(os.Stderr, "The HTTPS server on port %s has stopped: %v\n", cfg.Port, err)
 	}
 }
 

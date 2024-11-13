@@ -12,35 +12,26 @@ import (
 	"github.com/r-smith/deceptifeed/internal/config"
 )
 
-// StartUDP serves as a wrapper to initialize and start a generic UDP honeypot
-// server. It listens on the specified port, logging any received data without
-// responding back to the client. Since UDP is connectionless, clients are
-// unaware of the server's existence and that it is actively listening and
-// recording data sent to the port. Note that source IP addresses for UDP
-// packets are unreliable due to potential spoofing. As a result, interactions
-// logged from the UDP server will not be added to the threat feed. This
-// function calls the underlying startUDP function to perform the actual server
-// startup.
-func StartUDP(cfg *config.Server) {
+// Start initializes and starts a generic UDP honeypot server. It listens on
+// the specified port, logging any received data without responding back to the
+// client. Since UDP is connectionless, clients are unaware of the server's
+// existence and that it is actively listening and recording data sent to the
+// port. Note that source IP addresses for UDP packets are unreliable due to
+// potential spoofing. As a result, interactions with the UDP server are not
+// added to the threat feed.
+func Start(cfg *config.Server) {
 	fmt.Printf("Starting UDP server on port: %s\n", cfg.Port)
-	if err := startUDP(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "The UDP server has terminated:", err)
-	}
-}
-
-// startUDP starts the UDP honeypot server. It handles the server's main loop
-// and logging.
-func startUDP(cfg *config.Server) error {
-	// Convert the specified port number to an integer.
 	port, err := strconv.Atoi(cfg.Port)
 	if err != nil {
-		return fmt.Errorf("invalid port '%s': %w", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", cfg.Port, err)
+		return
 	}
 
 	// Start the UDP server.
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: port})
 	if err != nil {
-		return fmt.Errorf("failure to listen on port '%s': %w", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", cfg.Port, err)
+		return
 	}
 	defer conn.Close()
 

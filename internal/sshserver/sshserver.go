@@ -21,30 +21,21 @@ import (
 // automatically disconnected, set to 30 seconds.
 const serverTimeout = 30 * time.Second
 
-// StartSSH serves as a wrapper to initialize and start an SSH honeypot server.
-// The SSH server is designed to log the usernames and passwords submitted in
-// authentication requests. It is not possible for clients to log in to the
-// honeypot server, as authentication is the only function handled by the
-// server. Clients receive authentication failure responses for every login
-// attempt. This function calls the underlying startSSH function to perform the
-// actual server startup.
-func StartSSH(cfg *config.Server) {
+// Start initializes and starts an SSH honeypot server. The SSH server is
+// designed to log the usernames and passwords submitted in authentication
+// requests. It is not possible for clients to log in to the honeypot server,
+// as authentication is the only function handled by the server. Clients
+// receive authentication failure responses for every login attempt.
+// Interactions with the SSH server are sent to the threat feed.
+func Start(cfg *config.Server) {
 	fmt.Printf("Starting SSH server on port: %s\n", cfg.Port)
-	if err := startSSH(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "The SSH server has terminated:", err)
-	}
-}
-
-// startSSH starts the SSH honeypot server. It handles the server's main loop,
-// authentication callback, and logging.
-func startSSH(cfg *config.Server) error {
-	// Create a new SSH server configuration.
 	sshConfig := &ssh.ServerConfig{}
 
 	// Load or generate a private key and add it to the SSH configuration.
 	privateKey, err := loadOrGeneratePrivateKey(cfg.KeyPath)
 	if err != nil {
-		return err
+		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", cfg.Port, err)
+		return
 	}
 	sshConfig.AddHostKey(privateKey)
 
@@ -107,7 +98,8 @@ func startSSH(cfg *config.Server) error {
 	// Start the SSH server.
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
-		return fmt.Errorf("failed to listen on port '%s': %w", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", cfg.Port, err)
+		return
 	}
 	defer listener.Close()
 

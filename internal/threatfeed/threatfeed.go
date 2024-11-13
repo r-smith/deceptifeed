@@ -43,11 +43,10 @@ var (
 	hasMapChanged = false
 )
 
-// StartThreatFeed initializes and starts the threat feed server. The server
-// provides a list of IP addresses observed interacting with the honeypot
-// servers. The data is served in a format compatible with most enterprise
-// firewalls.
-func StartThreatFeed(cfg *config.ThreatFeed) {
+// Start initializes and starts the threat feed server. The server provides a
+// list of IP addresses observed interacting with the honeypot servers in
+// various formats.
+func Start(cfg *config.ThreatFeed) {
 	// Assign the passed-in config.ThreatFeed to the global configuration
 	// variable.
 	configuration = *cfg
@@ -55,7 +54,7 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	// Check for and open an existing threat feed CSV database, if available.
 	err := loadIoC()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "The Threat Feed server has terminated: Failed to open Threat Feed database:", err)
+		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed database:", err)
 		return
 	}
 
@@ -91,7 +90,7 @@ func StartThreatFeed(cfg *config.ThreatFeed) {
 	// Start the threat feed HTTP server.
 	fmt.Printf("Starting Threat Feed server on port: %s\n", cfg.Port)
 	if err := srv.ListenAndServe(); err != nil {
-		fmt.Fprintln(os.Stderr, "The Threat Feed server has terminated:", err)
+		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped:", err)
 	}
 }
 

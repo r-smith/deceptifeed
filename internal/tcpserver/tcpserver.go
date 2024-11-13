@@ -19,23 +19,15 @@ import (
 // automatically disconnected, set to 30 seconds.
 const serverTimeout = 30 * time.Second
 
-// StartTCP serves as a wrapper to initialize and start a generic TCP honeypot
-// server. It presents custom prompts to connected clients and logs their
-// responses. This function calls the underlying startTCP function to
-// perform the actual server startup.
-func StartTCP(cfg *config.Server) {
+// Start initializes and starts a generic TCP honeypot server. It presents
+// custom prompts to connected clients and logs their responses. Interactions
+// with the TCP server are sent to the threat feed.
+func Start(cfg *config.Server) {
 	fmt.Printf("Starting TCP server on port: %s\n", cfg.Port)
-	if err := startTCP(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "The TCP server has terminated:", err)
-	}
-}
-
-// startTCP starts the TCP honeypot server. It handles the server's main loop.
-func startTCP(cfg *config.Server) error {
-	// Start the TCP server.
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
-		return fmt.Errorf("failed to listen on port '%s': %w", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The TCP server on port %s has stopped: %v\n", cfg.Port, err)
+		return
 	}
 	defer listener.Close()
 
