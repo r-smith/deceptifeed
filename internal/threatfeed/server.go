@@ -58,6 +58,8 @@ func Start(cfg *config.ThreatFeed) {
 	mux.HandleFunc("GET /json/ips", enforcePrivateIP(disableCache(handleJSONSimple)))
 	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
 	mux.HandleFunc("GET /csv/ips", enforcePrivateIP(disableCache(handleCSVSimple)))
+	mux.HandleFunc("GET /stix2", enforcePrivateIP(disableCache(handleSTIX2)))
+	mux.HandleFunc("GET /stix2/ips", enforcePrivateIP(disableCache(handleSTIX2Simple)))
 	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

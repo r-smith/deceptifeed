@@ -147,6 +147,129 @@ func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleSTIX2 handles HTTP requests to serve the full threat feed in STIX 2
+// format. The response includes all IoC data (IP addresses and their
+// associated data). The response is structured as a STIX Bundle containing
+// `Indicators` (STIX Domain Objects) for each IP address in the threat feed.
+func handleSTIX2(w http.ResponseWriter, r *http.Request) {
+	type object struct {
+		Type           string     `json:"type"`
+		SpecVersion    string     `json:"spec_version"`
+		ID             string     `json:"id"`
+		IndicatorTypes []string   `json:"indicator_types"`
+		Pattern        string     `json:"pattern"`
+		PatternType    string     `json:"pattern_type"`
+		Created        time.Time  `json:"created"`
+		Modified       time.Time  `json:"modified"`
+		ValidFrom      time.Time  `json:"valid_from"`
+		ValidUntil     *time.Time `json:"valid_until,omitempty"`
+		Name           string     `json:"name"`
+		Description    string     `json:"description"`
+	}
+	type bundle struct {
+		Type    string   `json:"type"`
+		ID      string   `json:"id"`
+		Objects []object `json:"objects"`
+	}
+
+	ipData := prepareFeed()
+	objects := make([]object, 0, len(ipData))
+	for _, ip := range ipData {
+		if ioc, found := iocData[ip.String()]; found {
+			pattern := "[ipv4-addr:value = '"
+			if strings.Contains(ip.String(), ":") {
+				pattern = "[ipv6-addr:value = '"
+			}
+			pattern = pattern + ip.String() + "']"
+			var validUntil *time.Time
+			if configuration.ExpiryHours > 0 {
+				validUntil = new(time.Time)
+				*validUntil = ioc.LastSeen.Add(time.Hour * time.Duration(configuration.ExpiryHours)).UTC()
+			}
+			// The STIX 2.1 specification allows for deterministic identifiers
+			// for STIX Domain Objects using UUIDv5. The STIX namespace must
+			// not be used. For each Indicator, generate the UUID using the
+			// generic UUIDv5 DNS namespace and the string representation of
+			// the IP address.
+			objects = append(objects, object{
+				Type:           "indicator",
+				SpecVersion:    "2.1",
+				ID:             "indicator--" + newUUIDv5(nsDNS, ip.String()),
+				IndicatorTypes: []string{"malicious-activity"},
+				Pattern:        pattern,
+				PatternType:    "stix",
+				Created:        ioc.Added.UTC(),
+				Modified:       ioc.LastSeen.UTC(),
+				ValidFrom:      ioc.Added.UTC(),
+				ValidUntil:     validUntil,
+				Name:           "Honeypot interaction",
+				Description:    "This IP was observed interacting with a honeypot server.",
+			})
+		}
+	}
+	result := bundle{
+		Type:    "bundle",
+		ID:      "bundle--" + newUUIDv4(),
+		Objects: objects,
+	}
+
+	w.Header().Set("Content-Type", "application/stix+json;version=2.1")
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to STIX:", err)
+	}
+}
+
+// handleSTIX2Simple handles HTTP requests to serve a simplified version of the
+// threat feed in STIX 2 format. The response is structured as a STIX Bundle,
+// with each IP address in the threat feed included as a STIX Cyber-observable
+// Object.
+func handleSTIX2Simple(w http.ResponseWriter, r *http.Request) {
+	type object struct {
+		Type        string `json:"type"`
+		SpecVersion string `json:"spec_version"`
+		ID          string `json:"id"`
+		Value       string `json:"value"`
+	}
+	type bundle struct {
+		Type    string   `json:"type"`
+		ID      string   `json:"id"`
+		Objects []object `json:"objects"`
+	}
+
+	ipData := prepareFeed()
+	objects := make([]object, 0, len(ipData))
+	for _, ip := range ipData {
+		if _, found := iocData[ip.String()]; found {
+			t := "ipv4-addr"
+			if strings.Contains(ip.String(), ":") {
+				t = "ipv6-addr"
+			}
+			// Use a STIX 2.1 deterministic identifier. For an IP address SCO,
+			// the UUID portion of the identifier is generated using UUIDv5
+			// with the STIX namespace and a JSON version of the value. Example
+			// value: {"value":"127.0.0.1"}
+			objects = append(objects, object{
+				Type:        t,
+				SpecVersion: "2.1",
+				ID:          t + "--" + newUUIDv5(nsSTIX, "{\"value\":\""+ip.String()+"\"}"),
+				Value:       ip.String(),
+			})
+		}
+	}
+	result := bundle{
+		Type:    "bundle",
+		ID:      "bundle--" + newUUIDv4(),
+		Objects: objects,
+	}
+
+	w.Header().Set("Content-Type", "application/stix+json;version=2.1")
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(result); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to STIX:", err)
+	}
+}
+
 // handleEmpty handles HTTP requests to /empty. It returns an empty body with
 // status code 200. This endpoint is useful for temporarily clearing the threat
 // feed data in firewalls.
