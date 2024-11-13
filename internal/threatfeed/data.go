@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -33,9 +34,86 @@ const (
 )
 
 var (
-	// csvHeader defines the header row for the threat feed data.
+	// iocData stores the Indicator of Compromise (IoC) entries which make up
+	// the active threat feed. It is initially populated by loadCSV if an
+	// existing CSV file is provided. The map is subsequently updated by
+	// `Update` whenever a client interacts with a honeypot server. This
+	// map is served by the threat feed HTTP server for clients to consume.
+	iocData = make(map[string]*IoC)
+
+	// mutex is to ensure thread-safe access to iocData.
+	mutex sync.Mutex
+
+	// dataChanged indicates whether the IoC map has been modified since the
+	// last time it was saved to disk.
+	dataChanged = false
+
+	// csvHeader defines the header row for saved threat feed data.
 	csvHeader = []string{"ip", "added", "last_seen", "threat_score"}
 )
+
+// Update updates the threat feed with the provided source IP address and
+// threat score. This function should be called by honeypot servers whenever a
+// client interacts with the honeypot. If the source IP address is already in
+// the threat feed, its last-seen timestamp is updated, and its threat score is
+// incremented. Otherwise, the IP address is added as a new entry in the threat
+// feed.
+func Update(ip string, threatScore int) {
+	// Check if the given IP string is a private address. The threat feed may
+	// be configured to include or exclude private IPs.
+	netIP := net.ParseIP(ip)
+	if netIP == nil || netIP.IsLoopback() {
+		return
+	}
+	if !configuration.IsPrivateIncluded && netIP.IsPrivate() {
+		return
+	}
+
+	now := time.Now()
+	mutex.Lock()
+	if ioc, exists := iocData[ip]; exists {
+		// Update existing entry.
+		ioc.LastSeen = now
+		if threatScore > 0 {
+			if ioc.ThreatScore > math.MaxInt-threatScore {
+				ioc.ThreatScore = math.MaxInt
+			} else {
+				ioc.ThreatScore += threatScore
+			}
+		}
+	} else {
+		// Create a new entry.
+		iocData[ip] = &IoC{
+			Added:       now,
+			LastSeen:    now,
+			ThreatScore: threatScore,
+		}
+	}
+	mutex.Unlock()
+
+	dataChanged = true
+}
+
+// deleteExpired deletes expired threat feed entries from the IoC map.
+func deleteExpired() {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for key, value := range iocData {
+		if value.expired() {
+			delete(iocData, key)
+		}
+	}
+}
+
+// expired returns whether an IoC is considered expired based on the last
+// seen date and the configured expiry hours.
+func (ioc *IoC) expired() bool {
+	if configuration.ExpiryHours <= 0 {
+		return false
+	}
+	return ioc.LastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
+}
 
 // loadCSV loads existing threat feed data from a CSV file. If found, it
 // populates iocData which represents the active threat feed. This function is
@@ -88,69 +166,6 @@ func loadCSV() error {
 	}
 	deleteExpired()
 	return nil
-}
-
-// Update updates the threat feed with the provided source IP address and
-// threat score. This function should be called by honeypot servers whenever a
-// client interacts with the honeypot. If the source IP address is already in
-// the threat feed, its last-seen timestamp is updated, and its threat score is
-// incremented. Otherwise, the IP address is added as a new entry in the threat
-// feed.
-func Update(ip string, threatScore int) {
-	// Check if the given IP string is a private address. The threat feed may
-	// be configured to include or exclude private IPs.
-	netIP := net.ParseIP(ip)
-	if netIP == nil || netIP.IsLoopback() {
-		return
-	}
-	if !configuration.IsPrivateIncluded && netIP.IsPrivate() {
-		return
-	}
-
-	now := time.Now()
-	mutex.Lock()
-	if ioc, exists := iocData[ip]; exists {
-		// Update existing entry.
-		ioc.LastSeen = now
-		if threatScore > 0 {
-			if ioc.ThreatScore > math.MaxInt-threatScore {
-				ioc.ThreatScore = math.MaxInt
-			} else {
-				ioc.ThreatScore += threatScore
-			}
-		}
-	} else {
-		// Create a new entry.
-		iocData[ip] = &IoC{
-			Added:       now,
-			LastSeen:    now,
-			ThreatScore: threatScore,
-		}
-	}
-	mutex.Unlock()
-
-	hasMapChanged = true
-}
-
-// deleteExpired deletes expired threat feed entries from the IoC map.
-func deleteExpired() {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	for key, value := range iocData {
-		if value.expired() {
-			delete(iocData, key)
-		}
-	}
-}
-
-// expired returns whether an IoC is considered expired based on the last
-// seen date and the configured expiry hours.
-func (ioc *IoC) expired() bool {
-	if configuration.ExpiryHours <= 0 {
-		return false
-	}
-	return ioc.LastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
 }
 
 // saveCSV writes the current threat feed to a CSV file. This CSV file ensures
