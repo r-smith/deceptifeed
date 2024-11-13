@@ -11,9 +11,8 @@ import (
 	"time"
 )
 
-// IoC represents an Indicator of Compromise (IoC) entry in the threat feed
-// database. The database is in CSV format, with each row containing an IP
-// address and its associated IoC data.
+// IoC represents an Indicator of Compromise (IoC) entry that makes up the
+// structure of the threat feed.
 type IoC struct {
 	// Added records the time when an IP address is added to the threat feed.
 	Added time.Time
@@ -34,14 +33,14 @@ const (
 )
 
 var (
-	// csvHeader defines the header row for the threat feed database.
+	// csvHeader defines the header row for the threat feed data.
 	csvHeader = []string{"ip", "added", "last_seen", "threat_score"}
 )
 
-// loadIoC reads IoC data from an existing CSV database. If found, it
-// populates iocMap. This function is called once during the initialization of
-// the threat feed server.
-func loadIoC() error {
+// loadCSV loads existing threat feed data from a CSV file. If found, it
+// populates iocData which represents the active threat feed. This function is
+// called once during the initialization of the threat feed server.
+func loadCSV() error {
 	file, err := os.Open(configuration.DatabasePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -85,15 +84,19 @@ func loadIoC() error {
 			}
 		}
 
-		iocMap[ip] = &IoC{Added: added, LastSeen: lastSeen, ThreatScore: threatScore}
+		iocData[ip] = &IoC{Added: added, LastSeen: lastSeen, ThreatScore: threatScore}
 	}
 	deleteExpired()
 	return nil
 }
 
-// UpdateIoC updates the IoC map. This function is called by honeypot servers
-// each time a client interacts with the honeypot.
-func UpdateIoC(ip string, threatScore int) {
+// Update updates the threat feed with the provided source IP address and
+// threat score. This function should be called by honeypot servers whenever a
+// client interacts with the honeypot. If the source IP address is already in
+// the threat feed, its last-seen timestamp is updated, and its threat score is
+// incremented. Otherwise, the IP address is added as a new entry in the threat
+// feed.
+func Update(ip string, threatScore int) {
 	// Check if the given IP string is a private address. The threat feed may
 	// be configured to include or exclude private IPs.
 	netIP := net.ParseIP(ip)
@@ -106,7 +109,7 @@ func UpdateIoC(ip string, threatScore int) {
 
 	now := time.Now()
 	mutex.Lock()
-	if ioc, exists := iocMap[ip]; exists {
+	if ioc, exists := iocData[ip]; exists {
 		// Update existing entry.
 		ioc.LastSeen = now
 		if threatScore > 0 {
@@ -118,7 +121,7 @@ func UpdateIoC(ip string, threatScore int) {
 		}
 	} else {
 		// Create a new entry.
-		iocMap[ip] = &IoC{
+		iocData[ip] = &IoC{
 			Added:       now,
 			LastSeen:    now,
 			ThreatScore: threatScore,
@@ -129,14 +132,14 @@ func UpdateIoC(ip string, threatScore int) {
 	hasMapChanged = true
 }
 
-// deleteExpired deletes expired entries from the IoC map.
+// deleteExpired deletes expired threat feed entries from the IoC map.
 func deleteExpired() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	for key, value := range iocMap {
+	for key, value := range iocData {
 		if value.expired() {
-			delete(iocMap, key)
+			delete(iocData, key)
 		}
 	}
 }
@@ -150,9 +153,10 @@ func (ioc *IoC) expired() bool {
 	return ioc.LastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
 }
 
-// saveIoC writes the current IoC map to a CSV file, ensuring the threat feed
-// database persists across application restarts.
-func saveIoC() error {
+// saveCSV writes the current threat feed to a CSV file. This CSV file ensures
+// the threat feed data persists across application restarts. It is not the
+// active threat feed.
+func saveCSV() error {
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
 	err := writer.Write(csvHeader)
@@ -161,7 +165,7 @@ func saveIoC() error {
 	}
 
 	mutex.Lock()
-	for ip, ioc := range iocMap {
+	for ip, ioc := range iocData {
 		if err := writer.Write([]string{
 			ip,
 			ioc.Added.Format(dateFormat),

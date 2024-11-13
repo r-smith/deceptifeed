@@ -19,22 +19,22 @@ import (
 )
 
 var (
-	// configuration holds the global configuration for the threat feed server.
-	// This variable is assigned the config.ThreatFeed value that's passed in
-	// during the server's startup.
+	// configuration holds the configuration for the threat feed server. It is
+	// assigned when the server is initializing and the configuration values
+	// should not change.
 	configuration config.ThreatFeed
 
-	// iocMap stores the Indicator of Compromise (IoC) entries which makes up
-	// the threat feed database. It is initially populated by loadIoC if an
-	// existing CSV database file is provided. The map is subsequently updated
-	// by UpdateIoC whenever a client interacts with a honeypot server. This
-	// map is accessed and served by the threat feed HTTP server.
-	iocMap = make(map[string]*IoC)
+	// iocData stores the Indicator of Compromise (IoC) entries which make up
+	// the active threat feed. It is initially populated by loadCSV if an
+	// existing CSV file is provided. The map is subsequently updated by
+	// `Update` whenever a client interacts with a honeypot server. This
+	// map is served by the threat feed HTTP server for clients to consume.
+	iocData = make(map[string]*IoC)
 
-	// mutex is to ensure thread-safe access to iocMap.
+	// mutex is to ensure thread-safe access to iocData.
 	mutex sync.Mutex
 
-	// ticker creates a new ticker for periodically writing the IoC map to
+	// ticker creates a new ticker for periodically saving the threat feed to
 	// disk.
 	ticker = time.NewTicker(20 * time.Second)
 
@@ -51,20 +51,21 @@ func Start(cfg *config.ThreatFeed) {
 	// variable.
 	configuration = *cfg
 
-	// Check for and open an existing threat feed CSV database, if available.
-	err := loadIoC()
+	// Check for and open an existing threat feed CSV file, if available.
+	err := loadCSV()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed database:", err)
+		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed data:", err)
 		return
 	}
 
-	// Periodically save the current iocMap to disk.
+	// Periodically save the current threat feed to disk and delete expired
+	// entries.
 	go func() {
 		for range ticker.C {
 			if hasMapChanged {
 				deleteExpired()
-				if err := saveIoC(); err != nil {
-					fmt.Fprintln(os.Stderr, "Error saving Threat Feed database:", err)
+				if err := saveCSV(); err != nil {
+					fmt.Fprintln(os.Stderr, "Error saving Threat Feed data:", err)
 				}
 				hasMapChanged = false
 			}
@@ -124,8 +125,8 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleJSON handles HTTP requests to serve the full threat feed in JSON
-// format. It returns a JSON array containing the entire IoC database (IP
-// addresses and their associated data).
+// format. It returns a JSON array containing all IoC data (IP addresses and
+// their associated data).
 func handleJSON(w http.ResponseWriter, r *http.Request) {
 	type iocDetailed struct {
 		IP          string    `json:"ip"`
@@ -137,7 +138,7 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 	ipData := prepareThreatFeed()
 	result := make([]iocDetailed, 0, len(ipData))
 	for _, ip := range ipData {
-		if ioc, found := iocMap[ip.String()]; found {
+		if ioc, found := iocData[ip.String()]; found {
 			result = append(result, iocDetailed{
 				IP:          ip.String(),
 				Added:       ioc.Added,
@@ -168,8 +169,8 @@ func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCSV handles HTTP requests to serve the full threat feed in CSV format.
-// It returns a CSV file containing the entire IoC database (IP addresses and
-// their associated data).
+// It returns a CSV file containing all IoC data (IP addresses and their
+// associated data).
 func handleCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"threat-feed-"+time.Now().Format("20060102-150405")+".csv\"")
@@ -181,7 +182,7 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, ip := range prepareThreatFeed() {
-		if ioc, found := iocMap[ip.String()]; found {
+		if ioc, found := iocData[ip.String()]; found {
 			if err := c.Write([]string{
 				ip.String(),
 				ioc.Added.Format(dateFormat),
@@ -230,11 +231,11 @@ func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
 // map. The resulting slice of `net.IP` represents the current threat feed to
 // be served to clients.
 func prepareThreatFeed() []net.IP {
-	// Parse IPs from the iocMap to net.IP. Skip IPs that are expired, below
-	// the minimum threat score, or are private, based on the configuration.
+	// Parse IPs from iocData to net.IP. Skip IPs that are expired, below the
+	// minimum threat score, or are private, based on the configuration.
 	mutex.Lock()
-	netIPs := make([]net.IP, 0, len(iocMap))
-	for ip, ioc := range iocMap {
+	netIPs := make([]net.IP, 0, len(iocData))
+	for ip, ioc := range iocData {
 		if ioc.expired() || ioc.ThreatScore < configuration.MinimumThreatScore {
 			continue
 		}

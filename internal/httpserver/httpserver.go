@@ -159,7 +159,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 					src = header
 				}
 			}
-			threatfeed.UpdateIoC(src, cfg.ThreatScore)
+			threatfeed.Update(src, cfg.ThreatScore)
 		}
 
 		// Apply any custom HTTP response headers.
