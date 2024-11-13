@@ -15,6 +15,9 @@ import (
 // database. The database is in CSV format, with each row containing an IP
 // address and its associated IoC data.
 type IoC struct {
+	// Added records the time when an IP address is added to the threat feed.
+	Added time.Time
+
 	// LastSeen records the last time an IP was observed interacting with a
 	// honeypot server.
 	LastSeen time.Time
@@ -32,7 +35,7 @@ const (
 
 var (
 	// csvHeader defines the header row for the threat feed database.
-	csvHeader = []string{"ip,last_seen,threat_score"}
+	csvHeader = []string{"ip", "added", "last_seen", "threat_score"}
 )
 
 // loadIoC reads IoC data from an existing CSV database. If found, it
@@ -58,25 +61,31 @@ func loadIoC() error {
 		return nil
 	}
 
+	var added time.Time
 	var lastSeen time.Time
 	var threatScore int
 	for _, record := range records[1:] {
 		ip := record[0]
 
-		// Parse lastSeen, if available.
+		// Parse added, if available.
 		if len(record) > 1 && record[1] != "" {
-			lastSeen, _ = time.Parse(dateFormat, record[1])
+			added, _ = time.Parse(dateFormat, record[1])
+		}
+
+		// Parse lastSeen, if available.
+		if len(record) > 2 && record[2] != "" {
+			lastSeen, _ = time.Parse(dateFormat, record[2])
 		}
 
 		// Parse threat score, defaulting to 1.
 		threatScore = 1
-		if len(record) > 2 && record[2] != "" {
-			if parsedLevel, err := strconv.Atoi(record[2]); err == nil {
+		if len(record) > 3 && record[3] != "" {
+			if parsedLevel, err := strconv.Atoi(record[3]); err == nil {
 				threatScore = parsedLevel
 			}
 		}
 
-		iocMap[ip] = &IoC{LastSeen: lastSeen, ThreatScore: threatScore}
+		iocMap[ip] = &IoC{Added: added, LastSeen: lastSeen, ThreatScore: threatScore}
 	}
 	deleteExpired()
 	return nil
@@ -110,6 +119,7 @@ func UpdateIoC(ip string, threatScore int) {
 	} else {
 		// Create a new entry.
 		iocMap[ip] = &IoC{
+			Added:       now,
 			LastSeen:    now,
 			ThreatScore: threatScore,
 		}
@@ -154,6 +164,7 @@ func saveIoC() error {
 	for ip, ioc := range iocMap {
 		if err := writer.Write([]string{
 			ip,
+			ioc.Added.Format(dateFormat),
 			ioc.LastSeen.Format(dateFormat),
 			strconv.Itoa(ioc.ThreatScore),
 		}); err != nil {

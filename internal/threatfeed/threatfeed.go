@@ -130,16 +130,18 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 func handleJSON(w http.ResponseWriter, r *http.Request) {
 	type iocDetailed struct {
 		IP          string    `json:"ip"`
+		Added       time.Time `json:"added"`
 		LastSeen    time.Time `json:"last_seen"`
 		ThreatScore int       `json:"threat_score"`
 	}
 
 	ipData := prepareThreatFeed()
 	result := make([]iocDetailed, 0, len(ipData))
-	for _, ip := range prepareThreatFeed() {
+	for _, ip := range ipData {
 		if ioc, found := iocMap[ip.String()]; found {
 			result = append(result, iocDetailed{
 				IP:          ip.String(),
+				Added:       ioc.Added,
 				LastSeen:    ioc.LastSeen,
 				ThreatScore: ioc.ThreatScore,
 			})
@@ -183,7 +185,8 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 		if ioc, found := iocMap[ip.String()]; found {
 			if err := c.Write([]string{
 				ip.String(),
-				ioc.LastSeen.Format(time.RFC3339),
+				ioc.Added.Format(dateFormat),
+				ioc.LastSeen.Format(dateFormat),
 				strconv.Itoa(ioc.ThreatScore),
 			}); err != nil {
 				fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
