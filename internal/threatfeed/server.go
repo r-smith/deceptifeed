@@ -9,15 +9,18 @@ import (
 	"github.com/r-smith/deceptifeed/internal/config"
 )
 
+const (
+	// saveInterval represents how frequently the threat feed is saved to disk.
+	// The saved file ensures threat feed data persists across application
+	// restarts. It is not the active threat feed.
+	saveInterval = 20 * time.Second
+)
+
 var (
 	// configuration holds the configuration for the threat feed server. It is
 	// assigned when the server is initializing and the configuration values
 	// should not change.
 	configuration config.ThreatFeed
-
-	// ticker creates a new ticker for periodically saving the threat feed to
-	// disk.
-	ticker = time.NewTicker(20 * time.Second)
 )
 
 // Start initializes and starts the threat feed server. The server provides a
@@ -35,6 +38,7 @@ func Start(cfg *config.ThreatFeed) {
 
 	// Periodically delete expired entries and save the current threat feed to
 	// disk.
+	ticker := time.NewTicker(saveInterval)
 	go func() {
 		for range ticker.C {
 			if dataChanged {
