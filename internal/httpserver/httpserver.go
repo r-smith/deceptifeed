@@ -167,24 +167,26 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 			w.Header().Set(header, value)
 		}
 
-		// Serve the web content to the client based on the requested URL. If
-		// the root or /index.html is requested, serve the specified content.
-		// For any other requests, return a '404 Not Found' response.
+		// Serve a response based on the requested URL. If the root URL or
+		// /index.html is requested, serve the homepage. For all other
+		// requests, serve the error page with a 404 Not Found response.
+		// Optionally, a single static HTML file may be specified for both the
+		// homepage and the error page. If no custom files are provided,
+		// default minimal responses will be served.
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-			// The request is for the root or /index.html.
-			if len(cfg.HtmlPath) > 0 {
-				// Serve the custom HTML file specified in the configuration.
-				http.ServeFile(w, r, cfg.HtmlPath)
+			// Serve the homepage response.
+			if len(cfg.HomePagePath) > 0 {
+				http.ServeFile(w, r, cfg.HomePagePath)
 			} else {
-				// Serve the default page that prompts the client for basic
-				// authentication.
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			}
 		} else {
-			// The request is outside the root or /index.html. Respond with a
-			// 404 error.
+			// Serve the error page response.
 			w.WriteHeader(http.StatusNotFound)
+			if len(cfg.ErrorPagePath) > 0 {
+				http.ServeFile(w, r, cfg.ErrorPagePath)
+			}
 		}
 	}
 }

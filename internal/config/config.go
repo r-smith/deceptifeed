@@ -20,11 +20,11 @@ const (
 	DefaultPortHTTPS            = "8443"
 	DefaultPortSSH              = "2022"
 	DefaultPortThreatFeed       = "8081"
-	DefaultThreatExpiryHours    = 168
+	DefaultThreatExpiryHours    = 336
 	DefaultThreatDatabasePath   = "deceptifeed-database.csv"
 	DefaultThreatIncludePrivate = true
 	DefaultLogPath              = "deceptifeed-log.txt"
-	DefaultHtmlPath             = ""
+	DefaultHomePagePath         = ""
 	DefaultCertPathHTTPS        = "deceptifeed-https.crt"
 	DefaultKeyPathHTTPS         = "deceptifeed-https.key"
 	DefaultKeyPathSSH           = "deceptifeed-ssh.key"
@@ -87,7 +87,8 @@ type Server struct {
 	Port             string     `xml:"port"`
 	CertPath         string     `xml:"certPath"`
 	KeyPath          string     `xml:"keyPath"`
-	HtmlPath         string     `xml:"htmlPath"`
+	HomePagePath     string     `xml:"homePagePath"`
+	ErrorPagePath    string     `xml:"errorPagePath"`
 	Banner           string     `xml:"banner"`
 	Headers          []string   `xml:"headers>header"`
 	Prompts          []Prompt   `xml:"prompts>prompt"`
@@ -157,9 +158,9 @@ func Load(filename string) (*Config, error) {
 	}
 
 	for i := range config.Servers {
-		// Ensure a minimum threat score of 1.
-		if config.Servers[i].ThreatScore < 1 {
-			config.Servers[i].ThreatScore = 1
+		// Ensure a minimum threat score of 0.
+		if config.Servers[i].ThreatScore < 0 {
+			config.Servers[i].ThreatScore = 0
 		}
 
 		// Validate regex rules.
