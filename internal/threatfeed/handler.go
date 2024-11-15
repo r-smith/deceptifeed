@@ -186,15 +186,17 @@ func handleSTIX2(w http.ResponseWriter, r *http.Request) {
 				validUntil = new(time.Time)
 				*validUntil = ioc.LastSeen.Add(time.Hour * time.Duration(configuration.ExpiryHours)).UTC()
 			}
-			// The STIX 2.1 specification allows for deterministic identifiers
-			// for STIX Domain Objects using UUIDv5. The STIX namespace must
-			// not be used. For each Indicator, generate the UUID using the
-			// generic UUIDv5 DNS namespace and the string representation of
-			// the IP address.
+
+			// Generate a deterministic identifier for each IP address in the
+			// threat feed using UUIDv5. The UUID is derived from the STIX
+			// namespace and the STIX IP pattern represented as a JSON string.
+			// For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
+			patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
+
 			objects = append(objects, object{
 				Type:           "indicator",
 				SpecVersion:    "2.1",
-				ID:             "indicator--" + newUUIDv5(nsDNS, ip.String()),
+				ID:             "indicator--" + newUUIDv5(nsSTIX, patternJSON),
 				IndicatorTypes: []string{"malicious-activity"},
 				Pattern:        pattern,
 				PatternType:    "stix",
@@ -244,10 +246,11 @@ func handleSTIX2Simple(w http.ResponseWriter, r *http.Request) {
 			if strings.Contains(ip.String(), ":") {
 				t = "ipv6-addr"
 			}
-			// Use a STIX 2.1 deterministic identifier. For an IP address SCO,
-			// the UUID portion of the identifier is generated using UUIDv5
-			// with the STIX namespace and a JSON version of the value. Example
-			// value: {"value":"127.0.0.1"}
+
+			// Generate a deterministic identifier for each IP address in the
+			// threat feed using UUIDv5. The UUID is derived from the STIX
+			// namespace and IP value represented as a JSON string. For
+			// example: {"value":"127.0.0.1"}
 			objects = append(objects, object{
 				Type:        t,
 				SpecVersion: "2.1",
