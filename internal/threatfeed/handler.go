@@ -9,7 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -230,8 +230,8 @@ func prepareFeed() []net.IP {
 	}
 
 	// Sort the IP addresses.
-	sort.Slice(netIPs, func(i, j int) bool {
-		return bytes.Compare(netIPs[i], netIPs[j]) < 0
+	slices.SortFunc(netIPs, func(a, b net.IP) int {
+		return bytes.Compare(a, b)
 	})
 
 	return netIPs
