@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/r-smith/deceptifeed/internal/stix"
 )
 
 // handlePlain handles HTTP requests to serve the threat feed in plain text. It
@@ -152,70 +154,14 @@ func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
 // associated data). The response is structured as a STIX Bundle containing
 // `Indicators` (STIX Domain Objects) for each IP address in the threat feed.
 func handleSTIX2(w http.ResponseWriter, r *http.Request) {
-	type object struct {
-		Type           string     `json:"type"`
-		SpecVersion    string     `json:"spec_version"`
-		ID             string     `json:"id"`
-		IndicatorTypes []string   `json:"indicator_types"`
-		Pattern        string     `json:"pattern"`
-		PatternType    string     `json:"pattern_type"`
-		Created        time.Time  `json:"created"`
-		Modified       time.Time  `json:"modified"`
-		ValidFrom      time.Time  `json:"valid_from"`
-		ValidUntil     *time.Time `json:"valid_until,omitempty"`
-		Name           string     `json:"name"`
-		Description    string     `json:"description"`
-	}
-	type bundle struct {
-		Type    string   `json:"type"`
-		ID      string   `json:"id"`
-		Objects []object `json:"objects"`
+	const bundle = "bundle"
+	result := stix.Bundle{
+		Type:    bundle,
+		ID:      stix.NewID(bundle),
+		Objects: convertToIndicators(prepareFeed()),
 	}
 
-	ipData := prepareFeed()
-	objects := make([]object, 0, len(ipData))
-	for _, ip := range ipData {
-		if ioc, found := iocData[ip.String()]; found {
-			pattern := "[ipv4-addr:value = '"
-			if strings.Contains(ip.String(), ":") {
-				pattern = "[ipv6-addr:value = '"
-			}
-			pattern = pattern + ip.String() + "']"
-			var validUntil *time.Time
-			if configuration.ExpiryHours > 0 {
-				validUntil = new(time.Time)
-				*validUntil = ioc.LastSeen.Add(time.Hour * time.Duration(configuration.ExpiryHours)).UTC()
-			}
-
-			// Generate a deterministic identifier for each IP address in the
-			// threat feed using UUIDv5. The UUID is derived from the STIX
-			// namespace and the STIX IP pattern represented as a JSON string.
-			// For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
-			patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
-
-			objects = append(objects, object{
-				Type:           "indicator",
-				SpecVersion:    "2.1",
-				ID:             "indicator--" + newUUIDv5(nsSTIX, patternJSON),
-				IndicatorTypes: []string{"malicious-activity"},
-				Pattern:        pattern,
-				PatternType:    "stix",
-				Created:        ioc.Added.UTC(),
-				Modified:       ioc.LastSeen.UTC(),
-				ValidFrom:      ioc.Added.UTC(),
-				ValidUntil:     validUntil,
-				Name:           "Honeypot interaction",
-				Description:    "This IP was observed interacting with a honeypot server.",
-			})
-		}
-	}
-	result := bundle{
-		Type:    "bundle",
-		ID:      "bundle--" + newUUIDv4(),
-		Objects: objects,
-	}
-
-	w.Header().Set("Content-Type", "application/stix+json;version=2.1")
+	w.Header().Set("Content-Type", stix.ContentType)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to STIX:", err)
 	}
@@ -226,46 +172,14 @@ func handleSTIX2(w http.ResponseWriter, r *http.Request) {
 // with each IP address in the threat feed included as a STIX Cyber-observable
 // Object.
 func handleSTIX2Simple(w http.ResponseWriter, r *http.Request) {
-	type object struct {
-		Type        string `json:"type"`
-		SpecVersion string `json:"spec_version"`
-		ID          string `json:"id"`
-		Value       string `json:"value"`
-	}
-	type bundle struct {
-		Type    string   `json:"type"`
-		ID      string   `json:"id"`
-		Objects []object `json:"objects"`
+	const bundle = "bundle"
+	result := stix.Bundle{
+		Type:    bundle,
+		ID:      stix.NewID(bundle),
+		Objects: convertToObservables(prepareFeed()),
 	}
 
-	ipData := prepareFeed()
-	objects := make([]object, 0, len(ipData))
-	for _, ip := range ipData {
-		if _, found := iocData[ip.String()]; found {
-			t := "ipv4-addr"
-			if strings.Contains(ip.String(), ":") {
-				t = "ipv6-addr"
-			}
-
-			// Generate a deterministic identifier for each IP address in the
-			// threat feed using UUIDv5. The UUID is derived from the STIX
-			// namespace and IP value represented as a JSON string. For
-			// example: {"value":"127.0.0.1"}
-			objects = append(objects, object{
-				Type:        t,
-				SpecVersion: "2.1",
-				ID:          t + "--" + newUUIDv5(nsSTIX, "{\"value\":\""+ip.String()+"\"}"),
-				Value:       ip.String(),
-			})
-		}
-	}
-	result := bundle{
-		Type:    "bundle",
-		ID:      "bundle--" + newUUIDv4(),
-		Objects: objects,
-	}
-
-	w.Header().Set("Content-Type", "application/stix+json;version=2.1")
+	w.Header().Set("Content-Type", stix.ContentType)
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
 	if err := e.Encode(result); err != nil {
@@ -382,4 +296,88 @@ func filterIPs(ipList []net.IP, ipsToRemove map[string]struct{}) []net.IP {
 		}
 	}
 	return ipList[:i]
+}
+
+// convertToIndicators converts IP addresses from the threat feed into a
+// collection of STIX Indicator objects.
+func convertToIndicators(ips []net.IP) []stix.Object {
+	const indicator = "indicator"
+
+	result := make([]stix.Object, 0, len(ips)+1)
+
+	// Add the Deceptifeed `Identity` as the first object in the collection.
+	// All IP addresses in the collection will reference this identity as
+	// the creator.
+	result = append(result, stix.DeceptifeedIdentity())
+
+	for _, ip := range ips {
+		if ioc, found := iocData[ip.String()]; found {
+			pattern := "[ipv4-addr:value = '"
+			if strings.Contains(ip.String(), ":") {
+				pattern = "[ipv6-addr:value = '"
+			}
+			pattern = pattern + ip.String() + "']"
+
+			// Fixed expiration: 2 months since last seen.
+			validUntil := new(time.Time)
+			*validUntil = ioc.LastSeen.AddDate(0, 2, 0).UTC()
+
+			// Generate a deterministic identifier for each IP address in the
+			// threat feed using the STIX IP pattern represented as a JSON
+			// string. For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
+			patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
+
+			result = append(result, stix.Indicator{
+				Type:           indicator,
+				SpecVersion:    stix.SpecVersion,
+				ID:             stix.DeterministicID(indicator, patternJSON),
+				IndicatorTypes: []string{"malicious-activity"},
+				Pattern:        pattern,
+				PatternType:    "stix",
+				Created:        ioc.Added.UTC(),
+				Modified:       ioc.LastSeen.UTC(),
+				ValidFrom:      ioc.Added.UTC(),
+				ValidUntil:     validUntil,
+				Name:           ip.String() + " : honeypot interaction",
+				Description:    "This IP was observed interacting with a honeypot server.",
+				KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
+				Lang:           "en",
+				Labels:         []string{"testier"},
+				CreatedByRef:   stix.DeceptifeedID,
+			})
+		}
+	}
+	return result
+}
+
+// convertToObservables converts IP addresses from the threat feed into a
+// collection of STIX Cyber-observable Objects.
+func convertToObservables(ips []net.IP) []stix.Object {
+	result := make([]stix.Object, 0, len(ips)+1)
+
+	// Add the Deceptifeed `Identity` as the first object in the collection.
+	// All IP addresses in the collection will reference this identity as
+	// the creator.
+	result = append(result, stix.DeceptifeedIdentity())
+
+	for _, ip := range ips {
+		if _, found := iocData[ip.String()]; found {
+			t := "ipv4-addr"
+			if strings.Contains(ip.String(), ":") {
+				t = "ipv6-addr"
+			}
+
+			// Generate a deterministic identifier for each IP address in the
+			// threat feed using the IP value represented as a JSON string. For
+			// example: {"value":"127.0.0.1"}
+			result = append(result, stix.ObservableIP{
+				Type:         t,
+				SpecVersion:  stix.SpecVersion,
+				ID:           stix.DeterministicID(t, "{\"value\":\""+ip.String()+"\"}"),
+				Value:        ip.String(),
+				CreatedByRef: stix.DeceptifeedID,
+			})
+		}
+	}
+	return result
 }
