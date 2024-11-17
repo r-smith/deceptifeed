@@ -235,9 +235,8 @@ func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
 	// slice of Collections.
 	var result any
 	collections := taxii.ImplementedCollections()
-	id := r.PathValue("id")
 
-	if len(id) > 0 {
+	if id := r.PathValue("id"); len(id) > 0 {
 		found := false
 		for i, c := range collections {
 			if id == c.ID || id == c.Alias {
@@ -266,13 +265,43 @@ func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
 // structured according to the requested TAXII collection and wrapped in a
 // TAXII Envelope. Request URL format: `{api-root}/collections/{id}/objects/`.
 func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
-	// Get the added_after value, defaulting to the zero value for time.Time{}
-	// if parsing fails or the value is not present.
-	after, _ := time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
+	// Set default values.
+	after := time.Time{}
+	limit := 0
+	page := 0
+	var err error
 
+	// Parse the URL query parameters.
+	if len(r.URL.Query().Get("added_after")) > 0 {
+		after, err = time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+	}
+	if len(r.URL.Query().Get("limit")) > 0 {
+		limit, err = strconv.Atoi(r.URL.Query().Get("limit"))
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+	}
+	if len(r.URL.Query().Get("next")) > 0 {
+		page, err = strconv.Atoi(r.URL.Query().Get("next"))
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Ensure a minimum page number of 1.
+	if page < 1 {
+		page = 1
+	}
+
+	// Build the requested collection.
 	result := taxii.Envelope{}
-	id := r.PathValue("id")
-	switch id {
+	switch r.PathValue("id") {
 	case taxii.IndicatorsID, taxii.IndicatorsAlias:
 		result.Objects = convertToIndicators(prepareFeed(sortByLastSeen(), seenAfter(after)))
 	case taxii.ObservablesID, taxii.ObservablesAlias:
@@ -282,12 +311,88 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Paginate. result.Objects may be resliced depending on the requested
+	// limit and page number.
+	result.Objects, result.More = paginate(result.Objects, limit, page)
+
+	// If more results are available, include the `next` property in the
+	// response with the next page number.
+	if result.More {
+		if page+1 > 0 {
+			result.Next = strconv.Itoa(page + 1)
+		}
+	}
+
+	// Get the `last seen` timestamps of the first and last objects in the
+	// results for setting `X-TAXII-Date-Added-` headers.
+	first := time.Time{}
+	last := time.Time{}
+	objectCount := len(result.Objects)
+	if objectCount > 0 {
+		// Loop twice: the first iteration accesses the first element of the
+		// Objects slice, and the second iteration accesses the last element.
+		for i := 0; i < 2; i++ {
+			element := 0
+			if i == 1 {
+				element = len(result.Objects) - 1
+			}
+			timestamp := time.Time{}
+			switch v := result.Objects[element].(type) {
+			case stix.Indicator:
+				timestamp = v.Modified
+			case stix.ObservableIP:
+				if ioc, found := iocData[v.Value]; found {
+					timestamp = ioc.LastSeen
+				}
+			case stix.Identity:
+				timestamp = v.Created
+			}
+			if i == 0 {
+				first = timestamp
+			} else {
+				last = timestamp
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", taxii.ContentType)
+	if objectCount > 0 {
+		w.Header()["X-TAXII-Date-Added-First"] = []string{first.UTC().Format(time.RFC3339)}
+		w.Header()["X-TAXII-Date-Added-Last"] = []string{last.UTC().Format(time.RFC3339)}
+	}
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
 	if err := e.Encode(result); err != nil {
 		http.Error(w, "Error encoding TAXII response", http.StatusInternalServerError)
 	}
+}
+
+// paginate returns a slice of stix.Objects for the requested page, based on
+// the provided limit and page numbers. It also returns whether more items are
+// available.
+func paginate(items []stix.Object, limit int, page int) ([]stix.Object, bool) {
+	if limit <= 0 {
+		return items, false
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	// Determine the start index. Return an empty collection if out of bounds
+	// or if the calculation overflows.
+	start := (page - 1) * limit
+	if start >= len(items) || start < 0 {
+		return []stix.Object{}, false
+	}
+
+	// Determine the end index and whether more items are remaining.
+	end := start + limit
+	more := end < len(items)
+	if end > len(items) {
+		end = len(items)
+	}
+
+	return items[start:end], more
 }
 
 // handleEmpty handles HTTP requests to /empty. It returns an empty body with

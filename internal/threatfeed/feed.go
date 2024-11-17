@@ -98,7 +98,12 @@ func prepareFeed(options ...option) []net.IP {
 	case byLastSeen:
 		mutex.Lock()
 		slices.SortFunc(netIPs, func(a, b net.IP) int {
-			return iocData[a.String()].LastSeen.Compare(iocData[b.String()].LastSeen)
+			// Sort by LastSeen date, and if equal, sort by IP.
+			dateCompare := iocData[a.String()].LastSeen.Compare(iocData[b.String()].LastSeen)
+			if dateCompare != 0 {
+				return dateCompare
+			}
+			return bytes.Compare(a, b)
 		})
 		mutex.Unlock()
 

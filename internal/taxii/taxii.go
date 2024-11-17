@@ -52,7 +52,9 @@ func ImplementedCollections() []Collection {
 // Envelope represents a TAXII envelope resource, which is a simple wrapper for
 // STIX 2 content.
 type Envelope struct {
-	Objects []stix.Object `json:"objects"` // Optional
+	More    bool          `json:"more"`           // Optional
+	Next    string        `json:"next,omitempty"` // Optional
+	Objects []stix.Object `json:"objects"`        // Optional
 }
 
 // Collection represents a TAXII collection resource, which contains general
