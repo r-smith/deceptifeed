@@ -144,12 +144,14 @@ func loadCSV() error {
 	for _, record := range records[1:] {
 		ip := record[0]
 
-		// Parse added, if available.
+		// Parse added, defaulting to current time.
+		added = time.Now()
 		if len(record) > 1 && record[1] != "" {
 			added, _ = time.Parse(dateFormat, record[1])
 		}
 
-		// Parse lastSeen, if available.
+		// Parse lastSeen, defaulting to current time.
+		lastSeen = time.Now()
 		if len(record) > 2 && record[2] != "" {
 			lastSeen, _ = time.Parse(dateFormat, record[2])
 		}

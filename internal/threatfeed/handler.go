@@ -1,20 +1,16 @@
 package threatfeed
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/stix"
+	"github.com/r-smith/deceptifeed/internal/taxii"
 )
 
 // handlePlain handles HTTP requests to serve the threat feed in plain text. It
@@ -187,197 +183,117 @@ func handleSTIX2Simple(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleTAXIINotFound returns a 404 Not Found response. This is the default
+// response for the /taxii2/... endpoint when a request is made outside the
+// defined API.
+func handleTAXIINotFound(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+}
+
+// handleTAXIIDiscovery handles the TAXII server discovery endpoint, defined as
+// `/taxii2/`. It returns a list of API root URLs available on the TAXII server.
+// Deceptifeed has a single API root at `/taxii2/api/`
+func handleTAXIIDiscovery(w http.ResponseWriter, r *http.Request) {
+	result := taxii.DiscoveryResource{
+		Title:       "Deceptifeed TAXII Server",
+		Description: "This TAXII server contains IP addresses observed interacting with honeypots",
+		Default:     taxii.APIRoot,
+		APIRoots:    []string{taxii.APIRoot},
+	}
+
+	w.Header().Set("Content-Type", taxii.ContentType)
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(result); err != nil {
+		http.Error(w, "Error encoding TAXII response", http.StatusInternalServerError)
+	}
+}
+
+// handleTAXIIRoot returns general information about the requested API root.
+func handleTAXIIRoot(w http.ResponseWriter, r *http.Request) {
+	result := taxii.APIRootResource{
+		Title:            "Deceptifeed TAXII Server",
+		Versions:         []string{taxii.ContentType},
+		MaxContentLength: 1,
+	}
+
+	w.Header().Set("Content-Type", taxii.ContentType)
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(result); err != nil {
+		http.Error(w, "Error encoding TAXII response", http.StatusInternalServerError)
+	}
+}
+
+// handleTAXIICollections returns details about available TAXII collections
+// hosted under the API root. Requests for `{api-root}/collections/` return a
+// list of all available collections. Requests for
+// `{api-root}/collections/{id}/` return information about the requested
+// collection ID.
+func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
+	// Depending on the request, the result may be a single Collection or a
+	// slice of Collections.
+	var result any
+	collections := taxii.ImplementedCollections()
+	id := r.PathValue("id")
+
+	if len(id) > 0 {
+		found := false
+		for i, c := range collections {
+			if id == c.ID || id == c.Alias {
+				found = true
+				result = collections[i]
+				break
+			}
+		}
+		if !found {
+			handleTAXIINotFound(w, r)
+			return
+		}
+	} else {
+		result = map[string]interface{}{"collections": collections}
+	}
+
+	w.Header().Set("Content-Type", taxii.ContentType)
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(result); err != nil {
+		http.Error(w, "Error encoding TAXII response", http.StatusInternalServerError)
+	}
+}
+
+// handleTAXIIObjects returns the threat feed as STIX objects. The objects are
+// structured according to the requested TAXII collection and wrapped in a
+// TAXII Envelope. Request URL format: `{api-root}/collections/{id}/objects/`.
+func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
+	// Get the added_after value, defaulting to the zero value for time.Time{}
+	// if parsing fails or the value is not present.
+	after, _ := time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
+
+	result := taxii.Envelope{}
+	id := r.PathValue("id")
+	switch id {
+	case taxii.IndicatorsID, taxii.IndicatorsAlias:
+		result.Objects = convertToIndicators(prepareFeed(sortByLastSeen(), seenAfter(after)))
+	case taxii.ObservablesID, taxii.ObservablesAlias:
+		result.Objects = convertToObservables(prepareFeed(sortByLastSeen(), seenAfter(after)))
+	default:
+		handleTAXIINotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", taxii.ContentType)
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(result); err != nil {
+		http.Error(w, "Error encoding TAXII response", http.StatusInternalServerError)
+	}
+}
+
 // handleEmpty handles HTTP requests to /empty. It returns an empty body with
 // status code 200. This endpoint is useful for temporarily clearing the threat
 // feed data in firewalls.
 func handleEmpty(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-}
-
-// prepareFeed filters, processes, and sorts IP addresses from the threat feed.
-// The resulting slice of `net.IP` represents the current threat feed to be
-// served to clients.
-func prepareFeed() []net.IP {
-	// Parse IPs from iocData to net.IP. Skip IPs that are expired, below the
-	// minimum threat score, or are private, based on the configuration.
-	mutex.Lock()
-	netIPs := make([]net.IP, 0, len(iocData))
-	for ip, ioc := range iocData {
-		if ioc.expired() || ioc.ThreatScore < configuration.MinimumThreatScore {
-			continue
-		}
-
-		ipParsed := net.ParseIP(ip)
-		if ipParsed == nil {
-			continue
-		}
-		if !configuration.IsPrivateIncluded && ipParsed.IsPrivate() {
-			continue
-		}
-		netIPs = append(netIPs, ipParsed)
-	}
-	mutex.Unlock()
-
-	// If an exclude list is provided, filter the IP list.
-	if len(configuration.ExcludeListPath) > 0 {
-		ipsToRemove, err := parseExcludeList(configuration.ExcludeListPath)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to read threat feed exclude list:", err)
-		} else {
-			netIPs = filterIPs(netIPs, ipsToRemove)
-		}
-	}
-
-	// Sort the IP addresses.
-	slices.SortFunc(netIPs, func(a, b net.IP) int {
-		return bytes.Compare(a, b)
-	})
-
-	return netIPs
-}
-
-// parseExcludeList reads IP addresses and CIDR ranges from a file. Each line
-// should contain an IP address or CIDR. It returns a map of the unique IPs and
-// CIDR ranges found in the file.
-func parseExcludeList(filepath string) (map[string]struct{}, error) {
-	ips := make(map[string]struct{})
-
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if len(line) > 0 {
-			ips[line] = struct{}{}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	return ips, nil
-}
-
-// filterIPs removes IPs from ipList that are found in the ipsToRemove map. The
-// keys in ipsToRemove may be single IP addresses or CIDR ranges. If a key is a
-// CIDR range, an IP will be removed if it falls within that range.
-func filterIPs(ipList []net.IP, ipsToRemove map[string]struct{}) []net.IP {
-	if len(ipsToRemove) == 0 {
-		return ipList
-	}
-
-	cidrNetworks := []*net.IPNet{}
-	for cidr := range ipsToRemove {
-		if _, ipnet, err := net.ParseCIDR(cidr); err == nil {
-			cidrNetworks = append(cidrNetworks, ipnet)
-		}
-	}
-
-	i := 0
-	for _, ip := range ipList {
-		if _, found := ipsToRemove[ip.String()]; found {
-			continue
-		}
-
-		contains := false
-		for _, ipnet := range cidrNetworks {
-			if ipnet.Contains(ip) {
-				contains = true
-				break
-			}
-		}
-		if !contains {
-			ipList[i] = ip
-			i++
-		}
-	}
-	return ipList[:i]
-}
-
-// convertToIndicators converts IP addresses from the threat feed into a
-// collection of STIX Indicator objects.
-func convertToIndicators(ips []net.IP) []stix.Object {
-	const indicator = "indicator"
-
-	result := make([]stix.Object, 0, len(ips)+1)
-
-	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All IP addresses in the collection will reference this identity as
-	// the creator.
-	result = append(result, stix.DeceptifeedIdentity())
-
-	for _, ip := range ips {
-		if ioc, found := iocData[ip.String()]; found {
-			pattern := "[ipv4-addr:value = '"
-			if strings.Contains(ip.String(), ":") {
-				pattern = "[ipv6-addr:value = '"
-			}
-			pattern = pattern + ip.String() + "']"
-
-			// Fixed expiration: 2 months since last seen.
-			validUntil := new(time.Time)
-			*validUntil = ioc.LastSeen.AddDate(0, 2, 0).UTC()
-
-			// Generate a deterministic identifier for each IP address in the
-			// threat feed using the STIX IP pattern represented as a JSON
-			// string. For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
-			patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
-
-			result = append(result, stix.Indicator{
-				Type:           indicator,
-				SpecVersion:    stix.SpecVersion,
-				ID:             stix.DeterministicID(indicator, patternJSON),
-				IndicatorTypes: []string{"malicious-activity"},
-				Pattern:        pattern,
-				PatternType:    "stix",
-				Created:        ioc.Added.UTC(),
-				Modified:       ioc.LastSeen.UTC(),
-				ValidFrom:      ioc.Added.UTC(),
-				ValidUntil:     validUntil,
-				Name:           ip.String() + " : honeypot interaction",
-				Description:    "This IP was observed interacting with a honeypot server.",
-				KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
-				Lang:           "en",
-				Labels:         []string{"testier"},
-				CreatedByRef:   stix.DeceptifeedID,
-			})
-		}
-	}
-	return result
-}
-
-// convertToObservables converts IP addresses from the threat feed into a
-// collection of STIX Cyber-observable Objects.
-func convertToObservables(ips []net.IP) []stix.Object {
-	result := make([]stix.Object, 0, len(ips)+1)
-
-	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All IP addresses in the collection will reference this identity as
-	// the creator.
-	result = append(result, stix.DeceptifeedIdentity())
-
-	for _, ip := range ips {
-		if _, found := iocData[ip.String()]; found {
-			t := "ipv4-addr"
-			if strings.Contains(ip.String(), ":") {
-				t = "ipv6-addr"
-			}
-
-			// Generate a deterministic identifier for each IP address in the
-			// threat feed using the IP value represented as a JSON string. For
-			// example: {"value":"127.0.0.1"}
-			result = append(result, stix.ObservableIP{
-				Type:         t,
-				SpecVersion:  stix.SpecVersion,
-				ID:           stix.DeterministicID(t, "{\"value\":\""+ip.String()+"\"}"),
-				Value:        ip.String(),
-				CreatedByRef: stix.DeceptifeedID,
-			})
-		}
-	}
-	return result
 }
