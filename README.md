@@ -22,7 +22,7 @@ Unlike conventional honeypots that provide attackers with rich simulated environ
 
 ```shell
 # Extract.
-tar xvzf <release>.tgz
+tar xvzf <release>.tar.gz
 cd deceptifeed
 
 # Install (optional).
@@ -78,20 +78,20 @@ You can run Deceptifeed directly without installation.
 
 - Use `deceptifeed -help` to view the command-line options.
 - By default, Deceptifeed starts the following network services:
-  - SSH honeypot server on port 2022
+  - SSH honeypot server on port 2222
   - HTTP honeypot server on port 8080
   - HTTPS honeypot server on port 8443
-  - Threat feed server on port 8081
+  - Threat feed server on port 9000
 - Logs are saved to `deceptifeed-log.txt`.
 - The threat feed database is saved to `deceptifeed-database.csv`.
 - Certificates and keys are generated and saved as `deceptifeed-*.crt` and `deceptifeed-*.key`.
 
 ```shell
 $ ./deceptifeed
-Starting SSH server on port: 2022
+Starting SSH server on port: 2222
 Starting HTTP server on port: 8080
 Starting HTTPS server on port: 8443
-Starting Threat Feed server on port: 8081
+Starting Threat Feed server on port: 9000
 ```
 
 
@@ -114,33 +114,53 @@ The threat feed provides a real-time list of IP addresses that have interacted w
 
 Configure your firewall to use Deceptifeed as a custom threat feed and set your blocking rules accordingly. Ideally, exclude your honeypot services from any automatic blocking rules.
 
-> [!NOTE]
-> The threat feed is designed for private use and blocks access from non-private IP addresses.
+The threat feed is available in several formats, including plain text, CSV, JSON, STIX, and TAXII 2.1.
 
-**_Sample threat feed_**
+**_Sample threat feed in plain text_**
 
 ```shell
-$ curl http://threatfeed.example.com:8081
+$ curl http://threatfeed.example.com:9000
+```
+```
 10.30.16.110
 10.30.21.79
 10.99.17.38
 10.99.17.54
-10.200.2.115
-10.200.3.52
 172.16.1.9
 172.16.2.30
 172.16.3.2
-172.16.4.15
 172.18.0.208
 172.18.5.7
 172.18.5.15
 192.168.0.4
-192.168.0.12
 192.168.1.17
 192.168.1.113
 192.168.2.21
 192.168.3.8
-192.168.4.19
+```
+
+**_Sample threat feed in JSON format_**
+
+```shell
+$ curl http://threatfeed.example.com:9000/json
+```
+```json
+{
+  "threat_feed": [
+    {
+      "ip": "10.32.16.110",
+      "added": "2024-11-12T16:18:36-08:00",
+      "last_seen": "2024-11-15T04:27:59-08:00",
+      "threat_score": 27
+    },
+    {
+      "ip": "192.168.2.21",
+      "added": "2024-11-14T23:09:11-08:00",
+      "last_seen": "2024-11-17T00:40:51-08:00",
+      "threat_score": 51
+    }
+  ]
+}
 ```
 
 
