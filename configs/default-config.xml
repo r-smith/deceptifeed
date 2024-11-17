@@ -1,17 +1,92 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
+<!-- =========== -->
+<!-- Deceptifeed -->
+<!-- =========== -->
 <config>
 
+  <!-- The default log path for honeypot servers. -->
   <defaultLogPath>/opt/deceptifeed/logs/honeypot.log</defaultLogPath>
 
+  <!--
+  ===========================================================================
+  Threat Feed Configuration
+  ===========================================================================
+  This section controls the settings for the threat feed server, which
+  provides a list of IP addresses observed interacting with your honeypot
+  servers.
+  -->
+  <threatFeed>
+    <enabled>true</enabled>
+    <port>9000</port>
+    <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
+    <threatExpiryHours>336</threatExpiryHours>
+    <minimumThreatScore>0</minimumThreatScore>
+    <isPrivateIncluded>false</isPrivateIncluded>
+    <customThreatsPath></customThreatsPath>
+    <excludeListPath></excludeListPath>
+  </threatFeed>
+
+  <!--
+  =============================================================================
+  Honeypot Server Configuration
+  =============================================================================
+  This section allows you to define any number of honeypot servers. Each server
+  accepts network connections, logs interactions from clients, and updates the
+  threat feed with the connecting client's IP address.
+  
+  Use the `<server>` element to define a honeypot, and the `type` attribute to
+  specify the server's role (for example, <server type="http"> ... </server>).
+  
+  Available server types:
+  - "ssh"   SSH server. Records, but rejects every login attempt.
+  - "http"  Web server. Returns error codes for requests outside the homepage.
+  - "https" Web server. Returns error codes for requests outside the homepage.
+  - "tcp"   Simulates a generic TCP-based service.
+  - "udp"   Records incoming data. Does not send responses.
+  -->
   <honeypotServers>
+
+    <!-- SSH honeypot server on port 2222 -->
+    <server type="ssh">
+      <enabled>true</enabled>
+      <port>2222</port>
+      <logEnabled>true</logEnabled>
+      <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
+      <keyPath>/opt/deceptifeed/certs/ssh-key.pem</keyPath>
+      <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
+    </server>
+
+    <!-- HTTP honeypot server on port 8080 -->
     <server type="http">
       <enabled>true</enabled>
       <port>8080</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
       <threatScore>1</threatScore>
+      <rules>
+        <!-- Update the threat feed if any of the following conditions match: -->
+        <!-- File extensions, dot files, and paths -->
+        <include target="path">(?i)\.(asp|bak|cfm|cgi|dll|ds_store|env|esp|git|htaccess|ini|jhtml|js|key|log|pem|php|pl|sh|ssh|ssl|yml)</include>
+        <include target="path">(?i)(api|admin|aws|cfide|cgi-bin|config|cscoe|dashboard|data|env|login|manage|owa|panel|portal|query|readme|remote|sdk|server|setup|status|store|user|vpn|wp-)</include>
+        <!-- Query values -->
+        <include target="query">(?i)(action|conf|dns|file|form|json|login|php|q=|url|user)</include>
+        <!-- Directory traversal attempts -->
+        <include target="path">\.\.</include>
+        <include target="query">\.\.</include>
+        <include target="lang">\.\.</include>
+        <!-- Authorization header is set -->
+        <include target="authorization">.*</include>
+        <!-- An HTTP method that is not GET, HEAD or OPTIONS -->
+        <include target="method" negate="true">(?i)^(GET|HEAD|OPTIONS)$</include>
+        <!-- User agents -->
+        <include target="user-agent">(?i)(curl|go-http-client|httpclient|java|libwww|nikto|nmap|php|python|wget)</include>
+        <include target="user-agent">^$</include>
+      </rules>
     </server>
 
+    <!-- HTTPS honeypot server on port 8443 -->
     <server type="https">
       <enabled>true</enabled>
       <port>8443</port>
@@ -20,26 +95,49 @@
       <threatScore>1</threatScore>
       <certPath>/opt/deceptifeed/certs/https-cert.pem</certPath>
       <keyPath>/opt/deceptifeed/certs/https-key.pem</keyPath>
+      <rules>
+        <!-- Update the threat feed if any of the following conditions match: -->
+        <!-- File extensions, dot files, and paths -->
+        <include target="path">(?i)\.(asp|bak|cfm|cgi|dll|ds_store|env|esp|git|htaccess|ini|jhtml|js|key|log|pem|php|pl|sh|ssh|ssl|yml)</include>
+        <include target="path">(?i)(api|admin|aws|cfide|cgi-bin|config|cscoe|dashboard|data|env|login|manage|owa|panel|portal|query|readme|remote|sdk|server|setup|status|store|user|vpn|wp-)</include>
+        <!-- Query values -->
+        <include target="query">(?i)(action|conf|dns|file|form|json|login|php|q=|url|user)</include>
+        <!-- Directory traversal attempts -->
+        <include target="path">\.\.</include>
+        <include target="query">\.\.</include>
+        <include target="lang">\.\.</include>
+        <!-- Authorization header is set -->
+        <include target="authorization">.*</include>
+        <!-- An HTTP method that is not GET, HEAD or OPTIONS -->
+        <include target="method" negate="true">(?i)^(GET|HEAD|OPTIONS)$</include>
+        <!-- User agents -->
+        <include target="user-agent">(?i)(curl|go-http-client|httpclient|java|libwww|nikto|nmap|php|python|wget)</include>
+        <include target="user-agent">^$</include>
+      </rules>
     </server>
 
-    <server type="ssh">
-      <enabled>true</enabled>
-      <port>2022</port>
+    <!-- DISABLED: -->
+    <!-- Example TCP honeypot server to simulate a Cisco router -->
+    <server type="tcp">
+      <enabled>false</enabled>
+      <port>2323</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
       <threatScore>1</threatScore>
-      <keyPath>/opt/deceptifeed/certs/ssh-key.pem</keyPath>
-      <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
+      <banner>\nUser Access Verification\n\n</banner>
+      <prompts>
+        <prompt log="username">Username: </prompt>
+        <prompt log="password">Password: </prompt>
+      </prompts>
+    </server>
+
+    <!-- DISABLED: -->
+    <!-- Example UDP honeypot server to capture SIP scans -->
+    <server type="udp">
+      <enabled>true</enabled>
+      <port>5060</port>
+      <logEnabled>true</logEnabled>
     </server>
   </honeypotServers>
-
-  <threatFeed>
-    <enabled>true</enabled>
-    <port>8081</port>
-    <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
-    <threatExpiryHours>168</threatExpiryHours>
-    <minimumThreatScore>0</minimumThreatScore>
-    <isPrivateIncluded>false</isPrivateIncluded>
-  </threatFeed>
 
 </config>
