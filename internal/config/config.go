@@ -18,8 +18,8 @@ const (
 	DefaultEnableThreatFeed     = true
 	DefaultPortHTTP             = "8080"
 	DefaultPortHTTPS            = "8443"
-	DefaultPortSSH              = "2022"
-	DefaultPortThreatFeed       = "8081"
+	DefaultPortSSH              = "2222"
+	DefaultPortThreatFeed       = "9000"
 	DefaultThreatExpiryHours    = 336
 	DefaultThreatDatabasePath   = "deceptifeed-database.csv"
 	DefaultThreatIncludePrivate = true
