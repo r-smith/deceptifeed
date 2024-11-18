@@ -360,9 +360,7 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 		w.Header()["X-TAXII-Date-Added-First"] = []string{first.UTC().Format(time.RFC3339)}
 		w.Header()["X-TAXII-Date-Added-Last"] = []string{last.UTC().Format(time.RFC3339)}
 	}
-	e := json.NewEncoder(w)
-	e.SetIndent("", "  ")
-	if err := e.Encode(result); err != nil {
+	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Error encoding TAXII response", http.StatusInternalServerError)
 	}
 }
