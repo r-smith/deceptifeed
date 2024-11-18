@@ -29,8 +29,8 @@ type IoC struct {
 }
 
 const (
-	// dateFormat specifies the timestamp format used for CSV data.
-	dateFormat = time.RFC3339
+	// dateFormat specifies the timestamp format used for threat feed entries.
+	dateFormat = time.RFC3339Nano
 )
 
 var (

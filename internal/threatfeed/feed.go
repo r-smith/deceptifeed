@@ -216,7 +216,7 @@ func convertToIndicators(ips []net.IP) []stix.Object {
 				Modified:       ioc.LastSeen.UTC(),
 				ValidFrom:      ioc.Added.UTC(),
 				ValidUntil:     validUntil,
-				Name:           ip.String() + " : honeypot interaction",
+				Name:           "Honeypot interaction: " + ip.String(),
 				Description:    "This IP was observed interacting with a honeypot server.",
 				KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
 				Lang:           "en",
