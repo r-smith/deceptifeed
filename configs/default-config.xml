@@ -134,7 +134,7 @@
     <!-- DISABLED: -->
     <!-- Example UDP honeypot server to capture SIP scans -->
     <server type="udp">
-      <enabled>true</enabled>
+      <enabled>false</enabled>
       <port>5060</port>
       <logEnabled>true</logEnabled>
     </server>
