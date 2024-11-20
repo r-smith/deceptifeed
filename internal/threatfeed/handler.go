@@ -18,8 +18,14 @@ import (
 // returns a list of IP addresses that interacted with the honeypot servers.
 // This is the default catch-all route handler.
 func handlePlain(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain")
-	for _, ip := range prepareFeed() {
+	for _, ip := range prepareFeed(opt) {
 		_, err := w.Write([]byte(ip.String() + "\n"))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
@@ -47,6 +53,12 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 // format. It returns a JSON array containing all IoC data (IP addresses and
 // their associated data).
 func handleJSON(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	type iocDetailed struct {
 		IP          string    `json:"ip"`
 		Added       time.Time `json:"added"`
@@ -54,7 +66,7 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 		ThreatScore int       `json:"threat_score"`
 	}
 
-	ipData := prepareFeed()
+	ipData := prepareFeed(opt)
 	result := make([]iocDetailed, 0, len(ipData))
 	for _, ip := range ipData {
 		if ioc, found := iocData[ip.String()]; found {
@@ -79,10 +91,16 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 // threat feed in JSON format. It returns a JSON array containing only the IP
 // addresses from the threat feed.
 func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
-	if err := e.Encode(map[string]interface{}{"threat_feed": prepareFeed()}); err != nil {
+	if err := e.Encode(map[string]interface{}{"threat_feed": prepareFeed(opt)}); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
 	}
 }
@@ -91,6 +109,12 @@ func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
 // It returns a CSV file containing all IoC data (IP addresses and their
 // associated data).
 func handleCSV(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"threat-feed-"+time.Now().Format("20060102-150405")+".csv\"")
 
@@ -100,7 +124,7 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, ip := range prepareFeed() {
+	for _, ip := range prepareFeed(opt) {
 		if ioc, found := iocData[ip.String()]; found {
 			if err := c.Write([]string{
 				ip.String(),
@@ -124,6 +148,12 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 // threat feed in CSV format. It returns a CSV file containing only the IP
 // addresses of the threat feed.
 func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"threat-feed-ips-"+time.Now().Format("20060102-150405")+".csv\"")
 
@@ -133,7 +163,7 @@ func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, ip := range prepareFeed() {
+	for _, ip := range prepareFeed(opt) {
 		if err := c.Write([]string{ip.String()}); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
 			return
@@ -151,11 +181,17 @@ func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
 // associated data). The response is structured as a STIX Bundle containing
 // `Indicators` (STIX Domain Objects) for each IP address in the threat feed.
 func handleSTIX2(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	const bundle = "bundle"
 	result := stix.Bundle{
 		Type:    bundle,
 		ID:      stix.NewID(bundle),
-		Objects: prepareFeed().convertToIndicators(),
+		Objects: prepareFeed(opt).convertToIndicators(),
 	}
 
 	w.Header().Set("Content-Type", stix.ContentType)
@@ -169,11 +205,17 @@ func handleSTIX2(w http.ResponseWriter, r *http.Request) {
 // with each IP address in the threat feed included as a STIX Cyber-observable
 // Object.
 func handleSTIX2Simple(w http.ResponseWriter, r *http.Request) {
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	const bundle = "bundle"
 	result := stix.Bundle{
 		Type:    bundle,
 		ID:      stix.NewID(bundle),
-		Objects: prepareFeed().convertToObservables(),
+		Objects: prepareFeed(opt).convertToObservables(),
 	}
 
 	w.Header().Set("Content-Type", stix.ContentType)
@@ -268,7 +310,7 @@ func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
 func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 	opt, err := parseParams(r)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -378,44 +420,55 @@ func parseParams(r *http.Request) (feedOptions, error) {
 
 	// Handle TAXII parameters.
 	if strings.HasPrefix(r.URL.Path, taxii.APIRoot) {
-		// TAXII requires results to be sorted by object creation date.
-		// However, since IPs in the threat feed may have their `LastSeen` date
-		// updated after being added, it makes more sense to sort by the last
-		// seen date instead. Otherwise, clients may miss updates if they are
-		// only looking for newly added results.
+		// While TAXII requires sorting by creation date, we sort by `LastSeen`
+		// instead. This is because the threat feed is dynamic and IPs may be
+		// updated. This ensures clients don't miss updates if they are only
+		// looking for new entries.
 		opt.sortMethod = byLastSeen
 
 		var err error
 		if len(r.URL.Query().Get("added_after")) > 0 {
 			opt.seenAfter, err = time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
 			if err != nil {
-				return feedOptions{}, err
+				return feedOptions{}, fmt.Errorf("invalid 'added_after' value")
 			}
 		}
 		if len(r.URL.Query().Get("limit")) > 0 {
 			opt.limit, err = strconv.Atoi(r.URL.Query().Get("limit"))
 			if err != nil {
-				return feedOptions{}, err
+				return feedOptions{}, fmt.Errorf("invalid 'limit' value")
 			}
 		}
 		if len(r.URL.Query().Get("next")) > 0 {
 			opt.page, err = strconv.Atoi(r.URL.Query().Get("next"))
 			if err != nil {
-				return feedOptions{}, err
+				return feedOptions{}, fmt.Errorf("invalid 'next' value")
 			}
 		}
 		return opt, nil
 	}
 
 	switch r.URL.Query().Get("sort") {
+	case "ip":
+		opt.sortMethod = byIP
 	case "last_seen":
 		opt.sortMethod = byLastSeen
 	case "added":
 		opt.sortMethod = byAdded
 	case "threat_score":
 		opt.sortMethod = byThreatScore
+	case "":
+		// No sort option specified.
 	default:
-		opt.sortMethod = byIP
+		return feedOptions{}, fmt.Errorf("invalid 'sort' value")
+	}
+
+	if len(r.URL.Query().Get("last_seen_hours")) > 0 {
+		hours, err := strconv.Atoi(r.URL.Query().Get("last_seen_hours"))
+		if err != nil {
+			return feedOptions{}, fmt.Errorf("invalid 'last_seen_hours' value")
+		}
+		opt.seenAfter = time.Now().Add(-time.Hour * time.Duration(hours))
 	}
 
 	return opt, nil
