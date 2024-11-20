@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/stix"
@@ -154,7 +155,7 @@ func handleSTIX2(w http.ResponseWriter, r *http.Request) {
 	result := stix.Bundle{
 		Type:    bundle,
 		ID:      stix.NewID(bundle),
-		Objects: convertToIndicators(prepareFeed()),
+		Objects: prepareFeed().convertToIndicators(),
 	}
 
 	w.Header().Set("Content-Type", stix.ContentType)
@@ -172,7 +173,7 @@ func handleSTIX2Simple(w http.ResponseWriter, r *http.Request) {
 	result := stix.Bundle{
 		Type:    bundle,
 		ID:      stix.NewID(bundle),
-		Objects: convertToObservables(prepareFeed()),
+		Objects: prepareFeed().convertToObservables(),
 	}
 
 	w.Header().Set("Content-Type", stix.ContentType)
@@ -265,47 +266,24 @@ func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
 // structured according to the requested TAXII collection and wrapped in a
 // TAXII Envelope. Request URL format: `{api-root}/collections/{id}/objects/`.
 func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
-	// Set default values.
-	after := time.Time{}
-	limit := 0
-	page := 0
-	var err error
-
-	// Parse the URL query parameters.
-	if len(r.URL.Query().Get("added_after")) > 0 {
-		after, err = time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-	}
-	if len(r.URL.Query().Get("limit")) > 0 {
-		limit, err = strconv.Atoi(r.URL.Query().Get("limit"))
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-	}
-	if len(r.URL.Query().Get("next")) > 0 {
-		page, err = strconv.Atoi(r.URL.Query().Get("next"))
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
+	opt, err := parseParams(r)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	// Ensure a minimum page number of 1.
-	if page < 1 {
-		page = 1
+	if opt.page < 1 {
+		opt.page = 1
 	}
 
 	// Build the requested collection.
 	result := taxii.Envelope{}
 	switch r.PathValue("id") {
 	case taxii.IndicatorsID, taxii.IndicatorsAlias:
-		result.Objects = convertToIndicators(prepareFeed(sortByLastSeen(), seenAfter(after)))
+		result.Objects = prepareFeed(opt).convertToIndicators()
 	case taxii.ObservablesID, taxii.ObservablesAlias:
-		result.Objects = convertToObservables(prepareFeed(sortByLastSeen(), seenAfter(after)))
+		result.Objects = prepareFeed(opt).convertToObservables()
 	default:
 		handleTAXIINotFound(w, r)
 		return
@@ -313,13 +291,13 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 
 	// Paginate. result.Objects may be resliced depending on the requested
 	// limit and page number.
-	result.Objects, result.More = paginate(result.Objects, limit, page)
+	result.Objects, result.More = paginate(result.Objects, opt.limit, opt.page)
 
 	// If more results are available, include the `next` property in the
 	// response with the next page number.
 	if result.More {
-		if page+1 > 0 {
-			result.Next = strconv.Itoa(page + 1)
+		if opt.page+1 > 0 {
+			result.Next = strconv.Itoa(opt.page + 1)
 		}
 	}
 
@@ -391,6 +369,56 @@ func paginate(items []stix.Object, limit int, page int) ([]stix.Object, bool) {
 	}
 
 	return items[start:end], more
+}
+
+// parseParams extracts HTTP query parameters and maps them to options for
+// controlling the threat feed output.
+func parseParams(r *http.Request) (feedOptions, error) {
+	opt := feedOptions{}
+
+	// Handle TAXII parameters.
+	if strings.HasPrefix(r.URL.Path, taxii.APIRoot) {
+		// TAXII requires results to be sorted by object creation date.
+		// However, since IPs in the threat feed may have their `LastSeen` date
+		// updated after being added, it makes more sense to sort by the last
+		// seen date instead. Otherwise, clients may miss updates if they are
+		// only looking for newly added results.
+		opt.sortMethod = byLastSeen
+
+		var err error
+		if len(r.URL.Query().Get("added_after")) > 0 {
+			opt.seenAfter, err = time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
+			if err != nil {
+				return feedOptions{}, err
+			}
+		}
+		if len(r.URL.Query().Get("limit")) > 0 {
+			opt.limit, err = strconv.Atoi(r.URL.Query().Get("limit"))
+			if err != nil {
+				return feedOptions{}, err
+			}
+		}
+		if len(r.URL.Query().Get("next")) > 0 {
+			opt.page, err = strconv.Atoi(r.URL.Query().Get("next"))
+			if err != nil {
+				return feedOptions{}, err
+			}
+		}
+		return opt, nil
+	}
+
+	switch r.URL.Query().Get("sort") {
+	case "last_seen":
+		opt.sortMethod = byLastSeen
+	case "added":
+		opt.sortMethod = byAdded
+	case "threat_score":
+		opt.sortMethod = byThreatScore
+	default:
+		opt.sortMethod = byIP
+	}
+
+	return opt, nil
 }
 
 // handleEmpty handles HTTP requests to /empty. It returns an empty body with
