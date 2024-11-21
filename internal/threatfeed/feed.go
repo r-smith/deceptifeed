@@ -14,7 +14,20 @@ import (
 	"github.com/r-smith/deceptifeed/internal/stix"
 )
 
-type feed []net.IP
+// feedEntry represents an individual entry in the threat feed.
+type feedEntry struct {
+	IP          string    `json:"ip"`
+	IPBytes     net.IP    `json:"-"`
+	Added       time.Time `json:"added"`
+	LastSeen    time.Time `json:"last_seen"`
+	ThreatScore int       `json:"threat_score"`
+}
+
+// feedEntries is a slice of feedEntry structs. It represents the threat feed
+// served to clients. When clients request the feed, this structure is built
+// from the `iocData` map. The data is then formatted and served to clients in
+// the requested format.
+type feedEntries []feedEntry
 
 // sortMethod represents the method used for sorting the threat feed.
 type sortMethod int
@@ -22,8 +35,8 @@ type sortMethod int
 // Constants representing the possible values for sortMethod.
 const (
 	byIP sortMethod = iota
-	byLastSeen
 	byAdded
+	byLastSeen
 	byThreatScore
 )
 
@@ -48,7 +61,7 @@ type feedOptions struct {
 // prepareFeed filters, processes, and sorts IP addresses from the threat feed.
 // The resulting slice of `net.IP` represents the current threat feed to be
 // served to clients.
-func prepareFeed(options ...feedOptions) feed {
+func prepareFeed(options ...feedOptions) feedEntries {
 	// Set default feed options.
 	opt := feedOptions{
 		sortMethod:    byIP,
@@ -66,10 +79,10 @@ func prepareFeed(options ...feedOptions) feed {
 
 	// Parse and filter IPs from iocData into the threat feed.
 	mutex.Lock()
-	threats := make(feed, 0, len(iocData))
+	threats := make(feedEntries, 0, len(iocData))
 loop:
 	for ip, ioc := range iocData {
-		if ioc.expired() || ioc.ThreatScore < configuration.MinimumThreatScore || !ioc.LastSeen.After(opt.seenAfter) {
+		if ioc.expired() || ioc.threatScore < configuration.MinimumThreatScore || !ioc.lastSeen.After(opt.seenAfter) {
 			continue
 		}
 
@@ -88,7 +101,13 @@ loop:
 			continue
 		}
 
-		threats = append(threats, parsedIP)
+		threats = append(threats, feedEntry{
+			IP:          ip,
+			IPBytes:     parsedIP,
+			Added:       ioc.added,
+			LastSeen:    ioc.lastSeen,
+			ThreatScore: ioc.threatScore,
+		})
 	}
 	mutex.Unlock()
 
@@ -134,30 +153,24 @@ func parseExcludeList(filepath string) (map[string]struct{}, []*net.IPNet, error
 
 // applySort sorts the threat feed based on the specified sort method and
 // direction.
-func (f feed) applySort(method sortMethod, direction sortDirection) {
+func (f feedEntries) applySort(method sortMethod, direction sortDirection) {
 	switch method {
 	case byIP:
-		slices.SortFunc(f, func(a, b net.IP) int {
-			return bytes.Compare(a, b)
+		slices.SortFunc(f, func(a, b feedEntry) int {
+			return bytes.Compare(a.IPBytes, b.IPBytes)
 		})
 	case byLastSeen:
-		mutex.Lock()
-		slices.SortFunc(f, func(a, b net.IP) int {
-			return iocData[a.String()].LastSeen.Compare(iocData[b.String()].LastSeen)
+		slices.SortFunc(f, func(a, b feedEntry) int {
+			return a.LastSeen.Compare(b.LastSeen)
 		})
-		mutex.Unlock()
 	case byAdded:
-		mutex.Lock()
-		slices.SortFunc(f, func(a, b net.IP) int {
-			return iocData[a.String()].Added.Compare(iocData[b.String()].Added)
+		slices.SortFunc(f, func(a, b feedEntry) int {
+			return a.Added.Compare(b.Added)
 		})
-		mutex.Unlock()
 	case byThreatScore:
-		mutex.Lock()
-		slices.SortFunc(f, func(a, b net.IP) int {
-			return cmp.Compare(iocData[a.String()].ThreatScore, iocData[b.String()].ThreatScore)
+		slices.SortFunc(f, func(a, b feedEntry) int {
+			return cmp.Compare(a.ThreatScore, b.ThreatScore)
 		})
-		mutex.Unlock()
 	}
 	if direction == descending {
 		slices.Reverse(f)
@@ -166,7 +179,7 @@ func (f feed) applySort(method sortMethod, direction sortDirection) {
 
 // convertToIndicators converts IP addresses from the threat feed into a
 // collection of STIX Indicator objects.
-func (f feed) convertToIndicators() []stix.Object {
+func (f feedEntries) convertToIndicators() []stix.Object {
 	if len(f) == 0 {
 		return []stix.Object{}
 	}
@@ -179,49 +192,47 @@ func (f feed) convertToIndicators() []stix.Object {
 	// the creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
-	for _, ip := range f {
-		if ioc, found := iocData[ip.String()]; found {
-			pattern := "[ipv4-addr:value = '"
-			if strings.Contains(ip.String(), ":") {
-				pattern = "[ipv6-addr:value = '"
-			}
-			pattern = pattern + ip.String() + "']"
-
-			// Fixed expiration: 2 months since last seen.
-			validUntil := new(time.Time)
-			*validUntil = ioc.LastSeen.AddDate(0, 2, 0).UTC()
-
-			// Generate a deterministic identifier for each IP address in the
-			// threat feed using the STIX IP pattern represented as a JSON
-			// string. For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
-			patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
-
-			result = append(result, stix.Indicator{
-				Type:           indicator,
-				SpecVersion:    stix.SpecVersion,
-				ID:             stix.DeterministicID(indicator, patternJSON),
-				IndicatorTypes: []string{"malicious-activity"},
-				Pattern:        pattern,
-				PatternType:    "stix",
-				Created:        ioc.Added.UTC(),
-				Modified:       ioc.LastSeen.UTC(),
-				ValidFrom:      ioc.Added.UTC(),
-				ValidUntil:     validUntil,
-				Name:           "Honeypot interaction: " + ip.String(),
-				Description:    "This IP was observed interacting with a honeypot server.",
-				KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
-				Lang:           "en",
-				Labels:         []string{"honeypot"},
-				CreatedByRef:   stix.DeceptifeedID,
-			})
+	for _, entry := range f {
+		pattern := "[ipv4-addr:value = '"
+		if strings.Contains(entry.IP, ":") {
+			pattern = "[ipv6-addr:value = '"
 		}
+		pattern = pattern + entry.IP + "']"
+
+		// Fixed expiration: 2 months since last seen.
+		validUntil := new(time.Time)
+		*validUntil = entry.LastSeen.AddDate(0, 2, 0).UTC()
+
+		// Generate a deterministic identifier for each IP address in the
+		// threat feed using the STIX IP pattern represented as a JSON
+		// string. For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
+		patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
+
+		result = append(result, stix.Indicator{
+			Type:           indicator,
+			SpecVersion:    stix.SpecVersion,
+			ID:             stix.DeterministicID(indicator, patternJSON),
+			IndicatorTypes: []string{"malicious-activity"},
+			Pattern:        pattern,
+			PatternType:    "stix",
+			Created:        entry.Added.UTC(),
+			Modified:       entry.LastSeen.UTC(),
+			ValidFrom:      entry.Added.UTC(),
+			ValidUntil:     validUntil,
+			Name:           "Honeypot interaction: " + entry.IP,
+			Description:    "This IP was observed interacting with a honeypot server.",
+			KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
+			Lang:           "en",
+			Labels:         []string{"honeypot"},
+			CreatedByRef:   stix.DeceptifeedID,
+		})
 	}
 	return result
 }
 
 // convertToObservables converts IP addresses from the threat feed into a
 // collection of STIX Cyber-observable Objects.
-func (f feed) convertToObservables() []stix.Object {
+func (f feedEntries) convertToObservables() []stix.Object {
 	if len(f) == 0 {
 		return []stix.Object{}
 	}
@@ -233,24 +244,22 @@ func (f feed) convertToObservables() []stix.Object {
 	// the creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
-	for _, ip := range f {
-		if _, found := iocData[ip.String()]; found {
-			t := "ipv4-addr"
-			if strings.Contains(ip.String(), ":") {
-				t = "ipv6-addr"
-			}
-
-			// Generate a deterministic identifier for each IP address in the
-			// threat feed using the IP value represented as a JSON string. For
-			// example: {"value":"127.0.0.1"}
-			result = append(result, stix.ObservableIP{
-				Type:         t,
-				SpecVersion:  stix.SpecVersion,
-				ID:           stix.DeterministicID(t, "{\"value\":\""+ip.String()+"\"}"),
-				Value:        ip.String(),
-				CreatedByRef: stix.DeceptifeedID,
-			})
+	for _, entry := range f {
+		t := "ipv4-addr"
+		if strings.Contains(entry.IP, ":") {
+			t = "ipv6-addr"
 		}
+
+		// Generate a deterministic identifier for each IP address in the
+		// threat feed using the IP value represented as a JSON string. For
+		// example: {"value":"127.0.0.1"}
+		result = append(result, stix.ObservableIP{
+			Type:         t,
+			SpecVersion:  stix.SpecVersion,
+			ID:           stix.DeterministicID(t, "{\"value\":\""+entry.IP+"\"}"),
+			Value:        entry.IP,
+			CreatedByRef: stix.DeceptifeedID,
+		})
 	}
 	return result
 }

@@ -12,20 +12,20 @@ import (
 	"time"
 )
 
-// IoC represents an Indicator of Compromise (IoC) entry that makes up the
-// structure of the threat feed.
-type IoC struct {
-	// Added records the time when an IP address is added to the threat feed.
-	Added time.Time
+// IOC represents an Indicator of Compromise (IOC) entry that stores
+// information about IP addresses that interact with the honeypot servers.
+type IOC struct {
+	// added records the time when an IP address is added to the threat feed.
+	added time.Time
 
-	// LastSeen records the last time an IP was observed interacting with a
+	// lastSeen records the last time an IP was observed interacting with a
 	// honeypot server.
-	LastSeen time.Time
+	lastSeen time.Time
 
-	// ThreatScore represents a score for a given IP address. It is incremented
+	// threatScore represents a score for a given IP address. It is incremented
 	// based on the configured threat score of the honeypot server that the IP
 	// interacted with.
-	ThreatScore int
+	threatScore int
 }
 
 const (
@@ -34,12 +34,13 @@ const (
 )
 
 var (
-	// iocData stores the Indicator of Compromise (IoC) entries which make up
-	// the active threat feed. It is initially populated by loadCSV if an
-	// existing CSV file is provided. The map is subsequently updated by
-	// `Update` whenever a client interacts with a honeypot server. This
-	// map is served by the threat feed HTTP server for clients to consume.
-	iocData = make(map[string]*IoC)
+	// iocData stores Indicator of Compromise (IOC) entries, keyed by IP
+	// address. This map represents the internal structure of the threat feed.
+	// It is populated with existing threat data when the server starts. The
+	// map is then updated by `Update` whenever a potential attacker interacts
+	// with a honeypot server. The threat feed served to clients is generated
+	// based on the data in this map.
+	iocData = make(map[string]*IOC)
 
 	// mutex is to ensure thread-safe access to iocData.
 	mutex sync.Mutex
@@ -73,20 +74,20 @@ func Update(ip string, threatScore int) {
 	mutex.Lock()
 	if ioc, exists := iocData[ip]; exists {
 		// Update existing entry.
-		ioc.LastSeen = now
+		ioc.lastSeen = now
 		if threatScore > 0 {
-			if ioc.ThreatScore > math.MaxInt-threatScore {
-				ioc.ThreatScore = math.MaxInt
+			if ioc.threatScore > math.MaxInt-threatScore {
+				ioc.threatScore = math.MaxInt
 			} else {
-				ioc.ThreatScore += threatScore
+				ioc.threatScore += threatScore
 			}
 		}
 	} else {
 		// Create a new entry.
-		iocData[ip] = &IoC{
-			Added:       now,
-			LastSeen:    now,
-			ThreatScore: threatScore,
+		iocData[ip] = &IOC{
+			added:       now,
+			lastSeen:    now,
+			threatScore: threatScore,
 		}
 	}
 	mutex.Unlock()
@@ -108,11 +109,11 @@ func deleteExpired() {
 
 // expired returns whether an IoC is considered expired based on the last
 // seen date and the configured expiry hours.
-func (ioc *IoC) expired() bool {
+func (ioc *IOC) expired() bool {
 	if configuration.ExpiryHours <= 0 {
 		return false
 	}
-	return ioc.LastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
+	return ioc.lastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
 }
 
 // loadCSV loads existing threat feed data from a CSV file. If found, it
@@ -164,7 +165,7 @@ func loadCSV() error {
 			}
 		}
 
-		iocData[ip] = &IoC{Added: added, LastSeen: lastSeen, ThreatScore: threatScore}
+		iocData[ip] = &IOC{added: added, lastSeen: lastSeen, threatScore: threatScore}
 	}
 	deleteExpired()
 	return nil
@@ -185,9 +186,9 @@ func saveCSV() error {
 	for ip, ioc := range iocData {
 		if err := writer.Write([]string{
 			ip,
-			ioc.Added.Format(dateFormat),
-			ioc.LastSeen.Format(dateFormat),
-			strconv.Itoa(ioc.ThreatScore),
+			ioc.added.Format(dateFormat),
+			ioc.lastSeen.Format(dateFormat),
+			strconv.Itoa(ioc.threatScore),
 		}); err != nil {
 			return err
 		}

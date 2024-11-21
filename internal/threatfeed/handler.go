@@ -25,8 +25,8 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	for _, ip := range prepareFeed(opt) {
-		_, err := w.Write([]byte(ip.String() + "\n"))
+	for _, entry := range prepareFeed(opt) {
+		_, err := w.Write([]byte(entry.IP + "\n"))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
 			return
@@ -59,31 +59,12 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type iocDetailed struct {
-		IP          string    `json:"ip"`
-		Added       time.Time `json:"added"`
-		LastSeen    time.Time `json:"last_seen"`
-		ThreatScore int       `json:"threat_score"`
-	}
-
-	ipData := prepareFeed(opt)
-	result := make([]iocDetailed, 0, len(ipData))
-	for _, ip := range ipData {
-		if ioc, found := iocData[ip.String()]; found {
-			result = append(result, iocDetailed{
-				IP:          ip.String(),
-				Added:       ioc.Added,
-				LastSeen:    ioc.LastSeen,
-				ThreatScore: ioc.ThreatScore,
-			})
-		}
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
-	if err := e.Encode(map[string]interface{}{"threat_feed": result}); err != nil {
+	if err := e.Encode(map[string]interface{}{"threat_feed": prepareFeed(opt)}); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
+		return
 	}
 }
 
@@ -97,11 +78,16 @@ func handleJSONSimple(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ips := make([]string, 0, len(iocData))
+	for _, entry := range prepareFeed(opt) {
+		ips = append(ips, entry.IP)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
-	if err := e.Encode(map[string]interface{}{"threat_feed": prepareFeed(opt)}); err != nil {
+	if err := e.Encode(map[string]interface{}{"threat_feed": ips}); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
+		return
 	}
 }
 
@@ -124,17 +110,15 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, ip := range prepareFeed(opt) {
-		if ioc, found := iocData[ip.String()]; found {
-			if err := c.Write([]string{
-				ip.String(),
-				ioc.Added.Format(dateFormat),
-				ioc.LastSeen.Format(dateFormat),
-				strconv.Itoa(ioc.ThreatScore),
-			}); err != nil {
-				fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
-				return
-			}
+	for _, entry := range prepareFeed(opt) {
+		if err := c.Write([]string{
+			entry.IP,
+			entry.Added.Format(dateFormat),
+			entry.LastSeen.Format(dateFormat),
+			strconv.Itoa(entry.ThreatScore),
+		}); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+			return
 		}
 	}
 
@@ -163,8 +147,8 @@ func handleCSVSimple(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, ip := range prepareFeed(opt) {
-		if err := c.Write([]string{ip.String()}); err != nil {
+	for _, entry := range prepareFeed(opt) {
+		if err := c.Write([]string{entry.IP}); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
 			return
 		}
@@ -362,7 +346,7 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 				timestamp = v.Modified
 			case stix.ObservableIP:
 				if ioc, found := iocData[v.Value]; found {
-					timestamp = ioc.LastSeen
+					timestamp = ioc.lastSeen
 				}
 			case stix.Identity:
 				timestamp = v.Created
