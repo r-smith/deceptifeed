@@ -463,6 +463,17 @@ func parseParams(r *http.Request) (feedOptions, error) {
 		return feedOptions{}, fmt.Errorf("invalid 'sort' value")
 	}
 
+	switch r.URL.Query().Get("direction") {
+	case "asc":
+		opt.sortDirection = ascending
+	case "desc":
+		opt.sortDirection = descending
+	case "":
+		// No direction option specified.
+	default:
+		return feedOptions{}, fmt.Errorf("invalid 'direction' value")
+	}
+
 	if len(r.URL.Query().Get("last_seen_hours")) > 0 {
 		hours, err := strconv.Atoi(r.URL.Query().Get("last_seen_hours"))
 		if err != nil {

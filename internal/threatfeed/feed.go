@@ -16,9 +16,10 @@ import (
 
 type feed []net.IP
 
-// sortMethod is a type representing threat feed sorting methods.
+// sortMethod represents the method used for sorting the threat feed.
 type sortMethod int
 
+// Constants representing the possible values for sortMethod.
 const (
 	byIP sortMethod = iota
 	byLastSeen
@@ -26,12 +27,22 @@ const (
 	byThreatScore
 )
 
+// sortDirection represents the direction of sorting (ascending or descending).
+type sortDirection int
+
+// Constants representing the possible values for sortDirection.
+const (
+	ascending sortDirection = iota
+	descending
+)
+
 // feedOptions define configurable options for serving the threat feed.
 type feedOptions struct {
-	sortMethod sortMethod
-	seenAfter  time.Time
-	limit      int
-	page       int
+	sortMethod    sortMethod
+	sortDirection sortDirection
+	seenAfter     time.Time
+	limit         int
+	page          int
 }
 
 // prepareFeed filters, processes, and sorts IP addresses from the threat feed.
@@ -40,7 +51,8 @@ type feedOptions struct {
 func prepareFeed(options ...feedOptions) feed {
 	// Set default feed options.
 	opt := feedOptions{
-		sortMethod: byIP,
+		sortMethod:    byIP,
+		sortDirection: ascending,
 	}
 	// Override default options if provided.
 	if len(options) > 0 {
@@ -80,7 +92,7 @@ loop:
 	}
 	mutex.Unlock()
 
-	threats.applySort(opt.sortMethod)
+	threats.applySort(opt.sortMethod, opt.sortDirection)
 
 	return threats
 }
@@ -120,7 +132,9 @@ func parseExcludeList(filepath string) (map[string]struct{}, []*net.IPNet, error
 	return ips, cidr, nil
 }
 
-func (f feed) applySort(method sortMethod) {
+// applySort sorts the threat feed based on the specified sort method and
+// direction.
+func (f feed) applySort(method sortMethod, direction sortDirection) {
 	switch method {
 	case byIP:
 		slices.SortFunc(f, func(a, b net.IP) int {
@@ -144,6 +158,9 @@ func (f feed) applySort(method sortMethod) {
 			return cmp.Compare(iocData[a.String()].ThreatScore, iocData[b.String()].ThreatScore)
 		})
 		mutex.Unlock()
+	}
+	if direction == descending {
+		slices.Reverse(f)
 	}
 }
 
