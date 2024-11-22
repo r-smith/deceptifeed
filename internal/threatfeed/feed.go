@@ -161,15 +161,27 @@ func (f feedEntries) applySort(method sortMethod, direction sortDirection) {
 		})
 	case byLastSeen:
 		slices.SortFunc(f, func(a, b feedEntry) int {
-			return a.LastSeen.Compare(b.LastSeen)
+			t := a.LastSeen.Compare(b.LastSeen)
+			if t == 0 {
+				return bytes.Compare(a.IPBytes, b.IPBytes)
+			}
+			return t
 		})
 	case byAdded:
 		slices.SortFunc(f, func(a, b feedEntry) int {
-			return a.Added.Compare(b.Added)
+			t := a.Added.Compare(b.Added)
+			if t == 0 {
+				return bytes.Compare(a.IPBytes, b.IPBytes)
+			}
+			return t
 		})
 	case byThreatScore:
 		slices.SortFunc(f, func(a, b feedEntry) int {
-			return cmp.Compare(a.ThreatScore, b.ThreatScore)
+			t := cmp.Compare(a.ThreatScore, b.ThreatScore)
+			if t == 0 {
+				return bytes.Compare(a.IPBytes, b.IPBytes)
+			}
+			return t
 		})
 	}
 	if direction == descending {
