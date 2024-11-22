@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/r-smith/deceptifeed/internal/config"
@@ -21,7 +23,7 @@ func main() {
 	ssh := config.Server{Type: config.SSH}
 
 	// Parse command line flags.
-	configFile := flag.String("config", "", "Path to optional XML configuration file")
+	configPath := flag.String("config", "", "Path to optional XML configuration file")
 	flag.BoolVar(&http.Enabled, "enable-http", config.DefaultEnableHTTP, "Enable HTTP server")
 	flag.BoolVar(&https.Enabled, "enable-https", config.DefaultEnableHTTPS, "Enable HTTPS server")
 	flag.BoolVar(&ssh.Enabled, "enable-ssh", config.DefaultEnableSSH, "Enable SSH server")
@@ -40,19 +42,25 @@ func main() {
 	flag.StringVar(&ssh.KeyPath, "ssh-key", config.DefaultKeyPathSSH, "Path to optional SSH private key")
 	flag.Parse()
 
-	// If the '-config' flag is provided, the specified configuration file is
-	// loaded. When a config file is used, all other command-line flags are
-	// ignored. The 'cfg' variable will contain all settings parsed from the
-	// configuration file.
-	if *configFile != "" {
-		// Load the specified config file.
-		cfgFromFile, err := config.Load(*configFile)
+	// If the `-config` flag is not provided, use "config.xml" from the current
+	// directory if the file exists.
+	if len(*configPath) == 0 {
+		if _, err := os.Stat("config.xml"); err == nil {
+			*configPath = "config.xml"
+			fmt.Printf("Using configuration file: '%v'\n", *configPath)
+		}
+	}
+
+	// If a config file is specified (via the `-config` flag or "config.xml"),
+	// load it. Otherwise, configure the app using the command line flags and
+	// default settings.
+	if len(*configPath) > 0 {
+		cfgFromFile, err := config.Load(*configPath)
 		if err != nil {
 			log.Fatalln("Failed to load config:", err)
 		}
 		cfg = *cfgFromFile
 	} else {
-		// No config file specified. Use command line args.
 		https.HomePagePath = http.HomePagePath
 		cfg.Servers = append(cfg.Servers, http, https, ssh)
 		// Set defaults.
