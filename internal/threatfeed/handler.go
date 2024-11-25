@@ -377,6 +377,11 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Set default sort if no query parameters are provided.
+	if len(r.URL.Query()) == 0 {
+		opt.sortMethod = byLastSeen
+		opt.sortDirection = descending
+	}
 
 	tmpl, err := template.New("table").Parse(`
 <!DOCTYPE html>
