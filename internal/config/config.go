@@ -133,7 +133,7 @@ type ThreatFeed struct {
 	Port               string `xml:"port"`
 	DatabasePath       string `xml:"databasePath"`
 	ExpiryHours        int    `xml:"threatExpiryHours"`
-	IsPrivateIncluded  bool   `xml:"isPrivateIncluded"`
+	IsPrivateIncluded  bool   `xml:"includePrivateIPs"`
 	MinimumThreatScore int    `xml:"minimumThreatScore"`
 	CustomThreatsPath  string `xml:"customThreatsPath"`
 	ExcludeListPath    string `xml:"excludeListPath"`
