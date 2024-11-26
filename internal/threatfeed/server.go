@@ -53,25 +53,23 @@ func Start(cfg *config.ThreatFeed) {
 
 	// Setup handlers and server configuration.
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", enforcePrivateIP(disableCache(handlePlain)))
+	mux.HandleFunc("GET /", enforcePrivateIP(handleNotFound))
+	mux.HandleFunc("GET /{$}", enforcePrivateIP(handleHome))
+	mux.HandleFunc("GET /feed", enforcePrivateIP(disableCache(handlePlain)))
+	mux.HandleFunc("GET /plain", enforcePrivateIP(disableCache(handlePlain)))
 	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
-	mux.HandleFunc("GET /csv/ips", enforcePrivateIP(disableCache(handleCSVSimple)))
 	mux.HandleFunc("GET /html", enforcePrivateIP(disableCache(handleHTML)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
-	mux.HandleFunc("GET /json/ips", enforcePrivateIP(disableCache(handleJSONSimple)))
-	mux.HandleFunc("GET /stix2", enforcePrivateIP(disableCache(handleSTIX2)))
-	mux.HandleFunc("GET /stix2/ips", enforcePrivateIP(disableCache(handleSTIX2Simple)))
-	// Empty handlers.
-	mux.HandleFunc("GET /empty", enforcePrivateIP(handleEmpty))
-	mux.HandleFunc("GET /favicon.ico", enforcePrivateIP(handleEmpty))
+	mux.HandleFunc("GET /stix/indicators", enforcePrivateIP(disableCache(handleSTIXIndicators)))
+	mux.HandleFunc("GET /stix/observables", enforcePrivateIP(disableCache(handleSTIXObservables)))
 	// TAXII 2.1 handlers.
-	mux.HandleFunc("GET    /taxii2/", enforcePrivateIP(disableCache(handleTAXIINotFound)))
-	mux.HandleFunc("POST   /taxii2/", enforcePrivateIP(disableCache(handleTAXIINotFound)))
-	mux.HandleFunc("DELETE /taxii2/", enforcePrivateIP(disableCache(handleTAXIINotFound)))
-	mux.HandleFunc("GET    /taxii2/{$}", enforcePrivateIP(disableCache(handleTAXIIDiscovery)))
-	mux.HandleFunc("GET    /taxii2/api/{$}", enforcePrivateIP(disableCache(handleTAXIIRoot)))
-	mux.HandleFunc("GET    /taxii2/api/collections/{$}", enforcePrivateIP(disableCache(handleTAXIICollections)))
-	mux.HandleFunc("GET    /taxii2/api/collections/{id}/{$}", enforcePrivateIP(disableCache(handleTAXIICollections)))
+	mux.HandleFunc("GET    /taxii2/", enforcePrivateIP(handleNotFound))
+	mux.HandleFunc("POST   /taxii2/", enforcePrivateIP(handleNotFound))
+	mux.HandleFunc("DELETE /taxii2/", enforcePrivateIP(handleNotFound))
+	mux.HandleFunc("GET    /taxii2/{$}", enforcePrivateIP(handleTAXIIDiscovery))
+	mux.HandleFunc("GET    /taxii2/api/{$}", enforcePrivateIP(handleTAXIIRoot))
+	mux.HandleFunc("GET    /taxii2/api/collections/{$}", enforcePrivateIP(handleTAXIICollections))
+	mux.HandleFunc("GET    /taxii2/api/collections/{id}/{$}", enforcePrivateIP(handleTAXIICollections))
 	mux.HandleFunc("GET    /taxii2/api/collections/{id}/objects/{$}", enforcePrivateIP(disableCache(handleTAXIIObjects)))
 
 	srv := &http.Server{
