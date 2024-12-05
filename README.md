@@ -15,11 +15,11 @@ Most enterprise firewalls support ingesting threat feeds. By pointing to `Decept
 
 ## Deployment Diagram
 
-<a href="assets/diagram-light.svg?raw=true">
+<a href="assets/diagram-light.png?raw=true">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-dark.png" width="884" height="436">
-  <source media="(prefers-color-scheme: light)" srcset="assets/diagram-light.png" width="884" height="436">
-  <img alt="Deceptifeed deployment diagram" src="assets/diagram-light.png" width="884" heigh="436">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-dark.png" width="884">
+  <source media="(prefers-color-scheme: light)" srcset="assets/diagram-light.png" width="884">
+  <img alt="Deceptifeed deployment diagram" src="assets/diagram-light.png" width="884">
 </picture>
 </a>
 
