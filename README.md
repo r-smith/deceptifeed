@@ -171,6 +171,10 @@ Configure your firewall to use Deceptifeed as a custom threat feed and set your 
 
 The threat feed is available in plain text, CSV, JSON, STIX, and TAXII 2.1.
 
+**_Sample threat feed web interface_**
+
+<img alt="Threat Feed Web Interface" src="assets/threatfeed-web-screenshot.png" width="881" />
+
 **_Sample threat feed in plain text_**
 
 ```shell
