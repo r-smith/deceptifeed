@@ -23,51 +23,86 @@ Most enterprise firewalls support ingesting threat feeds. By pointing to `Decept
 </picture>
 </a>
 
-## Installation
+## Quick Start
+
+This section guides you through trying Deceptifeed as quickly as possible. There are no dependencies, configuration, or installation required. Refer to the [Installation](#installation) section when you're ready to set up a production environment.
 
 ### Option 1: Download the binary
 
-1. Download the latest binary from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
-2. Extract the downloaded file.
-3. Run `install.sh` to install the application (optional).
-   - Note: `install.sh` is intended for Linux distributions that use systemd (Ubuntu, Debian, Red Hat, Arch, SUSE, etc.).
+1. Download the latest release from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
+2. Extract and run the `deceptifeed` binary.
 
 ```shell
-# Extract.
+# Extract:
 tar xvzf <release>.tar.gz
+
+# Change into the extracted directory:
 cd deceptifeed
 
-# Install (optional).
+# Run:
+./deceptifeed
+```
+
+A `default-config.xml` file is included with the release but is not used by default. Instead, Deceptifeed starts with sensible defaults, and you can customize options using command-line flags. Run `./deceptifeed --help` to view the available options. If you want to use a configuration file, rename `default-config.xml` to `config.xml`, and Deceptifeed will automatically use it. You'll need to update several paths in the configuration. Search for occurrences of `/opt/deceptifeed/` in the file and adjust the paths as needed.
+
+### Option 2: Docker
+
+```shell
+# Pull and run the latest Deceptifeed Docker image:
+docker run -d --name deceptifeed -p 2222:2222 -p 8080:8080 -p 9000:9000 deceptifeed/server:latest
+
+# (Optional) Delete the container when you're finished testing:
+docker rm -f deceptifeed
+```
+
+### Try it out
+
+```shell
+# Trigger login attempts on the SSH honeypot:
+ssh -p 2222 root@<your-ip-address>
+
+# Trigger requests to the HTTP honeypot:
+curl -v http://<your-ip-address>:8080
+
+# Retrieve the threat feed in JSON format:
+curl http://<your-ip-address>:9000/json
+
+# View the threat feed web interface:
+# From a web browser, navigate to `http://<your-ip-address>:9000`
+```
+
+## Installation
+
+### Option 1: Install on a Linux system
+
+An installation script is available to quickly configure a production setup on a Linux system. The script supports only Linux distributions that use **systemd** (Debian, Ubuntu, Red Hat, Arch, SUSE, etc.).
+
+1. Download the latest release from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
+2. Extract and run the `install.sh` script.
+
+```shell
+# Extract:
+tar xvzf <release>.tar.gz
+
+# Change into the extracted directory:
+cd deceptifeed
+
+# Install:
 sudo ./install.sh
 ```
 
 <img alt="" src="assets/install.gif" width="600" />
 
-### Option 2: Build from source
+The installation script performs the following tasks:
+- Creates a low-privilege `deceptifeed` user and group to run Deceptifeed.
+- Sets up a directory structure under `/opt/deceptifeed/` to organize everything.
+- Registers Deceptifeed as a background service and configures it to start automatically at boot.
 
-**Go** version **1.22+** is required to build from source.
-
-```shell
-# Clone the repository.
-git clone https://github.com/r-smith/deceptifeed.git
-cd deceptifeed
-
-# Compile and build the binary to `./out/deceptifeed`.
-make
-
-# The installation script is intended for Linux distributions that use systemd.
-# For other systems, simply run the binary in `./out/` to launch Deceptifeed.
-sudo make install
-```
-
-## Usage
-
-### Option 1: Use the installation script
-
-If you're on a supported system, run `install.sh` or `make install`, as described in the previous section.
-
-- Deceptifeed runs as a background service. Use `sudo systemctl status deceptifeed` to check its status.
+Once installed:
+- Run `systemctl status deceptifeed` to check the status of the background service.
 - To modify the configuration, edit `/opt/deceptifeed/etc/config.xml`, then restart the service with `sudo systemctl restart deceptifeed`.
+
+**_Directory structure_**
 
 ```
 /opt/deceptifeed/
@@ -84,34 +119,42 @@ If you're on a supported system, run `install.sh` or `make install`, as describe
     └── threatfeed.csv
 ```
 
-### Option 2: Run directly
+### Option 2: Docker
 
-You can run Deceptifeed directly without installation.
-
-- Use `deceptifeed -help` to view the command-line options.
-- By default, Deceptifeed starts the following network services:
-  - SSH honeypot server on port 2222
-  - HTTP honeypot server on port 8080
-  - HTTPS honeypot server on port 8443
-  - Threat feed server on port 9000
-- Logs are saved to `deceptifeed-log.txt`.
-- The threat feed database is saved to `deceptifeed-database.csv`.
-- Certificates and keys are generated and saved as `deceptifeed-*.crt` and `deceptifeed-*.key`.
-
+1. Create a directory on your host system (for example, `/opt/deceptifeed/`) to store your configuration file and persistent data.
 ```shell
-$ ./deceptifeed
-Starting SSH server on port: 2222
-Starting HTTP server on port: 8080
-Starting HTTPS server on port: 8443
-Starting Threat Feed server on port: 9000
+mkdir /opt/deceptifeed/
 ```
+2. Download the default configuration file to the directory you created in step 1. The configuration file must be named `config.xml`.
+```
+curl https://raw.githubusercontent.com/r-smith/deceptifeed/main/configs/default-config.xml -o /opt/deceptifeed/config.xml
+```
+3. Edit the configuration file to suit your needs. The default configuration file is production-ready.
+4. Run the Deceptifeed Docker container.
+```shell
+docker run --detach --name deceptifeed \
+--publish 2222:2222 \
+--publish 8080:8080 \
+--publish 8443:8443 \
+--publish 9000:9000 \
+--restart unless-stopped \
+--volume /opt/deceptifeed/:/data/ \
+deceptifeed/server:latest
+```
+
+Here is a breakdown of the arguments:
+- `--detach` instructs Docker to run the Deceptifeed container in the background.
+- `--publish ####:####` opens a network port on your host machine and maps it to Deceptifeed's Docker container. The first number specifies the port your host system listens on. You can set it to any open port. The second number specifies the port used by Deceptifeed inside the Docker container, which should match the ports configured in `config.xml`. There are multiple `--publish` arguments because Deceptifeed runs multiple network services. The default configuration includes an SSH honeypot on port 2222, an HTTP honeypot on port 8080, an HTTPS honeypot on port 8443, and the threat feed on port 9000. If you want your host machine to listen on port 443 for the HTTPS honeypot, for example, you would use the following line `--publish 443:8443 \`. This makes your host system listen on port 443 and maps it to the HTTPS honeypot defined for port 8443 in `config.xml`.
+- `--restart unless-stopped` ensures Deceptifeed starts automatically when the host boots.
+- `--volume /opt/deceptifeed/:/data/` specifies the directory on your host machine where persistent data is stored. If you used a different directory, adjust the path accordingly, but keep `:/data/` unchanged. For example: `--volume /path/to/deceptifeed/directory/:/data/ \`.
+- `deceptifeed/server:latest` is the latest Docker image for Deceptifeed, hosted on *Docker Hub*. The image is updated with each official release and can be viewed on Docker Hub [here](https://hub.docker.com/r/deceptifeed/server).
 
 
 ## Features
 
 - **Multiple Honeypot Servers:** Run any number of honeypot services simultaneously.
-- **Threat Feed Server:** A real-time feed of IP addresses that have accessed your honeypots, delivered over HTTP for firewall integration.
-- **Rich Structured Logging:** Capture detailed logs of everything in JSON format for easy parsing.
+- **Threat Feed Server:** A real-time feed of IP addresses that have accessed your honeypots, delivered over HTTP. Available in plain text, CSV, JSON, STIX, and TAXII 2.1.
+- **Rich Structured Logging:** Capture detailed logs of honeypot interactions in JSON format.
 - **Secure:** The honeypot services never process or respond to client input; they only log the data received. Attackers are not given simulated or virtual environments.
 - **Several Honeypot Types:**
   - **SSH Honeyot:** Record login attempts to a fake SSH service.
@@ -126,12 +169,12 @@ The threat feed provides a real-time list of IP addresses that have interacted w
 
 Configure your firewall to use Deceptifeed as a custom threat feed and set your blocking rules accordingly. Ideally, exclude your honeypot services from any automatic blocking rules.
 
-The threat feed is available in several formats, including plain text, CSV, JSON, STIX, and TAXII 2.1.
+The threat feed is available in plain text, CSV, JSON, STIX, and TAXII 2.1.
 
 **_Sample threat feed in plain text_**
 
 ```shell
-$ curl http://threatfeed.example.com:9000
+$ curl http://threatfeed.example.com:9000/plain
 ```
 ```
 10.30.16.110
