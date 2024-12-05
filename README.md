@@ -127,7 +127,7 @@ mkdir /opt/deceptifeed/
 ```
 2. Download the default configuration file to the directory you created in step 1. The configuration file must be named `config.xml`.
 ```
-curl https://raw.githubusercontent.com/r-smith/deceptifeed/main/configs/default-config.xml -o /opt/deceptifeed/config.xml
+curl https://raw.githubusercontent.com/r-smith/deceptifeed/main/configs/docker-config.xml -o /opt/deceptifeed/config.xml
 ```
 3. Edit the configuration file to suit your needs. The default configuration file is production-ready.
 4. Run the Deceptifeed Docker container.

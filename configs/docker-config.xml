@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Deceptifeed Configuration -->
+<config>
+
+  <!-- The default log path for honeypot servers -->
+  <defaultLogPath>honeypot.log</defaultLogPath>
+
+  <!-- Threat Feed Configuration -->
+  <threatFeed>
+    <enabled>true</enabled>
+    <port>9000</port>
+    <databasePath>threatfeed.csv</databasePath>
+    <threatExpiryHours>336</threatExpiryHours>
+    <minimumThreatScore>0</minimumThreatScore>
+    <includePrivateIPs>false</includePrivateIPs>
+    <customThreatsPath></customThreatsPath>
+    <excludeListPath></excludeListPath>
+  </threatFeed>
+
+  <!-- Honeypot Server Configuration -->
+  <honeypotServers>
+
+    <!-- SSH honeypot server on port 2222 -->
+    <server type="ssh">
+      <enabled>true</enabled>
+      <port>2222</port>
+      <logEnabled>true</logEnabled>
+      <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
+      <keyPath>key-ssh-private.pem</keyPath>
+      <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
+    </server>
+
+    <!-- HTTP honeypot server on port 8080 -->
+    <server type="http">
+      <enabled>true</enabled>
+      <port>8080</port>
+      <logEnabled>true</logEnabled>
+      <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
+      <rules>
+        <!-- Update the threat feed if any of the following rules match: -->
+        <include target="path" negate="true">(?i)^(/|/index\.html|/favicon\.ico|/robots\.txt|/sitemap\.xml|/\.well-known/\w+\.txt)$</include>
+        <include target="query">(?i)(action|conf|dns|file|form|http|id=|json|login|php|q=|url|user|\.\.)</include>
+        <include target="authorization">.*</include>
+        <include target="method" negate="true">(?i)^(GET|HEAD|OPTIONS)$</include>
+        <include target="user-agent">(?i)(curl|go-http-client|httpclient|java|libwww|nikto|nmap|php|python|wget)</include>
+        <include target="user-agent">^$</include>
+      </rules>
+    </server>
+
+    <!-- HTTPS honeypot server on port 8443 -->
+    <server type="https">
+      <enabled>true</enabled>
+      <port>8443</port>
+      <logEnabled>true</logEnabled>
+      <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
+      <certPath>key-https-public.pem</certPath>
+      <keyPath>key-https-private.pem</keyPath>
+      <rules>
+        <!-- Update the threat feed if any of the following rules match: -->
+        <include target="path" negate="true">(?i)^(/|/index\.html|/favicon\.ico|/robots\.txt|/sitemap\.xml|/\.well-known/\w+\.txt)$</include>
+        <include target="query">(?i)(action|conf|dns|file|form|http|id=|json|login|php|q=|url|user|\.\.)</include>
+        <include target="authorization">.*</include>
+        <include target="method" negate="true">(?i)^(GET|HEAD|OPTIONS)$</include>
+        <include target="user-agent">(?i)(curl|go-http-client|httpclient|java|libwww|nikto|nmap|php|python|wget)</include>
+        <include target="user-agent">^$</include>
+      </rules>
+    </server>
+
+    <!-- DISABLED: -->
+    <!-- Example TCP honeypot server to simulate a Cisco router -->
+    <server type="tcp">
+      <enabled>false</enabled>
+      <port>2323</port>
+      <logEnabled>true</logEnabled>
+      <sendToThreatFeed>true</sendToThreatFeed>
+      <threatScore>1</threatScore>
+      <banner>\nUser Access Verification\n\n</banner>
+      <prompts>
+        <prompt log="username">Username: </prompt>
+        <prompt log="password">Password: </prompt>
+      </prompts>
+    </server>
+
+    <!-- DISABLED: -->
+    <!-- Example UDP honeypot server to capture SIP scans -->
+    <server type="udp">
+      <enabled>false</enabled>
+      <port>5060</port>
+      <logEnabled>true</logEnabled>
+    </server>
+  </honeypotServers>
+
+</config>
