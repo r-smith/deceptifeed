@@ -15,7 +15,7 @@ Most enterprise firewalls support ingesting threat feeds. By pointing to `Decept
 
 ## Deployment Diagram
 
-<a href="assets/diagram-light.png?raw=true">
+<a href="assets/diagram-light.svg?raw=true">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-dark.png" width="884">
   <source media="(prefers-color-scheme: light)" srcset="assets/diagram-light.png" width="884">
