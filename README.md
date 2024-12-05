@@ -6,10 +6,22 @@
   </picture>
 </p>
 
-`Deceptifeed` is a network defense tool that creates fake network services, or **honeypots**, to detect potential threats. It also provides a real-time **threat feed** that integrates with most enterprise firewalls. This feed lists the IP addresses that accessed your honeypots, allowing firewalls to automatically block them from reaching your legitimate services.
+`Deceptifeed` is a honeypot and threat feed server. It runs multiple honeypots (deceptive network services), while the threat feed lists IP addresses that have interacted with the honeypots.
 
-Unlike conventional honeypots that provide attackers with rich simulated environments, Deceptifeed is intentionally minimal. Simply the act of interacting with a fake service on your network is reason to trigger a defensive response. The integrated threat feed enables immediate action without needing a SIEM or additional tools.
+If an IP address interacts with a fake server on your network, why should it be allowed to access your real servers? `Deceptifeed` helps you build an automated defense system to reduce such risks. In a typical deployment, it runs alongside your real servers. The honeypots are exposed to the internet, while the threat feed remains private for use with your internal tools.
 
+Most enterprise firewalls support ingesting threat feeds. By pointing to `Deceptifeed`, your firewall can automatically block IP addresses that interact with the honeypots. For other security tools, the threat feed is available in several formats, including plain text, CSV, JSON, and TAXII 2.1.
+
+
+## Deployment Diagram
+
+<a href="assets/diagram-light.png?raw=true">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-dark.png" width="884">
+  <source media="(prefers-color-scheme: light)" srcset="assets/diagram-light.png" width="884">
+  <img alt="Deceptifeed deployment diagram" src="assets/diagram-light.png" width="884">
+</picture>
+</a>
 
 ## Installation
 
