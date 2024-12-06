@@ -136,9 +136,9 @@
     <div class="container">
         <div class="section-box">
             <h2>Threat Feed</h2>
-            <p>The threat feed lists IP addresses observed interacting with Deceptifeed honeypots. It is available in several formats to suit different use cases:</p>
+            <p>Welcome to the Threat Feed! The feed lists IP addresses that have interacted with Deceptifeed's honeypots. Below, you'll find instructions on how to access the feed in several different formats:</p>
             <ul>
-                <li><a href="/feed">Plain text</a> is the most commonly used format for integration with firewalls.</li>
+                <li><a href="/plain">Plain text</a> is the most commonly used format for integration with firewalls.</li>
                 <li><a href="/html">HTML</a> provides a user-friendly web page for monitoring the threat feed.</li>
                 <li><a href="/taxii2/">TAXII</a> is designed for integration with Threat Intelligence Platforms (TIPs).</li>
                 <li><a href="/json">JSON</a> and <a href="/csv">CSV</a> formats offer flexibility for integrating with various tools and workflows.</li>
@@ -157,7 +157,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><a class="endpoint" href="/feed">/feed</a></td>
+                        <td><a class="endpoint" href="/plain">/plain</a></td>
                         <td><span class="badge">Plain</span></td>
                         <td>One IP address per line. Suitable for firewall integration.</td>
                     </tr>
@@ -194,7 +194,7 @@
                 </tbody>
             </table>
             <p class="example"><strong>Example:</strong> Retrieve the threat feed formatted as plain text:</p>
-            <pre class="code">curl "http://threatfeed.example.com:9000/feed"</pre>
+            <pre class="code">curl "http://threatfeed.example.com:9000/plain"</pre>
             <p class="example"><strong>Example:</strong> Retrieve the threat feed formatted as JSON:</p>
             <pre class="code">curl "http://threatfeed.example.com:9000/json"</pre>
         </div>
@@ -237,7 +237,7 @@
             <p class="example"><strong>Example:</strong> Retrieve the JSON feed, sorted by the last seen date in descending order:</p>
             <pre class="code">curl "http://threatfeed.example.com:9000/json?sort=last_seen&direction=desc"</pre>
             <p class="example"><strong>Example:</strong> Retrieve the plain text feed, filtered to include only IP addresses seen within the last 24 hours:</p>
-            <pre class="code">curl "http://threatfeed.example.com:9000/feed?last_seen_hours=24"</pre>
+            <pre class="code">curl "http://threatfeed.example.com:9000/plain?last_seen_hours=24"</pre>
         </div>
 
         <div class="section-box">
