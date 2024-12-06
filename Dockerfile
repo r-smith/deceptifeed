@@ -5,6 +5,7 @@ COPY . .
 RUN make
 
 FROM alpine:latest
+RUN apk add --no-cache tzdata
 WORKDIR /data
 COPY --from=build-stage /build/out /
 ENTRYPOINT ["/deceptifeed"]
