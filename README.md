@@ -25,7 +25,7 @@ Most enterprise firewalls support ingesting threat feeds. By pointing to `Decept
 
 ## Quick Start
 
-This section guides you through trying Deceptifeed as quickly as possible. There are no dependencies, configuration, or installation required. Refer to the [Installation](#installation) section when you're ready to set up a production environment.
+This section guides you through trying Deceptifeed as quickly as possible. There are no dependencies, configuration, or installation required. Refer to the [Installation section](#installation) when you're ready to set up a production environment.
 
 ### Option 1: Download the binary
 
@@ -133,6 +133,7 @@ curl https://raw.githubusercontent.com/r-smith/deceptifeed/main/configs/docker-c
 4. Run the Deceptifeed Docker container.
 ```shell
 docker run --detach --name deceptifeed \
+--env "TZ=America/Los_Angeles" \
 --publish 2222:2222 \
 --publish 8080:8080 \
 --publish 8443:8443 \
@@ -144,10 +145,11 @@ deceptifeed/server:latest
 
 Here is a breakdown of the arguments:
 - `--detach` instructs Docker to run the Deceptifeed container in the background.
+- `--env "TZ=xxx/yyy"` sets the time zone. Replace `xxx/yyy` with the TZ identifier for your local time zone. If you prefer UTC time, don't include this argument. Refer to this [list of time zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for valid TZ identifiers.
 - `--publish ####:####` opens a network port on your host machine and maps it to Deceptifeed's Docker container. The first number specifies the port your host system listens on. You can set it to any open port. The second number specifies the port used by Deceptifeed inside the Docker container, which should match the ports configured in `config.xml`. There are multiple `--publish` arguments because Deceptifeed runs multiple network services. The default configuration includes an SSH honeypot on port 2222, an HTTP honeypot on port 8080, an HTTPS honeypot on port 8443, and the threat feed on port 9000. If you want your host machine to listen on port 443 for the HTTPS honeypot, for example, you would use the following line `--publish 443:8443 \`. This makes your host system listen on port 443 and maps it to the HTTPS honeypot defined for port 8443 in `config.xml`.
 - `--restart unless-stopped` ensures Deceptifeed starts automatically when the host boots.
 - `--volume /opt/deceptifeed/:/data/` specifies the directory on your host machine where persistent data is stored. If you used a different directory, adjust the path accordingly, but keep `:/data/` unchanged. For example: `--volume /path/to/deceptifeed/directory/:/data/ \`.
-- `deceptifeed/server:latest` is the latest Docker image for Deceptifeed, hosted on *Docker Hub*. The image is updated with each official release and can be viewed on Docker Hub [here](https://hub.docker.com/r/deceptifeed/server).
+- `deceptifeed/server:latest` is the latest Docker image for Deceptifeed, hosted on *Docker Hub*. The image is updated with each official release and can be viewed on [Docker Hub](https://hub.docker.com/r/deceptifeed/server).
 
 
 ## Features
@@ -327,48 +329,72 @@ Due to the connectionless nature of UDP and the possibility of spoofed source in
 
 ## Upgrading
 
-To upgrade Deceptifeed, follow the same steps you used for installation:
+### Binary
 
-#### If you installed from the binary:
-
-1. Download the latest package from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
-2. If you originally installed using the installation script, extract the latest package and re-run `install.sh`.
-3. If you did not use the installation script, simply replace the existing `deceptifeed` binary with the new version.
-
-#### If you installed from source:
-
+**If you originally installed using the installation script:**
+1. Download the latest release from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
+2. Extract the files.
+3. Run `install.sh`. The script will detect the existing installation and prompt you to upgrade.
+   - Optionally, you can add `--yes` to automatically confirm the upgrade prompt.
 ```shell
-# Navigate to the directory where you cloned the `deceptifeed` repository:
-cd #/path/to/deceptifeed/repository
+# Extract:
+tar xvzf <release>.tar.gz
 
-# Update your local repository:
-git pull origin main
+# Change into the extracted directory:
+cd deceptifeed
 
-# Compile the code:
-make
+# Install (add `--yes` to auto-confirm the upgrade):
+sudo ./install.sh
+```
 
-# Install the updated version:
-sudo make install
+**If you did not use the installation script:**
+1. Download the latest release from the [Releases page](https://github.com/r-smith/deceptifeed/releases).
+2. Extract the files.
+3. Replace the existing `deceptifeed` binary with the new version.
+
+### Docker
+
+1. Pull the latest version of the Deceptifeed image:
+```shell
+docker pull deceptifeed/server:latest
+```
+2. Stop and remove the existing container:
+```shell
+docker stop deceptifeed
+docker rm deceptifeed
+```
+3. Recreate the container with the new image:
+```shell
+# The `docker run` command will vary depending on how you originally ran the container.
+# If you used the example from this documentation, it will look like this:
+docker run --detach --name deceptifeed \
+--env "TZ=America/Los_Angeles" \
+--publish 2222:2222 \
+--publish 8080:8080 \
+--publish 8443:8443 \
+--publish 9000:9000 \
+--restart unless-stopped \
+--volume /opt/deceptifeed/:/data/ \
+deceptifeed/server:latest
 ```
 
 
 ## Uninstalling
 
-#### If you installed from the binary:
+### Binary
 
-- If you used the installation script, re-run it with the `--uninstall` option.
+**If you originally installed using the installation script:**
+1. Re-run `install.sh` with the `--uninstall` option.
 ```shell
 sudo ./install.sh --uninstall
 ```
 
-- If you did not use the installation script, simply delete the `deceptifeed` binary and any generated files. When running the binary directly, any generated files will be named `deceptifeed-*` in the same directory where you ran the `deceptifeed` binary.
+**If you did not use the installation script:**
+1. Delete the `deceptifeed` binary and any generated files.
 
-#### If you installed from source:
+### Docker
 
 ```shell
-# Navigate to the directory where you cloned the `deceptifeed` repository:
-cd #/path/to/deceptifeed/repository
-
-# Uninstall Deceptifeed:
-sudo make uninstall
+docker stop deceptifeed
+docker rm deceptifeed
 ```
