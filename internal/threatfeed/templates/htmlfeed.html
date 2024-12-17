@@ -207,30 +207,32 @@
         </svg>
     </header>
     <main>
-        <section>
-            <table>
-                <thead>
-                    <tr>
-                    <th><a href="?sort=ip&direction={{if and (eq .SortMethod "ip") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                        IP{{if eq .SortMethod "ip"}}</a><span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                    </th>
-                    <th><a href="?sort=added&direction={{if and (eq .SortMethod "added") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                        Added{{if eq .SortMethod "added"}}</a><span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                    </th>
-                    <th><a href="?sort=last_seen&direction={{if and (eq .SortMethod "last_seen") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                        Last Seen{{if eq .SortMethod "last_seen"}}</a><span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                    </th>
-                    <th><a href="?sort=threat_score&direction={{if and (eq .SortMethod "threat_score") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                        Threat Score{{if eq .SortMethod "threat_score"}}</a><span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                    </th>
-                    </tr>
-                </thead>
-                <tbody>
-                {{range .Data}}<tr><td>{{.IP}}<td>{{.Added.Format "2006-01-02 15:04:05"}}<td>{{.LastSeen.Format "2006-01-02 15:04:05"}}<td>{{.ThreatScore}}
-                {{end}}
-                </tbody>
-            </table>
-        </section>
+        <table>
+            <thead>
+                <tr>
+                <th><a href="?sort=ip&direction={{if and (eq .SortMethod "ip") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    IP
+                    </a>{{if eq .SortMethod "ip"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                <th><a href="?sort=added&direction={{if and (eq .SortMethod "added") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Added
+                    </a>{{if eq .SortMethod "added"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                <th><a href="?sort=last_seen&direction={{if and (eq .SortMethod "last_seen") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Last Seen
+                    </a>{{if eq .SortMethod "last_seen"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                <th><a href="?sort=threat_score&direction={{if and (eq .SortMethod "threat_score") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Threat Score
+                    </a>{{if eq .SortMethod "threat_score"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                </tr>
+            </thead>
+            <tbody>
+            {{range .Data}}<tr><td>{{.IP}}<td>{{.Added.Format "2006-01-02 15:04:05"}}<td>{{.LastSeen.Format "2006-01-02 15:04:05"}}<td>{{.ThreatScore}}
+            {{end}}
+            </tbody>
+        </table>
     </main>
 </body>
 </html>
