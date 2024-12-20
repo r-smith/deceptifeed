@@ -280,7 +280,7 @@ func flattenHeaders(headers map[string][]string) map[string]string {
 		}
 	}
 	// Delete the User-Agent header, as it is managed separately.
-	delete(newHeaders, "User-Agent")
+	delete(newHeaders, "user-agent")
 	return newHeaders
 }
 
