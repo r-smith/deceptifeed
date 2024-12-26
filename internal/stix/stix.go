@@ -46,11 +46,30 @@ type Indicator struct {
 	ValidFrom      time.Time   `json:"valid_from"`                  // Required
 	ValidUntil     *time.Time  `json:"valid_until,omitempty"`       // Optional
 	Name           string      `json:"name,omitempty"`              // Optional
+	Confidence     int         `json:"confidence,omitempty"`        // Optional
 	Description    string      `json:"description,omitempty"`       // Optional
 	KillChains     []KillChain `json:"kill_chain_phases,omitempty"` // Optional
 	Labels         []string    `json:"labels,omitempty"`            // Optional
 	Lang           string      `json:"lang,omitempty"`              // Optional
 	CreatedByRef   string      `json:"created_by_ref,omitempty"`    // Optional
+}
+
+// Sighting represents a STIX Sighting SRO.
+type Sighting struct {
+	Type             string    `json:"type"`                         // Required
+	SpecVersion      string    `json:"spec_version"`                 // Required
+	ID               string    `json:"id"`                           // Required
+	Created          time.Time `json:"created"`                      // Required
+	Modified         time.Time `json:"modified"`                     // Required
+	FirstSeen        time.Time `json:"first_seen"`                   // Optional
+	LastSeen         time.Time `json:"last_seen"`                    // Optional
+	Count            int       `json:"count"`                        // Optional
+	Confidence       int       `json:"confidence,omitempty"`         // Optional
+	Description      string    `json:"description,omitempty"`        // Optional
+	Lang             string    `json:"lang,omitempty"`               // Optional
+	SightingOfRef    string    `json:"sighting_of_ref"`              // Required
+	WhereSightedRefs []string  `json:"where_sighted_refs,omitempty"` // Optional
+	CreatedByRef     string    `json:"created_by_ref,omitempty"`     // Optional
 }
 
 // KillChain represents a STIX `kill-chain-phase` type, which represents a
