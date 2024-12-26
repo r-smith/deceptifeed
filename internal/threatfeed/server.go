@@ -60,8 +60,7 @@ func Start(cfg *config.ThreatFeed) {
 	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
 	mux.HandleFunc("GET /html", enforcePrivateIP(disableCache(handleHTML)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
-	mux.HandleFunc("GET /stix/indicators", enforcePrivateIP(disableCache(handleSTIXIndicators)))
-	mux.HandleFunc("GET /stix/observables", enforcePrivateIP(disableCache(handleSTIXObservables)))
+	mux.HandleFunc("GET /stix", enforcePrivateIP(disableCache(handleSTIX)))
 	// TAXII 2.1 handlers.
 	mux.HandleFunc("GET    /taxii2/", enforcePrivateIP(handleNotFound))
 	mux.HandleFunc("POST   /taxii2/", enforcePrivateIP(handleNotFound))

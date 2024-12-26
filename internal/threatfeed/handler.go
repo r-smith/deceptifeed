@@ -111,11 +111,11 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleSTIXIndicators handles HTTP requests to serve the full threat feed in
-// STIX 2.1 format. The response includes all IoC data (IP addresses and their
+// handleSTIX handles HTTP requests to serve the full threat feed in STIX 2.1
+// format. The response includes all IoC data (IP addresses and their
 // associated data). The response is structured as a STIX Bundle containing
 // `Indicators` (STIX Domain Objects) for each IP address in the threat feed.
-func handleSTIXIndicators(w http.ResponseWriter, r *http.Request) {
+func handleSTIX(w http.ResponseWriter, r *http.Request) {
 	opt, err := parseParams(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -131,32 +131,6 @@ func handleSTIXIndicators(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", stix.ContentType)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to STIX:", err)
-	}
-}
-
-// handleSTIXObservables handles HTTP requests to serve a simplified version of
-// the threat feed in STIX 2.1 format. The response is structured as a STIX
-// Bundle containing `Observables` (STIX Cyber-observable Objects) for each IP
-// address in the threat feed.
-func handleSTIXObservables(w http.ResponseWriter, r *http.Request) {
-	opt, err := parseParams(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	const bundle = "bundle"
-	result := stix.Bundle{
-		Type:    bundle,
-		ID:      stix.NewID(bundle),
-		Objects: prepareFeed(opt).convertToObservables(),
-	}
-
-	w.Header().Set("Content-Type", stix.ContentType)
-	e := json.NewEncoder(w)
-	e.SetIndent("", "  ")
-	if err := e.Encode(result); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to STIX:", err)
 	}
 }
