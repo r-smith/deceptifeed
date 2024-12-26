@@ -112,7 +112,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 	)
 
 	// Print a simplified version of the interaction to the console.
-	fmt.Printf("[TCP] %s %v\n", src_ip, responsesToString(responses))
+	fmt.Printf("[TCP] %s %q\n", src_ip, responsesToString(responses))
 
 	// Update the threat feed with the source IP address from the interaction.
 	if cfg.SendToThreatFeed {

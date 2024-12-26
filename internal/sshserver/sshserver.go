@@ -81,7 +81,7 @@ func Start(cfg *config.Server) {
 		)
 
 		// Print a simplified version of the request to the console.
-		fmt.Printf("[SSH] %s Username: %s Password: %s\n", src_ip, conn.User(), string(password))
+		fmt.Printf("[SSH] %s Username: %q Password: %q\n", src_ip, conn.User(), string(password))
 
 		// Update the threat feed with the source IP address from the request.
 		if cfg.SendToThreatFeed {

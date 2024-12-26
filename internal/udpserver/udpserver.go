@@ -72,7 +72,7 @@ func Start(cfg *config.Server) {
 			)
 
 			// Print a simplified version of the interaction to the console.
-			fmt.Printf("[UDP] %s Data: %s\n", src_ip, strings.TrimSpace(string(buffer[:n])))
+			fmt.Printf("[UDP] %s Data: %q\n", src_ip, strings.TrimSpace(string(buffer[:n])))
 		}()
 	}
 }
