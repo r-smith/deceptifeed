@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/csv"
 	"errors"
-	"math"
 	"net"
 	"os"
 	"strconv"
@@ -31,6 +30,9 @@ type IOC struct {
 const (
 	// dateFormat specifies the timestamp format used for threat feed entries.
 	dateFormat = time.RFC3339Nano
+
+	// maxScore is the maximum allowed threat score.
+	maxScore = 999_999_999
 )
 
 var (
@@ -76,8 +78,8 @@ func Update(ip string, threatScore int) {
 		// Update existing entry.
 		ioc.lastSeen = now
 		if threatScore > 0 {
-			if ioc.threatScore > math.MaxInt-threatScore {
-				ioc.threatScore = math.MaxInt
+			if ioc.threatScore > maxScore-threatScore {
+				ioc.threatScore = maxScore
 			} else {
 				ioc.threatScore += threatScore
 			}
