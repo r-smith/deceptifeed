@@ -15,14 +15,20 @@ const (
 	IndicatorsID = "2cc72f88-8d92-4745-9c00-ea0deac18163"
 
 	// IndicatorsAlias is the friendly alias for the indicators collection.
-	IndicatorsAlias = "deceptifeed-indicators"
+	IndicatorsAlias = "indicators"
 
 	// ObservablesID is a fixed (random) identifier for the observables
 	// collection.
 	ObservablesID = "8aaff655-40de-41e2-9064-3dc1620d6420"
 
 	// ObservablesAlias is the friendly alias for the observables collection.
-	ObservablesAlias = "deceptifeed-observables"
+	ObservablesAlias = "observables"
+
+	// SightingsID is a fixed (random) identifier for the sightings collection.
+	SightingsID = "2b27973a-5891-4883-89aa-b7141e78e3e1"
+
+	// SightingsAlias is the friendly alias for the sightings collection.
+	SightingsAlias = "sightings"
 )
 
 // ImplementedCollections returns the collections that are available for use.
@@ -31,7 +37,7 @@ func ImplementedCollections() []Collection {
 		{
 			ID:          IndicatorsID,
 			Title:       "Deceptifeed Indicators",
-			Description: "This collection contains IP addresses represented as STIX Indicators",
+			Description: "This collection contains IP addresses observed interacting with honeypots, represented as STIX Indicators",
 			Alias:       IndicatorsAlias,
 			CanRead:     true,
 			CanWrite:    false,
@@ -40,8 +46,17 @@ func ImplementedCollections() []Collection {
 		{
 			ID:          ObservablesID,
 			Title:       "Deceptifeed Observables",
-			Description: "This collection contains IP addresses represented as STIX Observables",
+			Description: "This collection contains IP addresses observed interacting with honeypots, represented as STIX Observables",
 			Alias:       ObservablesAlias,
+			CanRead:     true,
+			CanWrite:    false,
+			MediaTypes:  []string{ContentType},
+		},
+		{
+			ID:          SightingsID,
+			Title:       "Deceptifeed Sightings",
+			Description: "This collection contains Sightings of Indicators observed interacting with honeypots",
+			Alias:       SightingsAlias,
 			CanRead:     true,
 			CanWrite:    false,
 			MediaTypes:  []string{ContentType},

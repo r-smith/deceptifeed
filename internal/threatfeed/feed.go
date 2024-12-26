@@ -200,8 +200,8 @@ func (f feedEntries) convertToIndicators() []stix.Object {
 	result := make([]stix.Object, 0, len(f)+1)
 
 	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All IP addresses in the collection will reference this identity as
-	// the creator.
+	// All objects in the collection will reference this identity as the
+	// creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
 	for _, entry := range f {
@@ -215,9 +215,9 @@ func (f feedEntries) convertToIndicators() []stix.Object {
 		validUntil := new(time.Time)
 		*validUntil = entry.LastSeen.AddDate(0, 2, 0).UTC()
 
-		// Generate a deterministic identifier for each IP address in the
-		// threat feed using the STIX IP pattern represented as a JSON
-		// string. For example: {"pattern":"[ipv4-addr:value='127.0.0.1']"}
+		// Generate a deterministic identifier using the IP address represented
+		// as a STIX IP pattern and structured as a JSON string. Example:
+		// {"pattern":"[ipv4-addr:value='127.0.0.1']"}
 		patternJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
 
 		result = append(result, stix.Indicator{
@@ -234,9 +234,65 @@ func (f feedEntries) convertToIndicators() []stix.Object {
 			Name:           "Honeypot interaction: " + entry.IP,
 			Description:    "This IP was observed interacting with a honeypot server.",
 			KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
+			Confidence:     100,
 			Lang:           "en",
-			Labels:         []string{"honeypot"},
+			Labels:         []string{"honeypot-interaction"},
 			CreatedByRef:   stix.DeceptifeedID,
+		})
+	}
+	return result
+}
+
+// convertToSightings converts IP addresses from the threat feed into a
+// collection of STIX Sighting objects.
+func (f feedEntries) convertToSightings() []stix.Object {
+	if len(f) == 0 {
+		return []stix.Object{}
+	}
+
+	const indicator = "indicator"
+	const sighting = "sighting"
+	const maxCount = 999_999_999 // Maximum count according to STIX 2.1 specification.
+	result := make([]stix.Object, 0, len(f)+1)
+
+	// Add the Deceptifeed `Identity` as the first object in the collection.
+	// All objects in the collection will reference this identity as the
+	// creator.
+	result = append(result, stix.DeceptifeedIdentity())
+
+	for _, entry := range f {
+		pattern := "[ipv4-addr:value = '"
+		if strings.Contains(entry.IP, ":") {
+			pattern = "[ipv6-addr:value = '"
+		}
+		pattern = pattern + entry.IP + "']"
+
+		count := entry.ThreatScore
+		if count > maxCount {
+			count = maxCount
+		}
+
+		// Generate a deterministic identifier using the IP address represented
+		// as a STIX IP pattern and structured as a JSON string. Example:
+		// {"pattern":"[ipv4-addr:value='127.0.0.1']"}
+		indicatorJSON := fmt.Sprintf("{\"pattern\":\"%s\"}", pattern)
+		indicatorID := stix.DeterministicID(indicator, indicatorJSON)
+
+		result = append(result, stix.Sighting{
+			Type:             sighting,
+			SpecVersion:      stix.SpecVersion,
+			ID:               stix.DeterministicID(sighting, "{\"sighting_of_ref\":\""+indicatorID+"\"}"),
+			Created:          entry.Added.UTC(),
+			Modified:         entry.LastSeen.UTC(),
+			FirstSeen:        entry.Added.UTC(),
+			LastSeen:         entry.LastSeen.UTC(),
+			Count:            count,
+			Description:      "This IP was observed interacting with a honeypot server.",
+			Confidence:       100,
+			Lang:             "en",
+			SightingOfRef:    indicatorID,
+			WhereSightedRefs: []string{stix.DeceptifeedID},
+			CreatedByRef:     stix.DeceptifeedID,
 		})
 	}
 	return result
@@ -252,8 +308,8 @@ func (f feedEntries) convertToObservables() []stix.Object {
 	result := make([]stix.Object, 0, len(f)+1)
 
 	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All IP addresses in the collection will reference this identity as
-	// the creator.
+	// All objects in the collection will reference this identity as the
+	// creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
 	for _, entry := range f {

@@ -254,6 +254,8 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 		result.Objects = prepareFeed(opt).convertToIndicators()
 	case taxii.ObservablesID, taxii.ObservablesAlias:
 		result.Objects = prepareFeed(opt).convertToObservables()
+	case taxii.SightingsID, taxii.SightingsAlias:
+		result.Objects = prepareFeed(opt).convertToSightings()
 	default:
 		handleNotFound(w, r)
 		return
@@ -288,6 +290,8 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 			switch v := result.Objects[element].(type) {
 			case stix.Indicator:
 				timestamp = v.Modified
+			case stix.Sighting:
+				timestamp = v.LastSeen
 			case stix.ObservableIP:
 				if ioc, found := iocData[v.Value]; found {
 					timestamp = ioc.lastSeen
