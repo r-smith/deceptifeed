@@ -82,24 +82,24 @@ type Config struct {
 
 // Server represents a honeypot server with its relevant settings.
 type Server struct {
-	Type             ServerType `xml:"type,attr"`
-	Enabled          bool       `xml:"enabled"`
-	Port             string     `xml:"port"`
-	CertPath         string     `xml:"certPath"`
-	KeyPath          string     `xml:"keyPath"`
-	HomePagePath     string     `xml:"homePagePath"`
-	ErrorPagePath    string     `xml:"errorPagePath"`
-	Banner           string     `xml:"banner"`
-	Headers          []string   `xml:"headers>header"`
-	Prompts          []Prompt   `xml:"prompts>prompt"`
-	SendToThreatFeed bool       `xml:"sendToThreatFeed"`
-	ThreatScore      int        `xml:"threatScore"`
-	Rules            Rules      `xml:"rules"`
-	SourceIPHeader   string     `xml:"sourceIpHeader"`
-	LogPath          string     `xml:"logPath"`
-	LogEnabled       bool       `xml:"logEnabled"`
-	LogFile          *os.File
-	Logger           *slog.Logger
+	Type             ServerType   `xml:"type,attr"`
+	Enabled          bool         `xml:"enabled"`
+	Port             string       `xml:"port"`
+	CertPath         string       `xml:"certPath"`
+	KeyPath          string       `xml:"keyPath"`
+	HomePagePath     string       `xml:"homePagePath"`
+	ErrorPagePath    string       `xml:"errorPagePath"`
+	Banner           string       `xml:"banner"`
+	Headers          []string     `xml:"headers>header"`
+	Prompts          []Prompt     `xml:"prompts>prompt"`
+	SendToThreatFeed bool         `xml:"sendToThreatFeed"`
+	ThreatScore      int          `xml:"threatScore"`
+	Rules            Rules        `xml:"rules"`
+	SourceIPHeader   string       `xml:"sourceIpHeader"`
+	LogPath          string       `xml:"logPath"`
+	LogEnabled       bool         `xml:"logEnabled"`
+	LogFile          *os.File     `xml:"-"`
+	Logger           *slog.Logger `xml:"-"`
 }
 
 type Rules struct {
@@ -191,6 +191,8 @@ func validateRegexRules(rules Rules) error {
 // files using the server's specified log path, defaulting to the global log
 // path if none is provided.
 func (c *Config) InitializeLoggers() error {
+	openedLogFiles := make(map[string]*slog.Logger)
+
 	for i := range c.Servers {
 		if !c.Servers[i].Enabled {
 			continue
@@ -204,20 +206,27 @@ func (c *Config) InitializeLoggers() error {
 			logPath = c.LogPath
 		}
 
-		// If no log path is given or if logging is disabled, set up a dummy
-		// logger to discard output.
+		// If no log path is specified or if logging is disabled, discard logs.
 		if len(logPath) == 0 || !c.Servers[i].LogEnabled {
 			c.Servers[i].Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 			continue
 		}
 
-		// Open the specified log file and create a new logger.
-		logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		// Check if this log path has already been opened. If so, reuse the
+		// logger.
+		if logger, exists := openedLogFiles[logPath]; exists {
+			c.Servers[i].Logger = logger
+			continue
+		}
+
+		// Open the specified log file.
+		file, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}
-		c.Servers[i].LogFile = logFile
-		c.Servers[i].Logger = slog.New(slog.NewJSONHandler(c.Servers[i].LogFile, &slog.HandlerOptions{
+
+		// Create a new logger.
+		logger := slog.New(slog.NewJSONHandler(file, &slog.HandlerOptions{
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				// Remove 'message' and 'log level' fields from output.
 				if a.Key == slog.MessageKey || a.Key == slog.LevelKey {
@@ -226,6 +235,12 @@ func (c *Config) InitializeLoggers() error {
 				return a
 			},
 		}))
+
+		c.Servers[i].Logger = logger
+		c.Servers[i].LogFile = file
+
+		// Store the logger for reuse.
+		openedLogFiles[logPath] = logger
 	}
 
 	return nil
