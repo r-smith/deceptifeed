@@ -28,7 +28,7 @@ const (
 	DefaultCertPathHTTPS        = "deceptifeed-https.crt"
 	DefaultKeyPathHTTPS         = "deceptifeed-https.key"
 	DefaultKeyPathSSH           = "deceptifeed-ssh.key"
-	DefaultBannerSSH            = "SSH-2.0-OpenSSH_9.3 FreeBSD-20230316" // SSH banner for FreeBSD 13.2
+	DefaultBannerSSH            = "SSH-2.0-OpenSSH_9.6"
 )
 
 // ServerType represents the different types of honeypot servers that can be

@@ -29,7 +29,7 @@
       <sendToThreatFeed>true</sendToThreatFeed>
       <threatScore>1</threatScore>
       <keyPath>/opt/deceptifeed/certs/ssh-key.pem</keyPath>
-      <banner>SSH-2.0-OpenSSH_9.3 FreeBSD-20230316</banner>
+      <banner>SSH-2.0-OpenSSH_9.6</banner>
     </server>
 
     <!-- HTTP honeypot server on port 8080 -->
