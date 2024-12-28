@@ -38,7 +38,7 @@ func OpenFile(name string, maxSize int) (*File, error) {
 	// Get the current file size.
 	stat, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, err
 	}
 
