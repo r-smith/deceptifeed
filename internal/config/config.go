@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+
+	"github.com/r-smith/deceptifeed/internal/logrotate"
 )
 
 // This block of constants defines the default application settings when no
@@ -82,24 +84,24 @@ type Config struct {
 
 // Server represents a honeypot server with its relevant settings.
 type Server struct {
-	Type             ServerType   `xml:"type,attr"`
-	Enabled          bool         `xml:"enabled"`
-	Port             string       `xml:"port"`
-	CertPath         string       `xml:"certPath"`
-	KeyPath          string       `xml:"keyPath"`
-	HomePagePath     string       `xml:"homePagePath"`
-	ErrorPagePath    string       `xml:"errorPagePath"`
-	Banner           string       `xml:"banner"`
-	Headers          []string     `xml:"headers>header"`
-	Prompts          []Prompt     `xml:"prompts>prompt"`
-	SendToThreatFeed bool         `xml:"sendToThreatFeed"`
-	ThreatScore      int          `xml:"threatScore"`
-	Rules            Rules        `xml:"rules"`
-	SourceIPHeader   string       `xml:"sourceIpHeader"`
-	LogPath          string       `xml:"logPath"`
-	LogEnabled       bool         `xml:"logEnabled"`
-	LogFile          *os.File     `xml:"-"`
-	Logger           *slog.Logger `xml:"-"`
+	Type             ServerType      `xml:"type,attr"`
+	Enabled          bool            `xml:"enabled"`
+	Port             string          `xml:"port"`
+	CertPath         string          `xml:"certPath"`
+	KeyPath          string          `xml:"keyPath"`
+	HomePagePath     string          `xml:"homePagePath"`
+	ErrorPagePath    string          `xml:"errorPagePath"`
+	Banner           string          `xml:"banner"`
+	Headers          []string        `xml:"headers>header"`
+	Prompts          []Prompt        `xml:"prompts>prompt"`
+	SendToThreatFeed bool            `xml:"sendToThreatFeed"`
+	ThreatScore      int             `xml:"threatScore"`
+	Rules            Rules           `xml:"rules"`
+	SourceIPHeader   string          `xml:"sourceIpHeader"`
+	LogPath          string          `xml:"logPath"`
+	LogEnabled       bool            `xml:"logEnabled"`
+	LogFile          *logrotate.File `xml:"-"`
+	Logger           *slog.Logger    `xml:"-"`
 }
 
 type Rules struct {
@@ -191,6 +193,7 @@ func validateRegexRules(rules Rules) error {
 // files using the server's specified log path, defaulting to the global log
 // path if none is provided.
 func (c *Config) InitializeLoggers() error {
+	const maxSize = 50
 	openedLogFiles := make(map[string]*slog.Logger)
 
 	for i := range c.Servers {
@@ -220,9 +223,9 @@ func (c *Config) InitializeLoggers() error {
 		}
 
 		// Open the specified log file.
-		file, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		file, err := logrotate.OpenFile(logPath, maxSize)
 		if err != nil {
-			return fmt.Errorf("failed to open log file: %w", err)
+			return err
 		}
 
 		// Create a new logger.
