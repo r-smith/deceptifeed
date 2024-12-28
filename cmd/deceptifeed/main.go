@@ -57,7 +57,7 @@ func main() {
 	if len(*configPath) > 0 {
 		cfgFromFile, err := config.Load(*configPath)
 		if err != nil {
-			log.Fatalln("Failed to load config:", err)
+			log.Fatalln("Shutting down. Failed to load configuration file:", err)
 		}
 		cfg = *cfgFromFile
 	} else {
@@ -74,7 +74,7 @@ func main() {
 	// Initialize structured loggers for each honeypot server.
 	err := cfg.InitializeLoggers()
 	if err != nil {
-		log.Fatal("Shutting down. Error: ", err)
+		log.Fatalln("Shutting down. Failed to initialize logging:", err)
 	}
 	defer cfg.CloseLogFiles()
 

@@ -156,7 +156,7 @@ func Load(filename string) (*Config, error) {
 	xmlBytes, _ := io.ReadAll(file)
 	err = xml.Unmarshal(xmlBytes, &config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode XML file: %w", err)
+		return nil, err
 	}
 
 	for i := range config.Servers {
