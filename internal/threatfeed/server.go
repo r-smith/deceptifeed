@@ -30,11 +30,11 @@ func Start(cfg *config.ThreatFeed) {
 	configuration = *cfg
 
 	// Check for and open an existing threat feed CSV file, if available.
-	err := loadCSV()
-	if err != nil {
+	if err := loadCSV(); err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed data:", err)
 		return
 	}
+	deleteExpired()
 
 	// Periodically delete expired entries and save the current threat feed to
 	// disk.
@@ -42,11 +42,11 @@ func Start(cfg *config.ThreatFeed) {
 	go func() {
 		for range ticker.C {
 			if dataChanged {
+				dataChanged = false
 				deleteExpired()
 				if err := saveCSV(); err != nil {
 					fmt.Fprintln(os.Stderr, "Error saving Threat Feed data:", err)
 				}
-				dataChanged = false
 			}
 		}
 	}()

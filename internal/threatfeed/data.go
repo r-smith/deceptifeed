@@ -1,12 +1,14 @@
 package threatfeed
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -44,8 +46,8 @@ var (
 	// based on the data in this map.
 	iocData = make(map[string]*IOC)
 
-	// mutex is to ensure thread-safe access to iocData.
-	mutex sync.Mutex
+	// mu is to ensure thread-safe access to iocData.
+	mu sync.Mutex
 
 	// dataChanged indicates whether the IoC map has been modified since the
 	// last time it was saved to disk.
@@ -73,7 +75,7 @@ func Update(ip string, threatScore int) {
 	}
 
 	now := time.Now()
-	mutex.Lock()
+	mu.Lock()
 	if ioc, exists := iocData[ip]; exists {
 		// Update existing entry.
 		ioc.lastSeen = now
@@ -92,15 +94,15 @@ func Update(ip string, threatScore int) {
 			threatScore: threatScore,
 		}
 	}
-	mutex.Unlock()
+	mu.Unlock()
 
 	dataChanged = true
 }
 
 // deleteExpired deletes expired threat feed entries from the IoC map.
 func deleteExpired() {
-	mutex.Lock()
-	defer mutex.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 
 	for key, value := range iocData {
 		if value.expired() {
@@ -122,16 +124,19 @@ func (ioc *IOC) expired() bool {
 // populates iocData which represents the active threat feed. This function is
 // called once during the initialization of the threat feed server.
 func loadCSV() error {
-	file, err := os.Open(configuration.DatabasePath)
+	mu.Lock()
+	defer mu.Unlock()
+
+	f, err := os.Open(configuration.DatabasePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	reader := csv.NewReader(file)
+	reader := csv.NewReader(f)
 	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	if err != nil {
@@ -169,7 +174,6 @@ func loadCSV() error {
 
 		iocData[ip] = &IOC{added: added, lastSeen: lastSeen, threatScore: threatScore}
 	}
-	deleteExpired()
 	return nil
 }
 
@@ -177,29 +181,34 @@ func loadCSV() error {
 // the threat feed data persists across application restarts. It is not the
 // active threat feed.
 func saveCSV() error {
-	buf := new(bytes.Buffer)
-	writer := csv.NewWriter(buf)
-	err := writer.Write(csvHeader)
+	f, err := os.OpenFile(configuration.DatabasePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	w := bufio.NewWriterSize(f, 65536)
+	_, err = w.WriteString(strings.Join(csvHeader, ",") + "\n")
 	if err != nil {
 		return err
 	}
 
-	mutex.Lock()
+	mu.Lock()
 	for ip, ioc := range iocData {
-		if err := writer.Write([]string{
-			ip,
-			ioc.added.Format(dateFormat),
-			ioc.lastSeen.Format(dateFormat),
-			strconv.Itoa(ioc.threatScore),
-		}); err != nil {
+		_, err = w.WriteString(
+			fmt.Sprintf(
+				"%s,%s,%s,%d\n",
+				ip,
+				ioc.added.Format(dateFormat),
+				ioc.lastSeen.Format(dateFormat),
+				ioc.threatScore,
+			),
+		)
+		if err != nil {
 			return err
 		}
 	}
-	mutex.Unlock()
-	writer.Flush()
+	mu.Unlock()
 
-	if err := os.WriteFile(configuration.DatabasePath, buf.Bytes(), 0644); err != nil {
-		return err
-	}
-	return nil
+	return w.Flush()
 }

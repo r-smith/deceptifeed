@@ -78,7 +78,7 @@ func prepareFeed(options ...feedOptions) feedEntries {
 	}
 
 	// Parse and filter IPs from iocData into the threat feed.
-	mutex.Lock()
+	mu.Lock()
 	threats := make(feedEntries, 0, len(iocData))
 loop:
 	for ip, ioc := range iocData {
@@ -109,7 +109,7 @@ loop:
 			ThreatScore: ioc.threatScore,
 		})
 	}
-	mutex.Unlock()
+	mu.Unlock()
 
 	threats.applySort(opt.sortMethod, opt.sortDirection)
 
@@ -124,17 +124,17 @@ func parseExcludeList(filepath string) (map[string]struct{}, []*net.IPNet, error
 		return map[string]struct{}{}, []*net.IPNet{}, nil
 	}
 
-	file, err := os.Open(filepath)
+	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer file.Close()
+	defer f.Close()
 
 	// `ips` stores individual IPs to exclude, and `cidr` stores CIDR networks
 	// to exclude.
 	ips := make(map[string]struct{})
 	cidr := []*net.IPNet{}
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if len(line) > 0 {
