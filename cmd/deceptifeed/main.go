@@ -92,7 +92,7 @@ func main() {
 			return
 		}
 
-		threatfeed.Start(&cfg.ThreatFeed)
+		threatfeed.Start(&cfg)
 	}()
 
 	// Start the honeypot servers.

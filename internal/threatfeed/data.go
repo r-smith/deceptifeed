@@ -70,7 +70,7 @@ func Update(ip string, threatScore int) {
 	if netIP == nil || netIP.IsLoopback() {
 		return
 	}
-	if !configuration.IsPrivateIncluded && netIP.IsPrivate() {
+	if !cfg.ThreatFeed.IsPrivateIncluded && netIP.IsPrivate() {
 		return
 	}
 
@@ -114,10 +114,10 @@ func deleteExpired() {
 // expired returns whether an IoC is considered expired based on the last
 // seen date and the configured expiry hours.
 func (ioc *IOC) expired() bool {
-	if configuration.ExpiryHours <= 0 {
+	if cfg.ThreatFeed.ExpiryHours <= 0 {
 		return false
 	}
-	return ioc.lastSeen.Before(time.Now().Add(-time.Hour * time.Duration(configuration.ExpiryHours)))
+	return ioc.lastSeen.Before(time.Now().Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours)))
 }
 
 // loadCSV loads existing threat feed data from a CSV file. If found, it
@@ -127,7 +127,7 @@ func loadCSV() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	f, err := os.Open(configuration.DatabasePath)
+	f, err := os.Open(cfg.ThreatFeed.DatabasePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -181,7 +181,7 @@ func loadCSV() error {
 // the threat feed data persists across application restarts. It is not the
 // active threat feed.
 func saveCSV() error {
-	f, err := os.OpenFile(configuration.DatabasePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(cfg.ThreatFeed.DatabasePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}

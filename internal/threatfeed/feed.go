@@ -72,7 +72,7 @@ func prepareFeed(options ...feedOptions) feedEntries {
 		opt = options[0]
 	}
 
-	excludedIPs, excludedCIDR, err := parseExcludeList(configuration.ExcludeListPath)
+	excludedIPs, excludedCIDR, err := parseExcludeList(cfg.ThreatFeed.ExcludeListPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to read threat feed exclude list:", err)
 	}
@@ -82,12 +82,12 @@ func prepareFeed(options ...feedOptions) feedEntries {
 	threats := make(feedEntries, 0, len(iocData))
 loop:
 	for ip, ioc := range iocData {
-		if ioc.expired() || ioc.threatScore < configuration.MinimumThreatScore || !ioc.lastSeen.After(opt.seenAfter) {
+		if ioc.expired() || ioc.threatScore < cfg.ThreatFeed.MinimumThreatScore || !ioc.lastSeen.After(opt.seenAfter) {
 			continue
 		}
 
 		parsedIP := net.ParseIP(ip)
-		if parsedIP == nil || (parsedIP.IsPrivate() && !configuration.IsPrivateIncluded) {
+		if parsedIP == nil || (parsedIP.IsPrivate() && !cfg.ThreatFeed.IsPrivateIncluded) {
 			continue
 		}
 

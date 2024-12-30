@@ -17,17 +17,16 @@ const (
 )
 
 var (
-	// configuration holds the configuration for the threat feed server. It is
-	// assigned when the server is initializing and the configuration values
-	// should not change.
-	configuration config.ThreatFeed
+	// cfg contains the application configuration. This includes settings for
+	// the threat feed server as well as for each individual honeypot server.
+	cfg config.Config
 )
 
 // Start initializes and starts the threat feed server. The server provides a
 // list of IP addresses observed interacting with the honeypot servers in
 // various formats.
-func Start(cfg *config.ThreatFeed) {
-	configuration = *cfg
+func Start(c *config.Config) {
+	cfg = *c
 
 	// Check for and open an existing threat feed CSV file, if available.
 	if err := loadCSV(); err != nil {
@@ -72,7 +71,7 @@ func Start(cfg *config.ThreatFeed) {
 	mux.HandleFunc("GET    /taxii2/api/collections/{id}/objects/{$}", enforcePrivateIP(disableCache(handleTAXIIObjects)))
 
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
+		Addr:         ":" + c.ThreatFeed.Port,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -80,7 +79,7 @@ func Start(cfg *config.ThreatFeed) {
 	}
 
 	// Start the threat feed HTTP server.
-	fmt.Printf("Starting Threat Feed server on port: %s\n", cfg.Port)
+	fmt.Printf("Starting Threat Feed server on port: %s\n", c.ThreatFeed.Port)
 	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped:", err)
 	}
