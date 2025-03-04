@@ -211,7 +211,7 @@ func (c *Config) InitializeLoggers() error {
 
 		// If no log path is specified or if logging is disabled, discard logs.
 		if len(logPath) == 0 || !c.Servers[i].LogEnabled {
-			c.Servers[i].Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+			c.Servers[i].Logger = slog.New(slog.DiscardHandler)
 			continue
 		}
 
