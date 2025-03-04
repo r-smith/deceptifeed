@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"fmt"
-	prng "math/rand/v2"
 )
 
 var (
@@ -80,16 +79,10 @@ func newUUIDv4() string {
 	// overwritten to indicate version 4 and the variant (the format of the
 	// UUID).
 
-	// Get 16 random bytes.
+	// Get 16 random bytes. crypto/rand.Read is guaranteed to never return an
+	// error (as of Go 1.24).
 	var b = [16]byte{}
-	_, err := rand.Read(b[:])
-	if err != nil {
-		// Fall back to PRNG if the OS random number generator call fails.
-		for i := range b {
-			// Go's math/rand/v2 package is imported as `prng`.
-			b[i] = byte(prng.Int())
-		}
-	}
+	rand.Read(b[:])
 
 	// Overwrite the version bits with 0b0100 (UUID version 4).
 	b[6] = (b[6] & 0x0f) | 0x40
