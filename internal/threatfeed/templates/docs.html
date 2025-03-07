@@ -71,6 +71,62 @@
         }
 
         /* ===== */
+        /* Badge */
+        /* ===== */
+        .badge {
+            align-items: center;
+            background-color: transparent;
+            border: 1px solid #a7e521;
+            border-radius: 3px;
+            color: #a7e521;
+            font-size: 0.75rem;
+            font-weight: bold;
+            line-height: 0;
+            padding: 0.13rem 0.65rem;
+            text-transform: uppercase;
+        }
+
+        /* ==== */
+        /* Code */
+        /* ==== */
+        pre {
+            background-color: black;
+            border-radius: 3px;
+            color: #ffff55;
+            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
+            font-size: 0.875rem;
+            margin-bottom: 0;
+            margin-top: 0.75rem;
+            overflow-x: auto;
+            padding: 1.25rem 1rem;
+        }
+
+        code {
+            background: black;
+            color: #55ffff;
+            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
+            font-size: 1rem;
+            padding: 0 0.2rem;
+            text-wrap: wrap;
+            word-wrap: break-word;
+        }
+        
+        /* ======= */
+        /* Figures */
+        /* ======= */
+        figure {
+            margin: 0;
+        }
+
+        figcaption {
+            font-size: 1rem;
+            line-height: 1rem;
+            margin-bottom: 0;
+            margin-top: 3rem;
+            padding: 0;
+        }
+
+        /* ===== */
         /* Lists */
         /* ===== */
         li + li {
@@ -80,6 +136,42 @@
         ul {
             margin-bottom: 0;
         }
+        
+        ul.no-bullets {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        /* ====== */
+        /* Tables */
+        /* ====== */
+        table {
+            align-items: center;
+            border: none;
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        th {
+            background: transparent;
+            color: #f0f0f0;
+            font-size: 1.15rem;
+            font-weight: bold;
+            padding: 0.3rem 1rem 0.3rem 0;
+            text-align: left;
+        }
+
+        tbody.align-top {
+            vertical-align: top;
+        }
+
+        td {
+            background: transparent;
+            border-bottom: none;
+            color: #e0e0e0;
+            padding: 0.75rem 1rem 0.75rem 0;
+            text-align: left;
+        }
 
         /* ======= */
         /* Anchors */
@@ -88,6 +180,12 @@
             color: #8cb4ff;
             text-decoration: underline;
             text-underline-offset: 0.25rem;
+        }
+
+        a.endpoint {
+            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
+            font-size: 1.05rem;
+            text-underline-offset: 0.375rem;
         }
 
         a:hover {
@@ -142,6 +240,41 @@
                 margin-bottom: 0;
                 padding-bottom: 4rem;
             }
+
+            pre {
+                overflow-wrap: break-word;
+                text-wrap-mode: wrap;
+            }
+
+            .api-table > thead th {
+                display: none;
+            }
+            .api-table > tbody td {
+                display: block;
+                padding: 0.3rem 0;
+            }
+
+            .api-table tr > td:last-of-type {
+                margin-bottom: 1.75rem;
+                padding-bottom: 2rem;
+            }
+
+            .api-table [row-header] {
+                position: relative;
+                vertical-align: middle;
+            }
+            
+            .api-table [row-header]:before {
+                content: attr(row-header);
+                display: inline-block;
+                vertical-align: middle;
+                text-align: left;
+                width: 6.5rem;
+                padding-right: 1rem;
+                font-weight: bold;
+                white-space: nowrap;
+                overflow: hidden;
+            }
         }
 
         @media (max-width: 450px) {
@@ -151,6 +284,10 @@
 
             a.logo {
                 width: 90vw;
+            }
+
+            code {
+                font-size: 0.875rem;
             }
         }
     </style>
@@ -166,22 +303,122 @@
     </header>
     <main>
         <article>
-            <h2>Threat Feed</h2>
-            <p>The threat feed lists IP addresses that have interacted with Deceptifeed's honeypots. Its goal is to
-                help you build an automated defense system.
-            </p>
-            <p>
-                <a href="/threatfeed">View the threat feed</a> from your browser to explore the data.
-                <a href="/docs">See the documentation</a> for details on accessing the threat feed in different formats.
-            </p>
-            <p>
-            Supported formats include:
-            </p>
-            <ul>
-                <li><a href="/plain">Plain text</a> is the most commonly used format for integration with firewalls.</li>
-                <li><a href="/json">JSON</a> and <a href="/csv">CSV</a> formats offer flexibility for integrating with various tools and workflows.</li>
-                <li><a href="/taxii2/">TAXII</a> is designed for integration with Threat Intelligence Platforms (TIPs).</li>
+            <h2>Endpoints</h2>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Format</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td row-header="Endpoint"><a class="endpoint" href="/plain">/plain</a></td>
+                        <td row-header="Format"><span class="badge">Plain</span></td>
+                        <td>One IP address per line. Suitable for firewall integration.</td>
+                    </tr>
+                    <tr>
+                        <td row-header="Endpoint"><a class="endpoint" href="/csv">/csv</a></td>
+                        <td row-header="Format"><span class="badge">CSV</span></td>
+                        <td>CSV format containing full threat feed details.</td>
+                    </tr>
+                    <tr>
+                        <td row-header="Endpoint"><a class="endpoint" href="/json">/json</a></td>
+                        <td row-header="Format"><span class="badge">JSON</span></td>
+                        <td>JSON format containing full threat feed details.</td>
+                    </tr>
+                    <tr>
+                        <td row-header="Endpoint"><a class="endpoint" href="/stix">/stix</a></td>
+                        <td row-header="Format"><span class="badge">STIX</span></td>
+                        <td>STIX 2.1 <em>Indicators</em> containing full threat feed details.</td>
+                    </tr>
+                    <tr>
+                        <td row-header="Endpoint"><a class="endpoint" href="/taxii2">/taxii2</a></td>
+                        <td row-header="Format"><span class="badge">TAXII</span></td>
+                        <td>TAXII 2.1 API. See the <em>TAXII</em> section for usage details.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <figure>
+                <figcaption><b>Example:</b> Retrieve the threat feed formatted as plain text:</figcaption>
+                <pre>curl "http://threatfeed.example.com:9000/plain"</pre>
+            </figure>
+            <figure>
+                <figcaption><b>Example:</b> Retrieve the threat feed formatted as JSON:</figcaption>
+                <pre>curl "http://threatfeed.example.com:9000/json"</pre>
+            </figure>
+        </article>
+
+        <article>
+            <h2>Query Parameters</h2>
+            <p>All endpoints support optional query parameters to customize how the threat feed is formatted.
+                The following query parameters are supported:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody class="align-top">
+                    <tr>
+                        <td><code>sort</code></td>
+                        <td>Sort the results by a specific field. Valid values are:
+                            <ul class="no-bullets">
+                                <li><code>added</code></li>
+                                <li><code>ip</code></li>
+                                <li><code>last_seen</code></li>
+                                <li><code>threat_score</code></li>
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code>direction</code></td>
+                        <td>Specify the sorting direction. Valid values are:
+                            <ul class="no-bullets">
+                                <li><code>asc</code> - Ascending order</li>
+                                <li><code>desc</code> - Descending order</li>
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code>last_seen_hours</code></td>
+                        <td>Filter results to only include entries seen within the last specified number of hours.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <figure>
+                <figcaption><b>Example:</b> Retrieve the JSON feed, sorted by the last seen date in descending order:</figcaption>
+                <pre>curl "http://threatfeed.example.com:9000/json?sort=last_seen&direction=desc"</pre>
+            </figure>
+            <figure>
+                <figcaption><b>Example:</b> Retrieve the plain text feed, filtered to include only IP addresses seen within the last 24 hours:</figcaption>
+                <pre>curl "http://threatfeed.example.com:9000/plain?last_seen_hours=24"</pre>
+            </figure>
+        </article>
+
+        <article>
+            <h2>TAXII</h2>
+            <p>The threat feed is accessible via a TAXII 2.1 API.
+                This allows for integration with Threat Intelligence Platforms (TIPs) like <i>OpenCTI</i> and <i>Microsoft Sentinel</i>.</p>
+            <p>To access via TAXII 2.1, clients typically require the API root URL and a collection ID.
+                The API root URL is available on the threat feed server at the path <b>/taxii2/api/</b>.
+                Three collections are available: <b>indicators</b>, <b>sightings</b>, and <b>observables</b>.</p>
+            <h3>Key Details</h3>
+            <ul class="no-bullets">
+                <li>API root URL: <code>http://threatfeed.example.com:9000/taxii2/api/</code></li>
+                <li>Collection ID: <code>indicators</code></li>
+                <li>Collection ID: <code>sightings</code></li>
+                <li>Collection ID: <code>observables</code></li>
             </ul>
+
+            <figure>
+                <figcaption><b>Example:</b> Retrieve the TAXII 2.1 <em>Indicators</em> collection:</figcaption>
+                <pre>curl "http://threatfeed.example.com:9000/taxii2/api/collections/indicators/objects/"</pre>
+            </figure>
         </article>
     </main>
 </body>

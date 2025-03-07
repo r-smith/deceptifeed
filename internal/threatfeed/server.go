@@ -54,10 +54,11 @@ func Start(c *config.Config) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", enforcePrivateIP(handleNotFound))
 	mux.HandleFunc("GET /{$}", enforcePrivateIP(handleHome))
-	mux.HandleFunc("GET /feed", enforcePrivateIP(disableCache(handlePlain)))
+	mux.HandleFunc("GET /docs", enforcePrivateIP(handleDocs))
+	// Threat feed handlers.
+	mux.HandleFunc("GET /threatfeed", enforcePrivateIP(disableCache(handleHTML)))
 	mux.HandleFunc("GET /plain", enforcePrivateIP(disableCache(handlePlain)))
 	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
-	mux.HandleFunc("GET /html", enforcePrivateIP(disableCache(handleHTML)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
 	mux.HandleFunc("GET /stix", enforcePrivateIP(disableCache(handleSTIX)))
 	// TAXII 2.1 handlers.

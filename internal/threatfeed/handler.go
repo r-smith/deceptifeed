@@ -303,6 +303,15 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleDocs(w http.ResponseWriter, r *http.Request) {
+	tmpl := template.Must(template.ParseFS(templates, "templates/docs.html"))
+	err := tmpl.Execute(w, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to parse /docs template:", err)
+		return
+	}
+}
+
 // handleHTML returns the threat feed as a web page for viewing in a browser.
 func handleHTML(w http.ResponseWriter, r *http.Request) {
 	opt, err := parseParams(r)
