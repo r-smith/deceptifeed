@@ -56,7 +56,7 @@ func Start(c *config.Config) {
 	mux.HandleFunc("GET /{$}", enforcePrivateIP(handleHome))
 	mux.HandleFunc("GET /docs", enforcePrivateIP(handleDocs))
 	// Threat feed handlers.
-	mux.HandleFunc("GET /threatfeed", enforcePrivateIP(disableCache(handleHTML)))
+	mux.HandleFunc("GET /webfeed", enforcePrivateIP(disableCache(handleHTML)))
 	mux.HandleFunc("GET /plain", enforcePrivateIP(disableCache(handlePlain)))
 	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))

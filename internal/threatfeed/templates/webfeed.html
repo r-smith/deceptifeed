@@ -9,10 +9,10 @@
         /* Layout */
         /* ====== */
         body {
-            background-color: #09090B;
+            background: black;
             color: #f8f8f8;
             font-family: 'Segoe UI', 'Roboto', 'Ubuntu', 'Cantarell', 'Droid Sans', 'Helvetica Neue', sans-serif;
-            margin: 0 0 4rem 0;
+            margin: 0 0 2rem 0;
             padding: 0;
         }
 
@@ -20,132 +20,96 @@
             padding: 0 0 4rem 0;
             text-align: center;
         }
-        
+
         nav {
             background-color: black;
             border-bottom: 1px solid #38384d;
         }
 
-        main {
+        /* ====== */
+        /* Tables */
+        /* ====== */
+        table {
+            background: black;
+            border-bottom: 1px solid #8e6eff;
+            border-collapse: separate;
+            border-spacing: 0;
             margin: 0 auto;
-            max-width: 56rem;
-            width: 92vw;
+            overflow: auto;
         }
 
-        article {
-            background-color: black;
-            border: 1px solid #58586d;
-            box-shadow: 1.25rem 1.25rem 16px rgba(0, 0, 0, 0.5);
-            margin-bottom: 4rem;
-            padding: 3rem 5rem 3.5rem 5rem;
-        }
-
-        /* ======== */
-        /* Headings */
-        /* ======== */
-        h2 {
-            color: #b5a;
-            font-size: 1.95rem;
-            margin: 0 0 1.5rem 0;
-        }
-
-        h3 {
-            color: #d9c;
-            margin-top: 2rem;
-        }
-
-        /* ========== */
-        /* Paragraphs */
-        /* ========== */
-        p {
-            font-size: 1.05rem;
-            line-height: 1.9rem;
-            margin-bottom: 1.75rem;
-            margin-top: 1rem;
-        }
-
-        /* ===== */
-        /* Badge */
-        /* ===== */
-        .badge {
-            align-items: center;
-            background-color: transparent;
-            border: 1px solid #6fa;
-            border-radius: 3px;
-            color: #6fa;
-            font-size: 0.75rem;
-            font-weight: bold;
-            line-height: 0;
-            padding: 0.13rem 0.65rem;
-            text-transform: uppercase;
-        }
-
-        /* ==== */
-        /* Code */
-        /* ==== */
-        pre {
-            background-color: #050507;
-            border: 1px solid #446;
-            border-radius: 20px;
-            color: #ed6;
-            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
-            font-size: 0.875rem;
-            margin-bottom: 0;
-            margin-top: 0.75rem;
-            overflow-x: auto;
-            overflow-wrap: break-word;
-            padding: 1.5rem 1.2rem;
-            text-wrap-mode: wrap;
-        }
-
-        code {
-            color: #6ef;
-            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
-            font-size: 1.05rem;
-            padding: 0 0.2rem;
-            text-wrap: wrap;
-            word-wrap: break-word;
-        }
-        
-        /* ======= */
-        /* Figures */
-        /* ======= */
-        figure {
-            margin: 0;
-        }
-
-        figcaption {
+        thead {
+            background: black;
+            color: #ddd;
             font-size: 1rem;
-            line-height: 1rem;
-            margin-bottom: 0;
-            margin-top: 3rem;
-            padding: 0;
+            position: sticky;
+            text-align: left;
+            top: 0;
+            z-index: 10;
         }
 
-        /* ===== */
-        /* Lists */
-        /* ===== */
-        main li + li {
-            margin-top: 0.75rem;
+        th {
+            border-bottom: 1px solid #8e6eff;
+            padding: 0.7rem 1.25rem;
         }
 
-        main ul {
-            line-height: 1.5rem;
-            margin-bottom: 1rem;
+        td {
+            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
+            font-size: 1.1rem;
+            padding: 0.6rem 1.25rem;
         }
 
-        main p + ul {
-            margin-top: -1rem;
+        tbody tr:hover {
+            background-color: #1a1d22;
         }
 
-        main ul li::marker {
-            font-size: 0.9rem;
-            color: #ed6;
+        /* IP */
+        tbody td:nth-child(1) {
+            color: #48e3ff;
         }
-        
-        ul.no-bullets {
-            list-style-type: none;
-            padding-left: 0;
+        tbody tr:nth-child(odd) td:nth-child(1) {
+            color: #aaffff;
+        }
+
+        /* Added */
+        tbody td:nth-child(2) {
+            color: #8b949e;
+        }
+        tbody tr:nth-child(odd) td:nth-child(2) {
+            color: #ccc;
+        }
+
+        /* Last Seen */
+        tbody td:nth-child(3) {
+            color: #b8c1ff;
+        }
+        tbody tr:nth-child(odd) td:nth-child(3) {
+            color: #c8e1ff;
+        }
+
+        /* Threat Score */
+        tbody td:nth-child(4) {
+            color: #ffff55;
+            text-align: right
+        }
+        tbody tr:nth-child(odd) td:nth-child(4) {
+            color: #eedc82;
+        }
+
+        /* Sort arrows */
+        .sort-arrow {
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+
+        .asc::after {
+            color: #8e6eff;
+            content: "▲";
+        }
+
+        .desc::after {
+            color: #8e6eff;
+            content: "▼";
         }
 
         /* === */
@@ -170,9 +134,9 @@
         }
 
         nav li {
+            margin-right: 2rem;
             float: left;
             font-size: 1.075rem;
-            margin-right: 2rem;
         }
 
         nav li:last-child {
@@ -182,7 +146,7 @@
         nav li.selected a {
             color: #fff;
         }
-
+        
         nav li.selected a:hover {
             color: #fa1;
         }
@@ -212,55 +176,18 @@
             color: #eee;
         }
 
-        /* ====== */
-        /* Tables */
-        /* ====== */
-        table {
-            align-items: center;
-            border: none;
-            margin-top: 1.5rem;
-            width: 100%;
-        }
-
-        th {
-            background: transparent;
-            color: #ddd;
-            font-size: 1rem;
-            font-weight: bold;
-            padding: 0.3rem 1rem 0.3rem 0;
-            text-align: left;
-        }
-
-        tbody.align-top {
-            vertical-align: top;
-        }
-
-        td {
-            background: transparent;
-            border-bottom: none;
-            color: #e0e0e0;
-            padding: 0.75rem 1rem 0.75rem 0;
-            text-align: left;
-        }
-
         /* ======= */
         /* Anchors */
         /* ======= */
         a {
-            color: #9cf;
-            text-decoration: underline;
-            text-underline-offset: 0.275rem;
-        }
-
-        a.endpoint {
-            font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
-            font-size: 1.05rem;
-            text-underline-offset: 0.375rem;
+            color: inherit;
+            text-decoration: none;
         }
 
         a:hover {
             color: #fa1;
-            text-decoration: none;
+            text-decoration: underline;
+            text-underline-offset: .1875rem;
         }
 
         a:active {
@@ -272,6 +199,13 @@
         /* ============= */
         /* Media Queries */
         /* ============= */
+        @media (max-width: 920px) {
+            td,
+            th {
+                font-size: 1rem;
+            }
+        }
+
         @media (max-width: 900px) {
             a.logo {
                 margin: 0;
@@ -287,65 +221,14 @@
             }
         }
 
-        @media (max-width: 820px) {
-            body {
-                background-color: black;
-                margin: 0;
+        @media (max-width: 700px) {
+            td,
+            th {
+                padding: 0.75rem 1rem;
             }
 
-            header {
-                background: black;
-                padding-bottom: 0;
-            }
-
-            main {
-                width: 100%;
-            }
-
-            article {
-                border: none;
-                box-shadow: none;
-                margin-bottom: 1rem;
-                padding: 3rem;
-            }
-
-            article:last-of-type {
-                margin-bottom: 0;
-                padding-bottom: 4rem;
-            }
-
-            .api-table {
-                margin-bottom: -1rem;
-            }
-
-            .api-table > thead th {
-                display: none;
-            }
-            .api-table > tbody td {
-                display: block;
-                padding: 0.3rem 0;
-            }
-
-            .api-table tr > td:last-of-type {
-                margin-bottom: 1.75rem;
-                padding-bottom: 2rem;
-            }
-
-            .api-table [row-header] {
-                position: relative;
-                vertical-align: middle;
-            }
-            
-            .api-table [row-header]:before {
-                content: attr(row-header);
-                display: inline-block;
-                font-weight: bold;
-                overflow: hidden;
-                padding-right: 1rem;
+            tbody td:nth-child(4) {
                 text-align: left;
-                vertical-align: middle;
-                white-space: nowrap;
-                width: 6.5rem;
             }
         }
 
@@ -360,12 +243,37 @@
                 display: inline-block;
             }
 
-            article {
-                padding: 3rem 2rem;
+            td,
+            th {
+                padding: 0.75rem;
+            }
+        }
+
+        @media (max-width: 600px) {
+            td,
+            th {
+                padding: 0.5rem;
+            }
+        }
+
+        @media (max-width: 550px) {
+            td,
+            th {
+                font-size: 0.9375rem;
+                padding: 0.4rem;
+            }
+        }
+
+        @media (max-width: 450px) {
+            td,
+            th {
+                font-size: .875rem;
+                padding: 0.3rem;
             }
 
-            code {
-                font-size: 0.875rem;
+            td:nth-child(2),
+            th:nth-child(2) {
+                display: none;
             }
         }
     </style>
@@ -382,14 +290,14 @@
                         </svg>
                     </a>
                 </li>
-                <li>
+                <li class="selected">
                     <a href="/webfeed">
                         <svg class="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                             <path d="M21.0082 3C21.556 3 22 3.44495 22 3.9934V20.0066C22 20.5552 21.5447 21 21.0082 21H2.9918C2.44405 21 2 20.5551 2 20.0066V3.9934C2 3.44476 2.45531 3 2.9918 3H21.0082ZM20 5H4V19H20V5ZM18 15V17H6V15H18ZM12 7V13H6V7H12ZM18 11V13H14V11H18ZM10 9H8V11H10V9ZM18 7V9H14V7H18Z"></path>
                         </svg>Web Feed
                     </a>
                 </li>
-                <li class="selected">
+                <li>
                     <a href="/docs">
                         <svg class="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor">
                             <path d="M202.24 74C166.11 56.75 115.61 48.3 48 48a31.36 31.36 0 00-17.92 5.33A32 32 0 0016 79.9V366c0 19.34 13.76 33.93 32 33.93 71.07 0 142.36 6.64 185.06 47a4.11 4.11 0 006.94-3V106.82a15.89 15.89 0 00-5.46-12A143 143 0 00202.24 74zM481.92 53.3A31.33 31.33 0 00464 48c-67.61.3-118.11 8.71-154.24 26a143.31 143.31 0 00-32.31 20.78 15.93 15.93 0 00-5.45 12v337.13a3.93 3.93 0 006.68 2.81c25.67-25.5 70.72-46.82 185.36-46.81a32 32 0 0032-32v-288a32 32 0 00-14.12-26.61z"/>
@@ -400,119 +308,32 @@
         </nav>
     </header>
     <main>
-        <article>
-            <h2>Endpoints</h2>
-            <table class="api-table">
-                <thead>
-                    <tr>
-                        <th>Endpoint</th>
-                        <th>Format</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/plain">/plain</a></td>
-                        <td row-header="Format"><span class="badge">Plain</span></td>
-                        <td>One IP address per line. Suitable for firewall integration.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/csv">/csv</a></td>
-                        <td row-header="Format"><span class="badge">CSV</span></td>
-                        <td>CSV format containing full threat feed details.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/json">/json</a></td>
-                        <td row-header="Format"><span class="badge">JSON</span></td>
-                        <td>JSON format containing full threat feed details.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/stix">/stix</a></td>
-                        <td row-header="Format"><span class="badge">STIX</span></td>
-                        <td>STIX 2.1 <em>Indicators</em> containing full threat feed details.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/taxii2">/taxii2</a></td>
-                        <td row-header="Format"><span class="badge">TAXII</span></td>
-                        <td>TAXII 2.1 API. See the <em>TAXII</em> section for usage details.</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the threat feed formatted as plain text:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/plain"</pre>
-            </figure>
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the threat feed formatted as JSON:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/json"</pre>
-            </figure>
-        </article>
-
-        <article>
-            <h2>Query Parameters</h2>
-            <p>All endpoints support optional query parameters to customize how the threat feed is formatted.
-                The following query parameters are supported:</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody class="align-top">
-                    <tr>
-                        <td><code>sort</code></td>
-                        <td>Sort the results by a specific field. Valid values are:
-                            <ul class="no-bullets">
-                                <li><code>added</code></li>
-                                <li><code>ip</code></li>
-                                <li><code>last_seen</code></li>
-                                <li><code>threat_score</code></li>
-                            </ul>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>direction</code></td>
-                        <td>Specify the sorting direction. Valid values are:
-                            <ul class="no-bullets">
-                                <li><code>asc</code> - Ascending order</li>
-                                <li><code>desc</code> - Descending order</li>
-                            </ul>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>last_seen_hours</code></td>
-                        <td>Filter results to only include entries seen within the last specified number of hours.</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the JSON feed, sorted by the last seen date in descending order:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/json?sort=last_seen&direction=desc"</pre>
-            </figure>
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the plain text feed, filtered to include only IP addresses seen within the last 24 hours:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/plain?last_seen_hours=24"</pre>
-            </figure>
-        </article>
-
-        <article>
-            <h2>TAXII</h2>
-            <p>The threat feed is accessible via TAXII 2.1.
-                This allows for integration with Threat Intelligence Platforms (TIPs) like <i>OpenCTI</i> and <i>Microsoft Sentinel</i>.</p>
-            <p>To access via TAXII, clients require the API root URL and a collection ID.
-                The API root URL is available at the path <b>/taxii2/api/</b>.
-                Three collections are available: <b>indicators</b>, <b>sightings</b>, and <b>observables</b>.</p>
-            <h3>Key Details</h3>
-            <ul class="no-bullets">
-                <li>API root URL: <code>http://threatfeed.example.com:9000/taxii2/api/</code></li>
-                <li>Collection ID: <code>indicators</code></li>
-                <li>Collection ID: <code>sightings</code></li>
-                <li>Collection ID: <code>observables</code></li>
-            </ul>
-        </article>
+        <table>
+            <thead>
+                <tr>
+                <th><a href="?sort=ip&direction={{if and (eq .SortMethod "ip") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    IP
+                    </a>{{if eq .SortMethod "ip"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                <th><a href="?sort=added&direction={{if and (eq .SortMethod "added") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Added
+                    </a>{{if eq .SortMethod "added"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                <th><a href="?sort=last_seen&direction={{if and (eq .SortMethod "last_seen") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Last Seen
+                    </a>{{if eq .SortMethod "last_seen"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                <th><a href="?sort=threat_score&direction={{if and (eq .SortMethod "threat_score") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Threat Score
+                    </a>{{if eq .SortMethod "threat_score"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                </th>
+                </tr>
+            </thead>
+            <tbody>
+            {{range .Data}}<tr><td>{{.IP}}<td>{{.Added.Format "2006-01-02 15:04"}}<td>{{.LastSeen.Format "2006-01-02 15:04"}}<td>{{.ThreatScore}}
+            {{end}}
+            </tbody>
+        </table>
     </main>
 </body>
 </html>

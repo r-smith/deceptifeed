@@ -68,7 +68,7 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
-	if err := e.Encode(map[string]interface{}{"threat_feed": prepareFeed(opt)}); err != nil {
+	if err := e.Encode(map[string]any{"threat_feed": prepareFeed(opt)}); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
 		return
 	}
@@ -195,7 +195,7 @@ func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		result = map[string]interface{}{"collections": collections}
+		result = map[string]any{"collections": collections}
 	}
 
 	w.Header().Set("Content-Type", taxii.ContentType)
@@ -344,8 +344,8 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 		m = "threat_score"
 	}
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/htmlfeed.html"))
-	err = tmpl.Execute(w, map[string]interface{}{"Data": prepareFeed(opt), "SortDirection": d, "SortMethod": m})
+	tmpl := template.Must(template.ParseFS(templates, "templates/webfeed.html"))
+	err = tmpl.Execute(w, map[string]any{"Data": prepareFeed(opt), "SortDirection": d, "SortMethod": m})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to HTML:", err)
 		return
