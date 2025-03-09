@@ -298,16 +298,18 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFS(templates, "templates/home.html"))
 	err := tmpl.Execute(w, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to parse home page template:", err)
+		fmt.Fprintln(os.Stderr, "Failed to parse template 'home.html':", err)
 		return
 	}
 }
 
+// handleDocs serves a static page with documentation for accessing the threat
+// feed.
 func handleDocs(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFS(templates, "templates/docs.html"))
 	err := tmpl.Execute(w, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to parse /docs template:", err)
+		fmt.Fprintln(os.Stderr, "Failed to parse template 'docs.html':", err)
 		return
 	}
 }
@@ -453,7 +455,9 @@ func parseParams(r *http.Request) (feedOptions, error) {
 }
 
 // handleNotFound returns a 404 Not Found response. This is the default
-// response when a request is made outside the defined API.
+// response when a request is made to an undefined path.
 func handleNotFound(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	w.WriteHeader(http.StatusNotFound)
+	tmpl := template.Must(template.ParseFS(templates, "templates/404.html"))
+	_ = tmpl.Execute(w, nil)
 }
