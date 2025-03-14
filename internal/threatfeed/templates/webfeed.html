@@ -26,6 +26,106 @@
             border-bottom: 1px solid #38384d;
         }
 
+        /* === */
+        /* Nav */
+        /* === */
+        nav ul {
+            list-style-type: none;
+            margin: 0;
+            overflow: hidden;
+            padding: 0.5rem 0 0 0;
+        }
+
+        nav li {
+            float: left;
+            font-size: 1.075rem;
+            margin-right: 2rem;
+        }
+
+        nav li:last-child {
+            margin-right: 0;
+        }
+
+        a.logo {
+            display: inline-block;
+            margin: 0.5rem 1rem 0.375rem 1.5rem;
+            padding: 0.25rem 0.5rem 0 0.5rem;
+            position: relative;
+            width: 210px;
+        }
+
+        a.logo svg {
+            position: relative;
+            z-index: 2;
+        }
+
+        a.logo::after {
+            background-color: #556;
+            bottom: 8px;
+            content: '';
+            height: 1px;
+            left: 0.5rem;
+            position: absolute;
+            transform: scaleX(0);
+            transform-origin: bottom center;
+            transition: transform 0.3s ease-in-out;
+            width: 210px;
+            z-index: 0;
+        }
+
+        a.logo:hover::after {
+            transform: scaleX(1);
+        }
+
+        a.logo:focus::after {
+            width: 0;
+        }
+        
+        nav .icon {
+            margin-right: 0.45rem;
+            vertical-align: middle;
+        }
+
+        nav a {
+            border-radius: 7px;
+            color: #889;
+            display: block;
+            margin: 0.6rem 0.5rem 0.5rem 0.5rem;
+            padding: 0.5rem 0.7rem 0.5rem 0.7rem;
+            position: relative;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        nav li.selected a {
+            color: #fff;
+        }
+
+        nav a:hover,
+        nav li.selected a:hover {
+            color: #fb0;
+        }
+
+        nav a:active,
+        nav li.selected a:active {
+            background-color: #112;
+        }
+
+        a.logo:active {
+            background-color: transparent;
+        }
+
+        nav li.selected .icon
+        {
+            color: #eee;
+        }
+        
+        nav a:hover .icon,
+        nav a:active .icon
+        {
+            color: #fff;
+        }
+
         /* ====== */
         /* Tables */
         /* ====== */
@@ -41,7 +141,7 @@
         thead {
             background: black;
             color: #ddd;
-            font-size: 1rem;
+            font-size: 0.95rem;
             position: sticky;
             text-align: left;
             top: 0;
@@ -112,86 +212,22 @@
             content: "▼";
         }
 
-        /* === */
-        /* Nav */
-        /* === */
-        a.logo {
-            margin: 0 0 0 2rem;
-            padding: 0.75rem 1.5rem 0.375rem 1.5rem;
-            width: 210px;
-        }
-
-        a.logo:hover svg {
-            box-shadow: 0 -3px 0 0 black inset, 0 -4px #333 inset;
-            text-decoration: none;
-        }
-
-        nav ul {
-            list-style-type: none;
-            margin: 0;
-            overflow: hidden;
-            padding: 0.5rem 0 0 0;
-        }
-
-        nav li {
-            margin-right: 2rem;
-            float: left;
-            font-size: 1.075rem;
-        }
-
-        nav li:last-child {
-            margin-right: 0;
-        }
-
-        nav li.selected a {
-            color: #fff;
-        }
-        
-        nav li.selected a:hover {
-            color: #fa1;
-        }
-
-        nav a {
-            color: #bbb;
-            display: block;
-            padding: 1.1rem 1.2rem 1rem 1.2rem;
-            text-align: center;
-            text-decoration: none;
-        }
-
-        nav a:active,
-        nav li.selected a:active {
-            background-color: transparent;
-            color: #ed6;
-        }
-
-        .icon {
-            margin-right: 0.45rem;
-            vertical-align: middle;
-        }
-
-        nav a:hover .icon,
-        nav li.selected .icon
-        {
-            color: #eee;
-        }
-
         /* ======= */
         /* Anchors */
         /* ======= */
-        a {
+        main a {
             color: inherit;
             text-decoration: none;
         }
 
-        a:hover {
-            color: #fa1;
+        main a:hover {
+            color: #fb0;
             text-decoration: underline;
             text-underline-offset: .1875rem;
         }
 
-        a:active {
-            background: #fa1;
+        main a:active {
+            background: #fb0;
             color: black;
             text-decoration: none;
         }
@@ -208,16 +244,19 @@
 
         @media (max-width: 900px) {
             a.logo {
-                margin: 0;
+                margin-left: 1rem;
             }
 
             li.logo {
                 display: block;
                 float: none;
+                text-align: left;
             }
 
             nav a {
-                padding: 0.625rem 1.5rem;
+                border-radius: 5px;
+                margin: 0.325rem 0.2rem 0.325rem 1rem;
+                padding: 0.3rem 0.5rem 0.3rem 0.5rem;
             }
         }
 
@@ -233,6 +272,13 @@
         }
 
         @media (max-width: 650px) {
+            td,
+            th {
+                padding: 0.75rem;
+            }
+        }
+
+        @media (max-width: 600px) {
             nav li {
                 display: block;
                 float: none;
@@ -243,13 +289,6 @@
                 display: inline-block;
             }
 
-            td,
-            th {
-                padding: 0.75rem;
-            }
-        }
-
-        @media (max-width: 600px) {
             td,
             th {
                 padding: 0.5rem;

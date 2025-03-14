@@ -36,18 +36,24 @@
         }
 
         a.logo svg {
+            border-radius: 3px;
             display: block;
             height: auto;
             max-width: 100%;
             min-height: 20px;
-            transition: outline 0.2s ease;
+            outline: 2px solid transparent;
+            outline-offset: 2rem;
+            transition: outline 0.5s ease-in-out;
             width: 500px;
         }
 
-         a.logo:hover svg {
-            border-radius: 3px;
-            outline: 1px solid #444;
-            outline-offset: 2rem;
+        a.logo:focus {
+            outline: none;
+        }
+        
+        a.logo:hover svg,
+        a.logo:focus svg {
+            outline-color: #7de;
         }
 
         h1 {

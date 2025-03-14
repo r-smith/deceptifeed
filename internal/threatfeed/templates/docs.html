@@ -40,6 +40,106 @@
             padding: 3rem 5rem 3.5rem 5rem;
         }
 
+        /* === */
+        /* Nav */
+        /* === */
+        nav ul {
+            list-style-type: none;
+            margin: 0;
+            overflow: hidden;
+            padding: 0.5rem 0 0 0;
+        }
+
+        nav li {
+            float: left;
+            font-size: 1.075rem;
+            margin-right: 2rem;
+        }
+
+        nav li:last-child {
+            margin-right: 0;
+        }
+
+        a.logo {
+            display: inline-block;
+            margin: 0.5rem 1rem 0.375rem 1.5rem;
+            padding: 0.25rem 0.5rem 0 0.5rem;
+            position: relative;
+            width: 210px;
+        }
+
+        a.logo svg {
+            position: relative;
+            z-index: 2;
+        }
+
+        a.logo::after {
+            background-color: #556;
+            bottom: 8px;
+            content: '';
+            height: 1px;
+            left: 0.5rem;
+            position: absolute;
+            transform: scaleX(0);
+            transform-origin: bottom center;
+            transition: transform 0.3s ease-in-out;
+            width: 210px;
+            z-index: 0;
+        }
+
+        a.logo:hover::after {
+            transform: scaleX(1);
+        }
+        
+        a.logo:focus::after {
+            width: 0;
+        }
+
+        nav .icon {
+            margin-right: 0.45rem;
+            vertical-align: middle;
+        }
+
+        nav a {
+            border-radius: 7px;
+            color: #889;
+            display: block;
+            margin: 0.6rem 0.5rem 0.5rem 0.5rem;
+            padding: 0.5rem 0.7rem 0.5rem 0.7rem;
+            position: relative;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        nav li.selected a {
+            color: #fff;
+        }
+
+        nav a:hover,
+        nav li.selected a:hover {
+            color: #fb0;
+        }
+
+        nav a:active,
+        nav li.selected a:active {
+            background-color: #112;
+        }
+
+        a.logo:active {
+            background-color: transparent;
+        }
+
+        nav li.selected .icon
+        {
+            color: #eee;
+        }
+        
+        nav a:hover .icon,
+        nav a:active .icon
+        {
+            color: #fff;
+        }
+
         /* ======== */
         /* Headings */
         /* ======== */
@@ -148,70 +248,6 @@
             padding-left: 0;
         }
 
-        /* === */
-        /* Nav */
-        /* === */
-        a.logo {
-            margin: 0 0 0 2rem;
-            padding: 0.75rem 1.5rem 0.375rem 1.5rem;
-            width: 210px;
-        }
-
-        a.logo:hover svg {
-            box-shadow: 0 -3px 0 0 black inset, 0 -4px #333 inset;
-            text-decoration: none;
-        }
-
-        nav ul {
-            list-style-type: none;
-            margin: 0;
-            overflow: hidden;
-            padding: 0.5rem 0 0 0;
-        }
-
-        nav li {
-            float: left;
-            font-size: 1.075rem;
-            margin-right: 2rem;
-        }
-
-        nav li:last-child {
-            margin-right: 0;
-        }
-
-        nav li.selected a {
-            color: #fff;
-        }
-
-        nav li.selected a:hover {
-            color: #fa1;
-        }
-
-        nav a {
-            color: #bbb;
-            display: block;
-            padding: 1.1rem 1.2rem 1rem 1.2rem;
-            text-align: center;
-            text-decoration: none;
-        }
-
-        nav a:active,
-        nav li.selected a:active {
-            background-color: transparent;
-            color: #ed6;
-        }
-
-        .icon {
-            margin-right: 0.45rem;
-            vertical-align: middle;
-        }
-
-        nav a:hover .icon,
-        nav li.selected .icon
-        {
-            color: #eee;
-        }
-
         /* ====== */
         /* Tables */
         /* ====== */
@@ -246,25 +282,25 @@
         /* ======= */
         /* Anchors */
         /* ======= */
-        a {
+        main a {
             color: #9cf;
             text-decoration: underline;
             text-underline-offset: 0.275rem;
         }
 
-        a.endpoint {
+        main a.endpoint {
             font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
             font-size: 1.05rem;
             text-underline-offset: 0.375rem;
         }
 
-        a:hover {
-            color: #fa1;
+        main a:hover {
+            color: #fb0;
             text-decoration: none;
         }
 
-        a:active {
-            background: #fa1;
+        main a:active {
+            background: #fb0;
             color: black;
             text-decoration: none;
         }
@@ -274,16 +310,19 @@
         /* ============= */
         @media (max-width: 900px) {
             a.logo {
-                margin: 0;
+                margin-left: 1rem;
             }
 
             li.logo {
                 display: block;
                 float: none;
+                text-align: left;
             }
 
             nav a {
-                padding: 0.625rem 1.5rem;
+                border-radius: 5px;
+                margin: 0.325rem 0.2rem 0.325rem 1rem;
+                padding: 0.3rem 0.5rem 0.3rem 0.5rem;
             }
         }
 
@@ -350,6 +389,16 @@
         }
 
         @media (max-width: 650px) {
+            article {
+                padding: 3rem 2rem;
+            }
+
+            code {
+                font-size: 0.875rem;
+            }
+        }
+
+        @media (max-width: 600px) {
             nav li {
                 display: block;
                 float: none;
@@ -358,14 +407,6 @@
 
             nav a {
                 display: inline-block;
-            }
-
-            article {
-                padding: 3rem 2rem;
-            }
-
-            code {
-                font-size: 0.875rem;
             }
         }
     </style>
@@ -429,12 +470,12 @@
                     <tr>
                         <td row-header="Endpoint"><a class="endpoint" href="/stix">/stix</a></td>
                         <td row-header="Format"><span class="badge">STIX</span></td>
-                        <td>STIX 2.1 <em>Indicators</em> containing full threat feed details.</td>
+                        <td>STIX <em>Indicators</em> containing full threat feed details.</td>
                     </tr>
                     <tr>
                         <td row-header="Endpoint"><a class="endpoint" href="/taxii2">/taxii2</a></td>
                         <td row-header="Format"><span class="badge">TAXII</span></td>
-                        <td>TAXII 2.1 API. See the <em>TAXII</em> section for usage details.</td>
+                        <td>TAXII server. See the <em>TAXII</em> section for usage details.</td>
                     </tr>
                 </tbody>
             </table>
