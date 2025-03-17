@@ -27,4 +27,4 @@ deceptifeed.*
 deceptifeed-*.*
 
 # Ignore build output directory used by Makefile.
-out/
+bin/
