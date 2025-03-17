@@ -160,6 +160,11 @@ func Load(filename string) (*Config, error) {
 	}
 
 	for i := range config.Servers {
+		// Use the global log path if the server log path is not specified.
+		if len(config.Servers[i].LogPath) == 0 {
+			config.Servers[i].LogPath = config.LogPath
+		}
+
 		// Ensure a minimum threat score of 0.
 		if config.Servers[i].ThreatScore < 0 {
 			config.Servers[i].ThreatScore = 0
@@ -201,13 +206,7 @@ func (c *Config) InitializeLoggers() error {
 			continue
 		}
 
-		// Use the global log path if the server log path is not specified.
-		var logPath string
-		if len(c.Servers[i].LogPath) > 0 {
-			logPath = c.Servers[i].LogPath
-		} else {
-			logPath = c.LogPath
-		}
+		logPath := c.Servers[i].LogPath
 
 		// If no log path is specified or if logging is disabled, discard logs.
 		if len(logPath) == 0 || !c.Servers[i].LogEnabled {
