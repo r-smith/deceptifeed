@@ -158,9 +158,9 @@ install_app() {
     if [[ -f "${script_dir}/${source_bin}" ]]; then
         # Found in the same directory as the script.
         source_bin="${script_dir}/${source_bin}"
-    elif [[ -f "${script_dir}/../out/${source_bin}" ]]; then
-        # Found in ../out relative to the script.
-        source_bin="${script_dir}/../out/${source_bin}"
+    elif [[ -f "${script_dir}/../bin/${source_bin}" ]]; then
+        # Found in ../bin relative to the script.
+        source_bin="${script_dir}/../bin/${source_bin}"
     else
         # Could not locate.
         echo -e "${msg_error} ${white}Unable to locate the file: ${yellow}'${source_bin}'${clear}\n" >&2
