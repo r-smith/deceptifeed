@@ -231,6 +231,16 @@
             text-decoration: none;
         }
 
+        /* ======= */
+        /* Content */
+        /* ======= */
+        p.no-results {
+            color: #fb0;
+            font-size: 1.2rem;
+            padding-top: 1rem;
+            text-align: center;
+        }
+
         /* ============= */
         /* Media Queries */
         /* ============= */
@@ -321,6 +331,7 @@
         </nav>
     </header>
     <main>
+        {{if .}}
         <table>
             <thead>
                 <tr><th>Time<th>Source IP<th>Method<th>Path</tr>
@@ -330,6 +341,9 @@
                 {{end}}
             </tbody>
         </table>
+        {{else}}
+        <p class="no-results">No log data found</p>
+        {{end}}
     </main>
 </body>
 </html>

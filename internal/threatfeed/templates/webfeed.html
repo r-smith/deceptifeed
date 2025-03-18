@@ -228,6 +228,15 @@
             text-decoration: none;
         }
 
+        /* ======= */
+        /* Content */
+        /* ======= */
+        p.no-results {
+            color: #fb0;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
         /* ============= */
         /* Media Queries */
         /* ============= */
@@ -350,6 +359,7 @@
         </nav>
     </header>
     <main>
+        {{if .Data}}
         <table>
             <thead>
                 <tr>
@@ -376,6 +386,9 @@
             {{end}}
             </tbody>
         </table>
+        {{else}}
+        <p class="no-results">The threat feed is currently empty</p>
+        {{end}}
     </main>
 </body>
 </html>
