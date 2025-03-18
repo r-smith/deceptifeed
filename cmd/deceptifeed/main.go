@@ -65,6 +65,7 @@ func main() {
 		cfg.Servers = append(cfg.Servers, http, https, ssh)
 		// Set defaults.
 		for i := range cfg.Servers {
+			cfg.Servers[i].LogPath = cfg.LogPath
 			cfg.Servers[i].LogEnabled = true
 			cfg.Servers[i].SendToThreatFeed = true
 			cfg.Servers[i].ThreatScore = 1
