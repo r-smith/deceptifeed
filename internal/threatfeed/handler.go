@@ -583,13 +583,24 @@ type logFiles struct {
 // open opens all honeypot log files and returns an io.MultiReader that
 // combines all of the logs.
 func (l *logFiles) open() (io.Reader, error) {
-	paths := make(map[string]struct{}, len(cfg.Servers)*2)
-	for _, s := range cfg.Servers {
-		paths[s.LogPath] = struct{}{}
-		paths[s.LogPath+".1"] = struct{}{}
+	paths := []string{}
+	seenPaths := make(map[string]bool)
+
+	// Helper function to ensure only unique paths are added to the slice.
+	add := func(p string) {
+		if seenPaths[p] {
+			return
+		}
+		// New path. Add both the path and the path with ".1" to the slice.
+		paths = append(paths, p+".1", p)
+		seenPaths[p] = true
 	}
 
-	for path := range paths {
+	for _, s := range cfg.Servers {
+		add(s.LogPath)
+	}
+
+	for _, path := range paths {
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
