@@ -71,8 +71,8 @@ func Start(c *config.Config) {
 	mux.HandleFunc("GET    /taxii2/api/collections/{id}/{$}", enforcePrivateIP(handleTAXIICollections))
 	mux.HandleFunc("GET    /taxii2/api/collections/{id}/objects/{$}", enforcePrivateIP(disableCache(handleTAXIIObjects)))
 	// Honeypot log handlers.
-	mux.HandleFunc("GET /logs", handleLogsMain)
-	mux.HandleFunc("GET /logs/{logtype}", handleLogs)
+	mux.HandleFunc("GET /logs", enforcePrivateIP(handleLogsMain))
+	mux.HandleFunc("GET /logs/{logtype}", enforcePrivateIP(handleLogs))
 
 	srv := &http.Server{
 		Addr:         ":" + c.ThreatFeed.Port,
