@@ -44,7 +44,7 @@ article {
     padding: 3rem 5rem 3.5rem 5rem;
 }
 
-article + article {
+article+article {
     margin-top: 4rem;
 }
 
@@ -52,6 +52,8 @@ article + article {
 /* Nav */
 /* === */
 nav ul {
+    align-items: flex-end;
+    display: flex;
     list-style-type: none;
     margin: 0;
     overflow: hidden;
@@ -70,7 +72,7 @@ nav li:last-child {
 
 a.logo {
     display: inline-block;
-    margin: 0.6rem 1rem 0.375rem 1.5rem;
+    margin: 0.6rem 1rem 0.3rem 1.5rem;
     padding: 0.3rem 0.5rem 0 0.5rem;
     position: relative;
     width: 210px;
@@ -104,16 +106,18 @@ a.no-hover::after {
 }
 
 nav .icon {
-    margin-right: 0.45rem;
-    vertical-align: middle;
+    margin-right: 0.4rem;
+    margin-top: 2px;
 }
 
 nav a {
+    align-items: center;
     border-radius: 7px;
     color: #889;
-    display: block;
-    margin: 0.6rem 0.5rem 0.5rem 0.5rem;
-    padding: 0.5rem 0.7rem 0.5rem 0.7rem;
+    display: inline-flex;
+    justify-content: center;
+    margin: 0.6rem 0.5rem 0.35rem 0.5rem;
+    padding: 0.5rem 0.7rem;
     position: relative;
     text-align: center;
     text-decoration: none;
@@ -138,14 +142,12 @@ nav li.selected a.logo:active {
     background-color: transparent;
 }
 
-nav li.selected .icon
-{
+nav li.selected .icon {
     color: #eee;
 }
 
 nav a:hover .icon,
-nav a:active .icon
-{
+nav a:active .icon {
     color: #fff;
 }
 
@@ -194,7 +196,7 @@ p.error {
 /* ===== */
 /* Lists */
 /* ===== */
-main li + li {
+main li+li {
     margin-top: 0.75rem;
 }
 
@@ -203,7 +205,7 @@ main ul {
     margin-bottom: 1rem;
 }
 
-main p + ul {
+main p+ul {
     margin-top: -1rem;
 }
 
@@ -463,6 +465,7 @@ table.logs {
     color: #48e3ff;
     overflow-wrap: anywhere;
 }
+
 .webfeed tbody tr:nth-child(odd) td:nth-child(1) {
     color: #aaffff;
 }
@@ -471,6 +474,7 @@ table.logs {
 .webfeed tbody td:nth-child(2) {
     color: #8b949e;
 }
+
 .webfeed tbody tr:nth-child(odd) td:nth-child(2) {
     color: #ccc;
 }
@@ -479,6 +483,7 @@ table.logs {
 .webfeed tbody td:nth-child(3) {
     color: #b8c1ff;
 }
+
 .webfeed tbody tr:nth-child(odd) td:nth-child(3) {
     color: #c8e1ff;
 }
@@ -488,6 +493,7 @@ table.logs {
     color: #ffff55;
     text-align: right
 }
+
 .webfeed tbody tr:nth-child(odd) td:nth-child(4) {
     color: #eedc82;
 }
@@ -500,6 +506,7 @@ table.logs {
     color: #8b949e;
     white-space: nowrap;
 }
+
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(1) {
     color: #ccc;
 }
@@ -508,6 +515,7 @@ table.logs {
 .logs-ssh tbody td:nth-child(2) {
     color: #48e3ff;
 }
+
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(2) {
     color: #aaffff;
 }
@@ -517,6 +525,7 @@ table.logs {
     color: #b8c1ff;
     overflow-wrap: anywhere;
 }
+
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(3) {
     color: #c8e1ff;
 }
@@ -526,6 +535,7 @@ table.logs {
     color: #ffff55;
     overflow-wrap: anywhere;
 }
+
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(4) {
     color: #eedc82;
 }
@@ -538,6 +548,7 @@ table.logs {
     color: #8b949e;
     white-space: nowrap;
 }
+
 .logs-http tbody tr:nth-child(odd) td:nth-child(1) {
     color: #ccc;
 }
@@ -546,6 +557,7 @@ table.logs {
 .logs-http tbody td:nth-child(2) {
     color: #48e3ff;
 }
+
 .logs-http tbody tr:nth-child(odd) td:nth-child(2) {
     color: #aaffff;
 }
@@ -554,6 +566,7 @@ table.logs {
 .logs-http tbody td:nth-child(3) {
     color: #b8c1ff;
 }
+
 .logs-http tbody tr:nth-child(odd) td:nth-child(3) {
     color: #c8e1ff;
 }
@@ -563,6 +576,7 @@ table.logs {
     color: #ffff55;
     overflow-wrap: anywhere;
 }
+
 .logs-http tbody tr:nth-child(odd) td:nth-child(4) {
     color: #eedc82;
 }
@@ -571,6 +585,7 @@ table.logs {
 /* Media Queries */
 /* ============= */
 @media (max-width: 920px) {
+
     .webfeed td,
     .webfeed th {
         font-size: 1rem;
@@ -583,15 +598,18 @@ table.logs {
     }
 
     li.logo {
-        display: block;
         float: none;
         text-align: left;
+    }
+
+    nav ul {
+        display: block;
     }
 
     nav a {
         border-radius: 5px;
         margin: 0.325rem 0.2rem 0.325rem 1rem;
-        padding: 0.3rem 0.5rem 0.3rem 0.5rem;
+        padding: 0.3rem 0.5rem;
     }
 }
 
@@ -621,15 +639,16 @@ table.logs {
         margin-bottom: -1rem;
     }
 
-    .api-table > thead th {
+    .api-table>thead th {
         display: none;
     }
-    .api-table > tbody td {
+
+    .api-table>tbody td {
         display: block;
         padding: 0.3rem 0;
     }
 
-    .api-table tr > td:last-of-type {
+    .api-table tr>td:last-of-type {
         margin-bottom: 1.75rem;
         padding-bottom: 2rem;
     }
@@ -638,7 +657,7 @@ table.logs {
         position: relative;
         vertical-align: middle;
     }
-    
+
     .api-table [row-header]:before {
         content: attr(row-header);
         display: inline-block;
@@ -680,13 +699,12 @@ table.logs {
 
 @media (max-width: 600px) {
     nav li {
-        display: block;
         float: none;
         text-align: left;
     }
 
     nav a {
-        display: inline-block;
+        display: inline-flex;
     }
 
     .webfeed td,
