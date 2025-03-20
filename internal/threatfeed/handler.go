@@ -309,11 +309,18 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 // feed.
 func handleDocs(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFS(templates, "templates/docs.html"))
-	err := tmpl.Execute(w, nil)
+	_ = tmpl.Execute(w, nil)
+}
+
+// handleCSS serves a CSS stylesheet for styling HTML templates.
+func handleCSS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css")
+	data, err := templates.ReadFile("templates/css/style.css")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to parse template 'docs.html':", err)
+		fmt.Println(err)
 		return
 	}
+	w.Write(data)
 }
 
 // handleHTML returns the threat feed as a web page for viewing in a browser.
