@@ -23,18 +23,18 @@ type IOC struct {
 	// honeypot server.
 	lastSeen time.Time
 
-	// threatScore represents a score for a given IP address. It is incremented
-	// based on the configured threat score of the honeypot server that the IP
-	// interacted with.
-	threatScore int
+	// observations tracks the total number of interactions an IP has had with
+	// the honeypot servers.
+	observations int
 }
 
 const (
 	// dateFormat specifies the timestamp format used for threat feed entries.
 	dateFormat = time.RFC3339Nano
 
-	// maxScore is the maximum allowed threat score.
-	maxScore = 999_999_999
+	// maxObservations is the maximum number of interactions the threat feed
+	// will record for each IP.
+	maxObservations = 999_999_999
 )
 
 var (
@@ -54,16 +54,15 @@ var (
 	dataChanged = false
 
 	// csvHeader defines the header row for saved threat feed data.
-	csvHeader = []string{"ip", "added", "last_seen", "threat_score"}
+	csvHeader = []string{"ip", "added", "last_seen", "observations"}
 )
 
-// Update updates the threat feed with the provided source IP address and
-// threat score. This function should be called by honeypot servers whenever a
-// client interacts with the honeypot. If the source IP address is already in
-// the threat feed, its last-seen timestamp is updated, and its threat score is
-// incremented. Otherwise, the IP address is added as a new entry in the threat
-// feed.
-func Update(ip string, threatScore int) {
+// Update updates the threat feed with the provided source IP address. This
+// function should be called by honeypot servers whenever a client interacts
+// with the honeypot. If the source IP address is already in the threat feed,
+// its last-seen timestamp is updated, and its observation count is
+// incremented. Otherwise, the IP address is added as a new entry.
+func Update(ip string) {
 	// Check if the given IP string is a private address. The threat feed may
 	// be configured to include or exclude private IPs.
 	netIP := net.ParseIP(ip)
@@ -79,19 +78,15 @@ func Update(ip string, threatScore int) {
 	if ioc, exists := iocData[ip]; exists {
 		// Update existing entry.
 		ioc.lastSeen = now
-		if threatScore > 0 {
-			if ioc.threatScore > maxScore-threatScore {
-				ioc.threatScore = maxScore
-			} else {
-				ioc.threatScore += threatScore
-			}
+		if ioc.observations < maxObservations {
+			ioc.observations++
 		}
 	} else {
 		// Create a new entry.
 		iocData[ip] = &IOC{
-			added:       now,
-			lastSeen:    now,
-			threatScore: threatScore,
+			added:        now,
+			lastSeen:     now,
+			observations: 1,
 		}
 	}
 	mu.Unlock()
@@ -148,7 +143,7 @@ func loadCSV() error {
 
 	var added time.Time
 	var lastSeen time.Time
-	var threatScore int
+	var count int
 	for _, record := range records[1:] {
 		ip := record[0]
 
@@ -164,15 +159,15 @@ func loadCSV() error {
 			lastSeen, _ = time.Parse(dateFormat, record[2])
 		}
 
-		// Parse threat score, defaulting to 1.
-		threatScore = 1
+		// Parse observation count, defaulting to 1.
+		count = 1
 		if len(record) > 3 && record[3] != "" {
-			if parsedLevel, err := strconv.Atoi(record[3]); err == nil {
-				threatScore = parsedLevel
+			if parsedCount, err := strconv.Atoi(record[3]); err == nil {
+				count = parsedCount
 			}
 		}
 
-		iocData[ip] = &IOC{added: added, lastSeen: lastSeen, threatScore: threatScore}
+		iocData[ip] = &IOC{added: added, lastSeen: lastSeen, observations: count}
 	}
 	return nil
 }
@@ -201,7 +196,7 @@ func saveCSV() error {
 				ip,
 				ioc.added.Format(dateFormat),
 				ioc.lastSeen.Format(dateFormat),
-				ioc.threatScore,
+				ioc.observations,
 			),
 		)
 		if err != nil {

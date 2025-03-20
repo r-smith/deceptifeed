@@ -85,7 +85,7 @@ func Start(cfg *config.Server) {
 
 		// Update the threat feed with the source IP address from the request.
 		if cfg.SendToThreatFeed {
-			threatfeed.Update(src_ip, cfg.ThreatScore)
+			threatfeed.Update(src_ip)
 		}
 
 		// Insert fixed delay to mimic PAM.

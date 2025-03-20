@@ -16,11 +16,11 @@ import (
 
 // feedEntry represents an individual entry in the threat feed.
 type feedEntry struct {
-	IP          string    `json:"ip"`
-	IPBytes     net.IP    `json:"-"`
-	Added       time.Time `json:"added"`
-	LastSeen    time.Time `json:"last_seen"`
-	ThreatScore int       `json:"threat_score"`
+	IP           string    `json:"ip"`
+	IPBytes      net.IP    `json:"-"`
+	Added        time.Time `json:"added"`
+	LastSeen     time.Time `json:"last_seen"`
+	Observations int       `json:"observations"`
 }
 
 // feedEntries is a slice of feedEntry structs. It represents the threat feed
@@ -37,7 +37,7 @@ const (
 	byIP sortMethod = iota
 	byAdded
 	byLastSeen
-	byThreatScore
+	byObservations
 )
 
 // sortDirection represents the direction of sorting (ascending or descending).
@@ -102,11 +102,11 @@ loop:
 		}
 
 		threats = append(threats, feedEntry{
-			IP:          ip,
-			IPBytes:     parsedIP,
-			Added:       ioc.added,
-			LastSeen:    ioc.lastSeen,
-			ThreatScore: ioc.threatScore,
+			IP:           ip,
+			IPBytes:      parsedIP,
+			Added:        ioc.added,
+			LastSeen:     ioc.lastSeen,
+			Observations: ioc.observations,
 		})
 	}
 	mu.Unlock()
@@ -175,9 +175,9 @@ func (f feedEntries) applySort(method sortMethod, direction sortDirection) {
 			}
 			return t
 		})
-	case byThreatScore:
+	case byObservations:
 		slices.SortFunc(f, func(a, b feedEntry) int {
-			t := cmp.Compare(a.ThreatScore, b.ThreatScore)
+			t := cmp.Compare(a.Observations, b.Observations)
 			if t == 0 {
 				return bytes.Compare(a.IPBytes, b.IPBytes)
 			}
@@ -267,10 +267,7 @@ func (f feedEntries) convertToSightings() []stix.Object {
 		}
 		pattern = pattern + entry.IP + "']"
 
-		count := entry.ThreatScore
-		if count > maxCount {
-			count = maxCount
-		}
+		count := min(entry.Observations, maxCount)
 
 		// Generate a deterministic identifier using the IP address represented
 		// as a STIX IP pattern and structured as a JSON string. Example:

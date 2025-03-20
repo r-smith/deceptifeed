@@ -100,7 +100,7 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 			entry.IP,
 			entry.Added.Format(dateFormat),
 			entry.LastSeen.Format(dateFormat),
-			strconv.Itoa(entry.ThreatScore),
+			strconv.Itoa(entry.Observations),
 		}); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
 			return
@@ -351,8 +351,8 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 		m = "added"
 	case byLastSeen:
 		m = "last_seen"
-	case byThreatScore:
-		m = "threat_score"
+	case byObservations:
+		m = "observations"
 	}
 
 	tmpl := template.Must(template.ParseFS(templates, "templates/webfeed.html"))
@@ -433,8 +433,8 @@ func parseParams(r *http.Request) (feedOptions, error) {
 		opt.sortMethod = byLastSeen
 	case "added":
 		opt.sortMethod = byAdded
-	case "threat_score":
-		opt.sortMethod = byThreatScore
+	case "observations":
+		opt.sortMethod = byObservations
 	case "":
 		// No sort option specified.
 	default:

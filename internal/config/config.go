@@ -95,7 +95,6 @@ type Server struct {
 	Headers          []string        `xml:"headers>header"`
 	Prompts          []Prompt        `xml:"prompts>prompt"`
 	SendToThreatFeed bool            `xml:"sendToThreatFeed"`
-	ThreatScore      int             `xml:"threatScore"`
 	Rules            Rules           `xml:"rules"`
 	SourceIPHeader   string          `xml:"sourceIpHeader"`
 	LogPath          string          `xml:"logPath"`
@@ -162,11 +161,6 @@ func Load(filename string) (*Config, error) {
 		// Use the global log path if the server log path is not specified.
 		if len(config.Servers[i].LogPath) == 0 {
 			config.Servers[i].LogPath = config.LogPath
-		}
-
-		// Ensure a minimum threat score of 0.
-		if config.Servers[i].ThreatScore < 0 {
-			config.Servers[i].ThreatScore = 0
 		}
 
 		// Validate regex rules.

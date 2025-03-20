@@ -59,14 +59,14 @@
                     Last Seen
                     </a>{{if eq .SortMethod "last_seen"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
                 </th>
-                <th><a href="?sort=threat_score&direction={{if and (eq .SortMethod "threat_score") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                    Threat Score
-                    </a>{{if eq .SortMethod "threat_score"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
+                <th><a href="?sort=observations&direction={{if and (eq .SortMethod "observations") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
+                    Observations
+                    </a>{{if eq .SortMethod "observations"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
                 </th>
                 </tr>
             </thead>
             <tbody>
-            {{range .Data}}<tr><td>{{.IP}}<td>{{.Added.Format "2006-01-02 15:04"}}<td>{{.LastSeen.Format "2006-01-02 15:04"}}<td>{{.ThreatScore}}
+            {{range .Data}}<tr><td>{{.IP}}<td>{{.Added.Format "2006-01-02 15:04"}}<td>{{.LastSeen.Format "2006-01-02 15:04"}}<td>{{.Observations}}
             {{end}}
             </tbody>
         </table>

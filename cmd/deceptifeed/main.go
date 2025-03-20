@@ -68,7 +68,6 @@ func main() {
 			cfg.Servers[i].LogPath = cfg.LogPath
 			cfg.Servers[i].LogEnabled = true
 			cfg.Servers[i].SendToThreatFeed = true
-			cfg.Servers[i].ThreatScore = 1
 			if cfg.Servers[i].Type == config.SSH {
 				cfg.Servers[i].Banner = config.DefaultBannerSSH
 			}

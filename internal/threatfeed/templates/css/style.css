@@ -134,7 +134,7 @@ nav li.selected a:active {
 }
 
 a.logo:active,
-nav li.selected a:active {
+nav li.selected a.logo:active {
     background-color: transparent;
 }
 
