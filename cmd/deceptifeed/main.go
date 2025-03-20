@@ -1,10 +1,13 @@
 package main
 
 import (
+	"cmp"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/r-smith/deceptifeed/internal/config"
@@ -73,6 +76,21 @@ func main() {
 			}
 		}
 	}
+
+	// Sort the servers by port number. This is for cosmetic reasons to format
+	// the output when querying / viewing the active configuration.
+	slices.SortFunc(cfg.Servers, func(a, b config.Server) int {
+		p1, err := strconv.Atoi(a.Port)
+		if err != nil {
+			return 0
+		}
+		p2, err := strconv.Atoi(b.Port)
+		if err != nil {
+			return 0
+		}
+		t := cmp.Compare(p1, p2)
+		return t
+	})
 
 	// Initialize structured loggers for each honeypot server.
 	err := cfg.InitializeLoggers()
