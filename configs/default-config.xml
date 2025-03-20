@@ -12,7 +12,6 @@
     <port>9000</port>
     <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
     <threatExpiryHours>336</threatExpiryHours>
-    <minimumThreatScore>0</minimumThreatScore>
     <includePrivateIPs>false</includePrivateIPs>
     <customThreatsPath></customThreatsPath>
     <excludeListPath></excludeListPath>

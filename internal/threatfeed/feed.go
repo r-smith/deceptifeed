@@ -82,7 +82,7 @@ func prepareFeed(options ...feedOptions) feedEntries {
 	threats := make(feedEntries, 0, len(iocData))
 loop:
 	for ip, ioc := range iocData {
-		if ioc.expired() || ioc.threatScore < cfg.ThreatFeed.MinimumThreatScore || !ioc.lastSeen.After(opt.seenAfter) {
+		if ioc.expired() || !ioc.lastSeen.After(opt.seenAfter) {
 			continue
 		}
 

@@ -131,14 +131,13 @@ type Prompt struct {
 // can be configured to automatically block communication with IP addresses
 // appearing in the threat feed.
 type ThreatFeed struct {
-	Enabled            bool   `xml:"enabled"`
-	Port               string `xml:"port"`
-	DatabasePath       string `xml:"databasePath"`
-	ExpiryHours        int    `xml:"threatExpiryHours"`
-	IsPrivateIncluded  bool   `xml:"includePrivateIPs"`
-	MinimumThreatScore int    `xml:"minimumThreatScore"`
-	CustomThreatsPath  string `xml:"customThreatsPath"`
-	ExcludeListPath    string `xml:"excludeListPath"`
+	Enabled           bool   `xml:"enabled"`
+	Port              string `xml:"port"`
+	DatabasePath      string `xml:"databasePath"`
+	ExpiryHours       int    `xml:"threatExpiryHours"`
+	IsPrivateIncluded bool   `xml:"includePrivateIPs"`
+	CustomThreatsPath string `xml:"customThreatsPath"`
+	ExcludeListPath   string `xml:"excludeListPath"`
 }
 
 // Load reads an optional XML configuration file and unmarshals its contents
