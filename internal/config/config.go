@@ -174,6 +174,11 @@ func Load(filename string) (*Config, error) {
 		if err := validateRegexRules(config.Servers[i].Rules); err != nil {
 			return nil, err
 		}
+
+		// Use the default SSH banner if no banner is specified.
+		if config.Servers[i].Type == SSH && len(config.Servers[i].Banner) == 0 {
+			config.Servers[i].Banner = DefaultBannerSSH
+		}
 	}
 
 	return &config, nil
