@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/r-smith/deceptifeed/internal/logrotate"
@@ -80,6 +81,7 @@ type Config struct {
 	LogPath    string     `xml:"defaultLogPath"`
 	Servers    []Server   `xml:"honeypotServers>server"`
 	ThreatFeed ThreatFeed `xml:"threatFeed"`
+	FilePath   string     `xml:"-"`
 }
 
 // Server represents a honeypot server with its relevant settings.
@@ -151,6 +153,13 @@ func Load(filename string) (*Config, error) {
 	defer file.Close()
 
 	var config Config
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		config.FilePath = filename
+	} else {
+		config.FilePath = absPath
+	}
+
 	xmlBytes, _ := io.ReadAll(file)
 	err = xml.Unmarshal(xmlBytes, &config)
 	if err != nil {
