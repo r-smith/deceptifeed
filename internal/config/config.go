@@ -12,6 +12,11 @@ import (
 	"github.com/r-smith/deceptifeed/internal/logrotate"
 )
 
+// Version stores Deceptifeed's version number. This variable is set at build
+// time using the `-X` option with `-ldflags` and is assigned the latest Git
+// tag. Refer to the Makefile in the project root for details on how it's set.
+var Version = "undefined"
+
 // This block of constants defines the default application settings when no
 // configuration file is provided.
 const (

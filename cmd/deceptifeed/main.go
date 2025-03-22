@@ -43,7 +43,14 @@ func main() {
 	flag.StringVar(&https.CertPath, "https-cert", config.DefaultCertPathHTTPS, "Path to optional TLS public certificate")
 	flag.StringVar(&https.KeyPath, "https-key", config.DefaultKeyPathHTTPS, "Path to optional TLS private key")
 	flag.StringVar(&ssh.KeyPath, "ssh-key", config.DefaultKeyPathSSH, "Path to optional SSH private key")
+	ver := flag.Bool("version", false, "Output the version number and exit")
 	flag.Parse()
+
+	// If the `-version` flag is provided, output the version number and exit.
+	if *ver {
+		fmt.Println(config.Version)
+		return
+	}
 
 	// If the `-config` flag is not provided, use "config.xml" from the current
 	// directory if the file exists.
