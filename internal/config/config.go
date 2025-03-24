@@ -186,6 +186,11 @@ func Load(filename string) (*Config, error) {
 		if config.Servers[i].Type == SSH && len(config.Servers[i].Banner) == 0 {
 			config.Servers[i].Banner = DefaultBannerSSH
 		}
+
+		// Explicitly disable threat feed for UDP honeypots.
+		if config.Servers[i].Type == UDP {
+			config.Servers[i].SendToThreatFeed = false
+		}
 	}
 
 	return &config, nil
