@@ -13,7 +13,6 @@
     <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
     <threatExpiryHours>336</threatExpiryHours>
     <includePrivateIPs>false</includePrivateIPs>
-    <customThreatsPath></customThreatsPath>
     <excludeListPath></excludeListPath>
   </threatFeed>
 

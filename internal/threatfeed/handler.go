@@ -40,21 +40,6 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	// If a custom threat file is supplied in the configuration, append the
-	// contents of the file to the HTTP response. To allow for flexibility, the
-	// contents of the file are not parsed or validated.
-	if len(cfg.ThreatFeed.CustomThreatsPath) > 0 {
-		data, err := os.ReadFile(cfg.ThreatFeed.CustomThreatsPath)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to read custom threats file:", err)
-			return
-		}
-		_, err = w.Write(data)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
-		}
-	}
 }
 
 // handleJSON handles HTTP requests to serve the full threat feed in JSON

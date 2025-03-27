@@ -142,7 +142,6 @@ type ThreatFeed struct {
 	DatabasePath      string `xml:"databasePath"`
 	ExpiryHours       int    `xml:"threatExpiryHours"`
 	IsPrivateIncluded bool   `xml:"includePrivateIPs"`
-	CustomThreatsPath string `xml:"customThreatsPath"`
 	ExcludeListPath   string `xml:"excludeListPath"`
 }
 
