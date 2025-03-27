@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/r-smith/deceptifeed/internal/config"
 	"github.com/r-smith/deceptifeed/internal/stix"
 	"github.com/r-smith/deceptifeed/internal/taxii"
 )
@@ -306,6 +307,17 @@ func handleCSS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(data)
+}
+
+// handleConfig serves a page that displays the Deceptifeed configuration.
+func handleConfig(w http.ResponseWriter, r *http.Request) {
+	type templateData struct {
+		C       config.Config
+		Version string
+	}
+	d := templateData{C: cfg, Version: config.Version}
+	tmpl := template.Must(template.ParseFS(templates, "templates/config.html"))
+	_ = tmpl.Execute(w, d)
 }
 
 // handleHTML returns the threat feed as a web page for viewing in a browser.
