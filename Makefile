@@ -9,7 +9,7 @@ BIN_WINDOWS := $(BIN_DEFAULT)_windows_amd64.exe
 INSTALL_SCRIPT := ./scripts/install.sh
 UNINSTALL_SCRIPT := ./scripts/install.sh --uninstall
 VERSION := $(shell git describe --tags)
-BUILD_OPTIONS := -trimpath -ldflags="-s -w -X 'github.com/r-smith/deceptifeed/internal/config.Version=$(VERSION)'"
+BUILD_OPTIONS := -trimpath -ldflags="-s -w -X 'github.com/r-smith/deceptifeed/internal/config.Version=$(VERSION:v%=%)'"
 GO := go
 CGO_ENABLED := 0
 
