@@ -118,7 +118,8 @@ loop:
 
 // parseExcludeList reads IP addresses and CIDR ranges from a file. Each line
 // should contain an IP address or CIDR. It returns a map of the unique IPs and
-// a slice of the CIDR ranges found in the file.
+// a slice of the CIDR ranges found in the file. The file may include comments
+// using "#". The "#" symbol on a line and everything after is ignored.
 func parseExcludeList(filepath string) (map[string]struct{}, []*net.IPNet, error) {
 	if len(filepath) == 0 {
 		return map[string]struct{}{}, []*net.IPNet{}, nil
@@ -137,6 +138,12 @@ func parseExcludeList(filepath string) (map[string]struct{}, []*net.IPNet, error
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+
+		// Remove comments from text.
+		if i := strings.Index(line, "#"); i != -1 {
+			line = strings.TrimSpace(line[:i])
+		}
+
 		if len(line) > 0 {
 			if _, ipnet, err := net.ParseCIDR(line); err == nil {
 				cidr = append(cidr, ipnet)
