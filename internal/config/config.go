@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/r-smith/deceptifeed/internal/logmonitor"
 	"github.com/r-smith/deceptifeed/internal/logrotate"
 )
 
@@ -83,10 +84,11 @@ func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
 // logger, settings for managing a threat feed, and the collection of honeypot
 // servers that are configured to run.
 type Config struct {
-	LogPath    string     `xml:"defaultLogPath"`
-	Servers    []Server   `xml:"honeypotServers>server"`
-	ThreatFeed ThreatFeed `xml:"threatFeed"`
-	FilePath   string     `xml:"-"`
+	LogPath    string              `xml:"defaultLogPath"`
+	Servers    []Server            `xml:"honeypotServers>server"`
+	ThreatFeed ThreatFeed          `xml:"threatFeed"`
+	FilePath   string              `xml:"-"`
+	Monitor    *logmonitor.Monitor `xml:"-"`
 }
 
 // Server represents a honeypot server with its relevant settings.
@@ -215,6 +217,8 @@ func validateRegexRules(rules Rules) error {
 // path if none is provided.
 func (c *Config) InitializeLoggers() error {
 	const maxSize = 50
+	c.Monitor = logmonitor.New()
+
 	openedLogFiles := make(map[string]*slog.Logger)
 
 	for i := range c.Servers {
@@ -243,16 +247,22 @@ func (c *Config) InitializeLoggers() error {
 			return err
 		}
 
-		// Create a new logger.
-		logger := slog.New(slog.NewJSONHandler(file, &slog.HandlerOptions{
-			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-				// Remove 'message' and 'log level' fields from output.
-				if a.Key == slog.MessageKey || a.Key == slog.LevelKey {
-					return slog.Attr{}
-				}
-				return a
-			},
-		}))
+		// Create a JSON logger with two writers: one writes to disk using file
+		// rotation, the other writes to a channel for live monitoring.
+		logger := slog.New(
+			slog.NewJSONHandler(
+				io.MultiWriter(file, c.Monitor),
+				&slog.HandlerOptions{
+					ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+						// Remove 'message' and 'log level' fields from output.
+						if a.Key == slog.MessageKey || a.Key == slog.LevelKey {
+							return slog.Attr{}
+						}
+						return a
+					},
+				},
+			),
+		)
 
 		c.Servers[i].Logger = logger
 		c.Servers[i].LogFile = file
