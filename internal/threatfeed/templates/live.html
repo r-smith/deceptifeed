@@ -25,14 +25,14 @@
                         </svg>Threats
                     </a>
                 </li>
-                <li class="selected">
+                <li>
                     <a href="/logs">
                         <svg class="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                             <path d="M21.0082 3C21.556 3 22 3.44495 22 3.9934V20.0066C22 20.5552 21.5447 21 21.0082 21H2.9918C2.44405 21 2 20.5551 2 20.0066V3.9934C2 3.44476 2.45531 3 2.9918 3H21.0082ZM20 5H4V19H20V5ZM18 15V17H6V15H18ZM12 7V13H6V7H12ZM18 11V13H14V11H18ZM10 9H8V11H10V9ZM18 7V9H14V7H18Z"/>
                         </svg>Logs
                     </a>
                 </li>
-                <li>
+                <li class="selected">
                     <a href="/live">
                         <svg class="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                             <path d="M3 3C12.9411 3 21 11.0589 21 21H18C18 12.7157 11.2843 6 3 6V3ZM3 10C9.07513 10 14 14.9249 14 21H11C11 16.5817 7.41828 13 3 13V10ZM3 17C5.20914 17 7 18.7909 7 21H3V17Z"/>
@@ -56,20 +56,174 @@
             </ul>
         </nav>
     </header>
-    <main class="full-width">
-        {{if .}}
-        <table class="logs logs-ssh">
-            <thead>
-                <tr><th>Time<th>Source IP<th>Username<th>Password</tr>
-            </thead>
-            <tbody>
-                {{range .}}<tr><td class="time">{{.Time.Format "2006-01-02 15:04:05"}}<td>{{.SourceIP}}<td>{{.Details.Username}}<td>{{.Details.Password}}</tr>
-                {{end}}
-            </tbody>
-        </table>
-        {{else}}
-        <p class="no-results">No log data found</p>
-        {{end}}
+    <main>
+        <h2 class="live-logs">Real-Time Logs</h2>
+        <div id="ws-status"></div>
+        <table id="logs" class="live-logs"></table>
     </main>
+
+    <script>
+        const maxLogs = 200;
+        const logs = document.getElementById('logs');
+        const wsStatus = document.getElementById('ws-status');
+        const wsURL = '/live-ws';
+        const initialReconnectDelay = 1000;
+        const maxReconnectDelay = 15000;
+        const maxReconnectAttempts = 100;
+        let ws;
+        let reconnectAttempts = 0;
+        let isInitialBatchProcessed = false;
+
+        function handleWS() {
+            ws = new WebSocket(wsURL);
+
+            ws.onopen = () => {
+                reconnectAttempts = 0;
+                wsStatus.textContent = '';
+                wsStatus.className = '';
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data === '---end---') {
+                    isInitialBatchProcessed = true;
+                    return;
+                }
+                handleMessage(event.data, isInitialBatchProcessed);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                reconnectWS();
+            };
+        }
+
+        function reconnectWS() {
+            if (reconnectAttempts > maxReconnectAttempts) {
+                wsStatus.textContent = 'Failed connecting to Deceptifeed';
+                wsStatus.className = 'red';
+                return;
+            }
+
+            const delay = Math.min(
+                maxReconnectDelay,
+                initialReconnectDelay * (2 ** reconnectAttempts),
+            );
+            const finalDelay = delay + (Math.random() * delay * 0.2);
+
+            setTimeout(() => {
+                reconnectAttempts++;
+                wsStatus.textContent = 'Connecting... ';
+                wsStatus.classList.add('gray', 'connecting');
+                handleWS();
+            }, finalDelay);
+        }
+
+        function handleMessage(data, shouldAnimate) {
+            try {
+                const d = JSON.parse(data);
+
+                const timeElement = document.createElement('td');
+                const initialTime = new Date(d.time);
+                const formattedTime = initialTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                timeElement.textContent = formattedTime;
+                timeElement.className = 'timestamp';
+
+                const srcIPElement = document.createElement('td');
+                srcIPElement.textContent = d.source_ip;
+                srcIPElement.className = 'source-ip';
+
+                const eventDetails = document.createElement('td');
+                eventDetails.className = 'event-details';
+
+                switch (d.event_type) {
+                    case 'http': {
+                        const httpMethod = document.createElement('span');
+                        httpMethod.textContent = `${d.event_details.method} `;
+                        httpMethod.className = 'magenta';
+
+                        const httpPath = document.createTextNode(d.event_details.path);
+
+                        eventDetails.appendChild(httpMethod);
+                        eventDetails.appendChild(httpPath);
+
+                        break;
+                    }
+                    case 'ssh': {
+                        const usernameLabel = document.createElement('span');
+                        usernameLabel.textContent = 'User: ';
+                        usernameLabel.className = 'magenta';
+                        const username = document.createTextNode(d.event_details.username);
+
+                        const br = document.createElement('br');
+
+                        const passwordLabel = document.createElement('span');
+                        passwordLabel.textContent = 'Pass: ';
+                        passwordLabel.className = 'magenta';
+                        const password = document.createTextNode(d.event_details.password);
+
+                        eventDetails.appendChild(usernameLabel);
+                        eventDetails.appendChild(username);
+                        eventDetails.appendChild(br);
+                        eventDetails.appendChild(passwordLabel);
+                        eventDetails.appendChild(password);
+
+                        break;
+                    }
+                    case 'udp': {
+                        // Remove '[unreliable]' string from IP found in UDP logs.
+                        const spaceIndex = d.source_ip.indexOf(' ');
+                        if (spaceIndex >= 0) {
+                            srcIPElement.textContent = d.source_ip.slice(0, spaceIndex);
+                        }
+
+                        const udpLabel = document.createElement('span');
+                        udpLabel.textContent = `[UDP:${d.server_port}] `;
+                        udpLabel.className = 'magenta';
+
+                        const udpData = document.createTextNode(d.event_details.data);
+
+                        eventDetails.appendChild(udpLabel);
+                        eventDetails.appendChild(udpData);
+
+                        break;
+                    }
+                    default: {
+                        const protoLabel = document.createElement('span');
+                        protoLabel.textContent = `[${d.event_type.toUpperCase()}:${d.server_port}] `;
+                        protoLabel.className = 'magenta';
+
+                        const protoData = document.createTextNode(JSON.stringify(d.event_details, null, 1));
+
+                        eventDetails.appendChild(protoLabel);
+                        eventDetails.appendChild(protoData);
+                    }
+                }
+
+                // Add log entry to table.
+                const logEntry = document.createElement('tr');
+                logEntry.appendChild(timeElement);
+                logEntry.appendChild(srcIPElement);
+                logEntry.appendChild(eventDetails);
+
+                if (shouldAnimate) {
+                    logEntry.className = 'fade-in';
+                }
+
+                logs.insertBefore(logEntry, logs.firstChild);
+
+                if (logs.children.length > maxLogs) {
+                    logs.removeChild(logs.lastChild);
+                }
+            }
+            catch (error) {
+                console.error('Failed to parse log data:', error);
+            }
+        }
+
+        handleWS();
+    </script>
 </body>
 </html>

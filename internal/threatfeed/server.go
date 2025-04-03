@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"golang.org/x/net/websocket"
 )
 
 const (
@@ -50,6 +51,9 @@ func Start(c *config.Config) {
 		}
 	}()
 
+	// Monitor honeypot log data and broadcast to connected WebSocket clients.
+	go broadcastLogsToClients()
+
 	// Setup handlers and server configuration.
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", enforcePrivateIP(handleNotFound))
@@ -57,6 +61,8 @@ func Start(c *config.Config) {
 	mux.HandleFunc("GET /css/style.css", enforcePrivateIP(handleCSS))
 	mux.HandleFunc("GET /docs", enforcePrivateIP(handleDocs))
 	mux.HandleFunc("GET /config", enforcePrivateIP(handleConfig))
+	mux.HandleFunc("GET /live", enforcePrivateIP(handleLiveIndex))
+	mux.Handle("GET /live-ws", websocket.Handler(handleWebSocket))
 	// Threat feed handlers.
 	mux.HandleFunc("GET /webfeed", enforcePrivateIP(disableCache(handleHTML)))
 	mux.HandleFunc("GET /plain", enforcePrivateIP(disableCache(handlePlain)))
