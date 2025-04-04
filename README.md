@@ -6,14 +6,16 @@
   </picture>
 </p>
 
-`Deceptifeed` is a honeypot and threat feed server. It runs multiple honeypots (deceptive network services), while the threat feed lists IP addresses that have interacted with the honeypots.
+`Deceptifeed` is a honeypot and threat feed server. It runs multiple deceptive network services (honeypots), while the threat feed lists IP addresses that have interacted with the honeypots. Additionally, `Deceptifeed` provides real-time visibility into honeypot activity, allowing you to monitor logs and interactions as they occur.
 
-If an IP address interacts with a fake server on your network, why should it be allowed to access your real servers? `Deceptifeed` helps you build an automated defense system to reduce such risks. In a typical deployment, it runs alongside your real servers. The honeypots are exposed to the internet, while the threat feed remains private for use with your internal tools.
+When an IP address interacts with a fake server on your network, why should it be allowed to access your real servers? `Deceptifeed` helps you build an automated defense system to reduce such risks. In a typical deployment, it runs alongside your real servers. The honeypots are exposed to the internet, while the threat feed remains private for use with your internal tools.
 
-Most enterprise firewalls support ingesting threat feeds. By pointing to `Deceptifeed`, your firewall can automatically block IP addresses that interact with the honeypots. For other security tools, the threat feed is available in several formats, including plain text, CSV, JSON, and TAXII 2.1.
+Most enterprise firewalls support ingesting threat feeds. By pointing to `Deceptifeed`, your firewall can automatically block IP addresses that interact with the honeypots. For other security tools, the threat feed is available in several formats, including plain text, CSV, JSON, and TAXII.
 
 
-## Deployment Diagram
+## Visuals
+
+*Deployment diagram*
 
 <a href="assets/diagram-light.svg?raw=true">
 <picture>
@@ -22,6 +24,14 @@ Most enterprise firewalls support ingesting threat feeds. By pointing to `Decept
   <img alt="Deceptifeed deployment diagram" src="assets/diagram-light.png" width="884">
 </picture>
 </a>
+
+<br>
+<br>
+<img alt="Example of the threat feed web interface" src="assets/screenshot-webfeed.png" width="860" />
+
+<br>
+<img alt="Example showing real-time honeypot log monitoring" src="assets/screenshot-live.png" width="860" />
+
 
 ## Quick Start
 
@@ -154,28 +164,36 @@ Here is a breakdown of the arguments:
 
 ## Features
 
-- **Multiple Honeypot Servers:** Run any number of honeypot services simultaneously.
-- **Threat Feed Server:** A real-time feed of IP addresses that have accessed your honeypots, delivered over HTTP. Available in plain text, CSV, JSON, STIX, and TAXII 2.1.
-- **Rich Structured Logging:** Capture detailed logs of honeypot interactions in JSON format.
-- **Secure:** The honeypot services never process or respond to client input; they only log the data received. Attackers are not given simulated or virtual environments.
-- **Several Honeypot Types:**
-  - **SSH Honeyot:** Record login attempts to a fake SSH service.
-  - **HTTP/HTTPS Honeypot:** Record requested URLs and HTTP headers.
-  - **Generic TCP/UDP Services:** Record data sent by connecting clients.
-- **Cross-platform:** Supports Linux, macOS, Windows, and *BSD.
+- **Honeypot Servers:**
+  - Run any number of honeypot services simultaneously.
+  - Honeypots are low interaction (no simulated environments for attackers to access).
+  - **SSH honeyot:** Record and reject login attempts to a fake SSH service.
+  - **HTTP/HTTPS honeypot:** Record requested URLs and HTTP headers.
+  - **Generic TCP/UDP services:** Record data sent by connecting clients.
+- **Threat Feed Server:**
+  - A feed of IP addresses that have accessed your honeypots, delivered over HTTP.
+  - Available in plain text, CSV, JSON, STIX, and TAXII.
+  - Includes a friendly web interface for browsing feed and honeypot data.
+- **Rich Structured Logging:**
+  - Honeypot interactions are logged in a structured JSON format.
+  - Logs can be optionally forwarded to the SIEM of your choice.
+  - Automatic log file rollover ensures the system is self-managing.
+- **Security:**
+  - The honeypot services never process or respond to client input.
+  - Attackers are not given simulated or virtual environments.
+  - Deceptifeed is self-contained and does **not** use any external libraries, frameworks, plugins, third-party modules, or GitHub actions.
+- **Cross-platform:**
+  - Supports Linux, macOS, Windows, and *BSD.
+  - Available as a Docker container.
 
 
 ## Threat Feed
 
-The threat feed provides a real-time list of IP addresses that have interacted with your honeypot services. It is delivered over HTTP for easy integration with firewalls. Most enterprise firewalls support ingesting custom threat feeds, allowing them to automatically block communication with the listed IP addresses.
+The threat feed provides a list of IP addresses that have interacted with your honeypot services. It is delivered over HTTP for easy integration with firewalls. Most enterprise firewalls support ingesting custom threat feeds, allowing them to automatically block communication with the listed IP addresses.
 
 Configure your firewall to use Deceptifeed as a custom threat feed and set your blocking rules accordingly. Ideally, exclude your honeypot services from any automatic blocking rules.
 
-The threat feed is available in plain text, CSV, JSON, STIX, and TAXII 2.1.
-
-**_Sample threat feed web interface_**
-
-<img alt="Threat Feed Web Interface" src="assets/screenshot-webfeed.png" width="860" />
+The threat feed is available in plain text, CSV, JSON, STIX, and TAXII.
 
 **_Sample threat feed in plain text_**
 
