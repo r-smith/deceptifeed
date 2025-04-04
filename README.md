@@ -175,7 +175,7 @@ The threat feed is available in plain text, CSV, JSON, STIX, and TAXII 2.1.
 
 **_Sample threat feed web interface_**
 
-<img alt="Threat Feed Web Interface" src="assets/threatfeed-web-screenshot.png" width="881" />
+<img alt="Threat Feed Web Interface" src="assets/screenshot-webfeed.png" width="860" />
 
 **_Sample threat feed in plain text_**
 
