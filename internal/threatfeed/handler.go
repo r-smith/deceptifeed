@@ -304,7 +304,7 @@ func handleCSS(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 // handleConfig serves a page that displays the Deceptifeed configuration.

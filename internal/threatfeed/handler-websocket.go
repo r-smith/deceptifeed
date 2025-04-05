@@ -59,7 +59,7 @@ func handleWebSocket(ws *websocket.Conn) {
 		muWSClients.Lock()
 		delete(wsClients, ws)
 		muWSClients.Unlock()
-		ws.Close()
+		_ = ws.Close()
 	}()
 
 	// Enforce private IPs.
@@ -79,11 +79,11 @@ func handleWebSocket(ws *websocket.Conn) {
 
 	// Send the cache of recent log messages to the new client.
 	for _, msg := range wsRecentMessages {
-		websocket.Message.Send(ws, msg)
+		_ = websocket.Message.Send(ws, msg)
 	}
 	// Send a message informing the client that we're done sending the initial
 	// cache of log messages.
-	websocket.Message.Send(ws, "---end---")
+	_ = websocket.Message.Send(ws, "---end---")
 
 	// Keep WebSocket open.
 	var message string
