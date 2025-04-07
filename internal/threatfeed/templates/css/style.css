@@ -280,7 +280,8 @@ thead th a {
 thead th a:hover {
     color: #fb0;
     text-decoration: underline;
-    text-underline-offset: .1875rem;
+    text-decoration-thickness: 1px;
+    text-underline-offset: .25rem;
 }
 
 thead th a:active {
@@ -453,7 +454,7 @@ table.docs-table {
 table.webfeed,
 table.logs {
     background: black;
-    border-bottom: 1px solid #8e6eff;
+    border-bottom: 1px solid #a6f;
     border-collapse: separate;
     border-spacing: 0;
     margin: 0 auto;
@@ -473,7 +474,7 @@ table.logs {
 
 .webfeed th,
 .logs th {
-    border-bottom: 1px solid #8e6eff;
+    border-bottom: 1px solid #a6f;
     padding: 0.7rem 1.25rem;
 }
 
@@ -485,7 +486,7 @@ table.logs {
 .logs td {
     font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
     font-size: 1.1rem;
-    padding: 0.6rem 1.25rem;
+    padding: 0.75rem 1.25rem;
 }
 
 .logs td {
@@ -496,7 +497,7 @@ table.logs {
 
 .webfeed tbody tr:hover,
 .logs tbody tr:hover {
-    background-color: #1a1d22;
+    background-color: #0c0e1e;
 }
 
 table.server-info {
@@ -559,12 +560,12 @@ table.config-info tbody tr:not(:last-child) td {
 }
 
 .asc::after {
-    color: #8e6eff;
+    color: #a6f;
     content: '▲';
 }
 
 .desc::after {
-    color: #8e6eff;
+    color: #a6f;
     content: '▼';
 }
 
@@ -632,45 +633,75 @@ table.live-logs {
     overflow-wrap: anywhere;
 }
 
+.tooltip {
+    position: relative;
+}
+
+pre.tooltip-content {
+    background-color: #224;
+    border: 1px solid #cdf;
+    border-radius: 10px;
+    color: #cdf !important;
+    display: none;
+    font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
+    font-size: 0.875rem;
+    left: 0;
+    margin: 0;
+    max-width: 25rem;
+    min-width: 5rem;
+    overflow-x: auto;
+    overflow-wrap: unset;
+    padding: 1rem;
+    position: absolute;
+    text-align: left;
+    text-wrap-mode: nowrap;
+    top: 2.5rem;
+    z-index: 1;
+}
+
+table.live-logs td.tooltip:hover pre.tooltip-content {
+    display: block;
+}
+
 /* ======== */
 /* Web Feed */
 /* ======== */
 /* IP */
 .webfeed tbody td:nth-child(1) {
-    color: #48e3ff;
+    color: #1ee;
     overflow-wrap: anywhere;
 }
 
 .webfeed tbody tr:nth-child(odd) td:nth-child(1) {
-    color: #aaffff;
+    color: #5ff;
 }
 
 /* Added */
 .webfeed tbody td:nth-child(2) {
-    color: #8b949e;
+    color: #556;
 }
 
 .webfeed tbody tr:nth-child(odd) td:nth-child(2) {
-    color: #ccc;
+    color: #667;
 }
 
 /* Last Seen */
 .webfeed tbody td:nth-child(3) {
-    color: #b8c1ff;
+    color: #ccd;
 }
 
 .webfeed tbody tr:nth-child(odd) td:nth-child(3) {
-    color: #c8e1ff;
+    color: #dde;
 }
 
 /* Threat Score */
 .webfeed tbody td:nth-child(4) {
-    color: #ffff55;
+    color: #ee6;
     text-align: right
 }
 
 .webfeed tbody tr:nth-child(odd) td:nth-child(4) {
-    color: #eedc82;
+    color: #ff5;
 }
 
 /* ======== */
@@ -852,10 +883,6 @@ table.live-logs {
 
     table.live-logs {
         margin: 1.5rem;
-    }
-
-    h2.live-logs {
-        display: none;
     }
 }
 

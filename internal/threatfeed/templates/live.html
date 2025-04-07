@@ -57,7 +57,6 @@
         </nav>
     </header>
     <main>
-        <h2 class="live-logs">Real-Time Logs</h2>
         <div id="ws-status"></div>
         <table id="logs" class="live-logs"></table>
     </main>
@@ -70,6 +69,11 @@
         const initialReconnectDelay = 1000;
         const maxReconnectDelay = 15000;
         const maxReconnectAttempts = 100;
+        const timeFormat = new Intl.DateTimeFormat([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
         let ws;
         let reconnectAttempts = 0;
         let isInitialBatchProcessed = false;
@@ -127,8 +131,7 @@
 
                 const timeElement = document.createElement('td');
                 const initialTime = new Date(d.time);
-                const formattedTime = initialTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                timeElement.textContent = formattedTime;
+                timeElement.textContent = timeFormat.format(initialTime);
                 timeElement.className = 'timestamp';
 
                 const srcIPElement = document.createElement('td');
@@ -146,8 +149,20 @@
 
                         const httpPath = document.createTextNode(d.event_details.path);
 
+                        const tooltipContent = document.createElement('pre');
+                        tooltipContent.className = 'tooltip-content';
+                        let jsonDetails = JSON.stringify(d.event_details, null, 2);
+                        // Remove outer braces.
+                        jsonDetails = jsonDetails.slice(2, -1);
+                        // Remove initial 2-space indent.
+                        jsonDetails = jsonDetails.replace(/^ {2}/gm, '');
+                        jsonDetails = jsonDetails.replace(/"([^"]+)":/g, '$1:');
+                        tooltipContent.textContent = jsonDetails
+
+                        eventDetails.classList.add('tooltip');
                         eventDetails.appendChild(httpMethod);
                         eventDetails.appendChild(httpPath);
+                        eventDetails.appendChild(tooltipContent);
 
                         break;
                     }
@@ -211,7 +226,7 @@
                 if (shouldAnimate) {
                     logEntry.className = 'fade-in';
                 }
-
+                
                 logs.insertBefore(logEntry, logs.firstChild);
 
                 if (logs.children.length > maxLogs) {
