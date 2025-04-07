@@ -81,6 +81,7 @@ func Start(c *config.Config) {
 	// Honeypot log handlers.
 	mux.HandleFunc("GET /logs", enforcePrivateIP(handleLogsMain))
 	mux.HandleFunc("GET /logs/{logtype}", enforcePrivateIP(handleLogs))
+	mux.HandleFunc("GET /logs/{logtype}/{subtype}", enforcePrivateIP(handleLogs))
 
 	srv := &http.Server{
 		Addr:         ":" + c.ThreatFeed.Port,

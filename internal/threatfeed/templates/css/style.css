@@ -239,11 +239,11 @@ ul.no-bullets {
 }
 
 ul.log-list {
+    font-family: 'Menlo', 'Consolas', 'Monaco', 'Liberation Mono', 'Lucida Console', monospace;
     font-size: 1.1rem;
-    line-height: 2.5rem;
+    line-height: 1.75rem;
     list-style-type: none;
-    margin-bottom: 0.3rem;
-    padding-left: 0;
+    padding: 0;
 }
 
 /* ======= */
@@ -294,29 +294,15 @@ thead th a:active {
     color: #9cf;
     text-decoration: none;
     text-underline-offset: 0.3rem;
-    padding: 0.75rem 0.8rem;
-    min-width: 100rem;
-    border-radius: 8px;
-}
-
-.log-list .icon {
-    margin-right: 0.6rem;
-    vertical-align: middle;
-    padding-bottom: 0.3rem;
-    color: #aab;
+    padding: 0.3rem 0;
 }
 
 .log-list a:hover {
-    outline: 2px solid #7de;
-    color: #fb0;
-}
-
-.log-list a:hover .icon {
-    color: #fff;
+    text-decoration: underline;
 }
 
 .log-list a:active {
-    background-color: #112;
+    text-decoration: none;
 }
 
 /* ===== */
@@ -704,46 +690,69 @@ table.live-logs td.tooltip:hover pre.tooltip-content {
     color: #ff5;
 }
 
+/* ===== */
+/* Stats */
+/* ===== */
+/* Count */
+.logs-stats tbody td:nth-child(1) {
+    color: #ee6;
+    text-align: right;
+}
+
+.logs-stats tbody tr:nth-child(odd) td:nth-child(1) {
+    color: #ff5;
+}
+
+/* Value */
+.logs-stats tbody td:nth-child(2) {
+    color: #1ee;
+    overflow-wrap: anywhere;
+}
+
+.logs-stats tbody tr:nth-child(odd) td:nth-child(2) {
+    color: #5ff;
+}
+
 /* ======== */
 /* SSH Logs */
 /* ======== */
 /* Time */
 .logs-ssh tbody td:nth-child(1) {
-    color: #8b949e;
+    color: #778;
     white-space: nowrap;
 }
 
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(1) {
-    color: #ccc;
+    color: #99a;
 }
 
 /* Source IP */
 .logs-ssh tbody td:nth-child(2) {
-    color: #48e3ff;
+    color: #1ee;
 }
 
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(2) {
-    color: #aaffff;
+    color: #5ff;
 }
 
 /* Username */
 .logs-ssh tbody td:nth-child(3) {
-    color: #b8c1ff;
+    color: #ed7;
     overflow-wrap: anywhere;
 }
 
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(3) {
-    color: #c8e1ff;
+    color: #ff5;
 }
 
 /* Password */
 .logs-ssh tbody td:nth-child(4) {
-    color: #ffff55;
+    color: #8bf;
     overflow-wrap: anywhere;
 }
 
 .logs-ssh tbody tr:nth-child(odd) td:nth-child(4) {
-    color: #eedc82;
+    color: #69e;
 }
 
 /* ========= */
@@ -751,40 +760,40 @@ table.live-logs td.tooltip:hover pre.tooltip-content {
 /* ========= */
 /* Time */
 .logs-http tbody td:nth-child(1) {
-    color: #8b949e;
+    color: #778;
     white-space: nowrap;
 }
 
 .logs-http tbody tr:nth-child(odd) td:nth-child(1) {
-    color: #ccc;
+    color: #99a;
 }
 
 /* Source IP */
 .logs-http tbody td:nth-child(2) {
-    color: #48e3ff;
+    color: #1ee;
 }
 
 .logs-http tbody tr:nth-child(odd) td:nth-child(2) {
-    color: #aaffff;
+    color: #5ff;
 }
 
 /* Method */
 .logs-http tbody td:nth-child(3) {
-    color: #b8c1ff;
+    color: #8bf;
 }
 
 .logs-http tbody tr:nth-child(odd) td:nth-child(3) {
-    color: #c8e1ff;
+    color: #69e;
 }
 
 /* Path */
 .logs-http tbody td:nth-child(4) {
-    color: #ffff55;
+    color: #ed7;
     overflow-wrap: anywhere;
 }
 
 .logs-http tbody tr:nth-child(odd) td:nth-child(4) {
-    color: #eedc82;
+    color: #ff5;
 }
 
 /* ============= */
@@ -964,6 +973,10 @@ table.live-logs td.tooltip:hover pre.tooltip-content {
 
     .live-logs td:nth-child(3) {
         margin-bottom: 2rem;
+    }
+
+    pre.tooltip-content {
+        top: 0;
     }
 }
 

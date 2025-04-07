@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deceptifeed</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="full-width">
+    <header>
+        {{template "nav" .NavData}}
+    </header>
+    <main class="full-width">
+        {{if .Data}}
+        <table id="stats" class="logs logs-stats">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">Count
+                    <th onclick="sortTable(1)">{{.Header}}
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Data}}<tr><td>{{.Count}}<td>{{.Field}}</tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="no-results">No log data found</p>
+        {{end}}
+    </main>
+
+    <script>
+        function applyNumberSeparator() {
+            // Format 'Count' with a thousands separator based on user's locale.
+            const numberFormat = new Intl.NumberFormat();
+            document.querySelectorAll("#stats tbody tr").forEach(row => {
+                const observationCount = parseInt(row.cells[0].textContent, 10);
+                if (!isNaN(observationCount)) {
+                    row.cells[0].textContent = numberFormat.format(observationCount);
+                }
+            });
+        }
+
+        applyNumberSeparator();
+    </script>
+</body>
+</html>
