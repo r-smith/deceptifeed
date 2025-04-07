@@ -281,19 +281,15 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 // delivers a static HTML document with information on accessing the threat
 // feed.
 func handleHome(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/home.html"))
-	err := tmpl.Execute(w, nil)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to parse template 'home.html':", err)
-		return
-	}
+	tmpl := template.Must(template.ParseFS(templates, "templates/home.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "home.html", "home")
 }
 
 // handleDocs serves a static page with documentation for accessing the threat
 // feed.
 func handleDocs(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/docs.html"))
-	_ = tmpl.Execute(w, nil)
+	tmpl := template.Must(template.ParseFS(templates, "templates/docs.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "docs.html", "docs")
 }
 
 // handleCSS serves a CSS stylesheet for styling HTML templates.
@@ -312,10 +308,11 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 	type templateData struct {
 		C       config.Config
 		Version string
+		NavData string
 	}
-	d := templateData{C: cfg, Version: config.Version}
-	tmpl := template.Must(template.ParseFS(templates, "templates/config.html"))
-	_ = tmpl.Execute(w, d)
+	d := templateData{C: cfg, Version: config.Version, NavData: "config"}
+	tmpl := template.Must(template.ParseFS(templates, "templates/config.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "config.html", d)
 }
 
 // handleHTML returns the threat feed as a web page for viewing in a browser.
@@ -350,12 +347,12 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 		m = "observations"
 	}
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/webfeed.html"))
-	err = tmpl.Execute(w, map[string]any{"Data": prepareFeed(opt), "SortDirection": d, "SortMethod": m})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to HTML:", err)
-		return
-	}
+	tmpl := template.Must(template.ParseFS(templates, "templates/webfeed.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(
+		w,
+		"webfeed.html",
+		map[string]any{"Data": prepareFeed(opt), "SortDirection": d, "SortMethod": m, "NavData": "webfeed"},
+	)
 }
 
 // paginate returns a slice of stix.Objects for the requested page, based on

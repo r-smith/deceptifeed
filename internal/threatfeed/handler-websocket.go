@@ -29,8 +29,8 @@ var (
 // handleLiveIndex serves a web page that displays honeypot log data in
 // real-time through a WebSocket connection.
 func handleLiveIndex(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/live.html"))
-	_ = tmpl.Execute(w, nil)
+	tmpl := template.Must(template.ParseFS(templates, "templates/live.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "live.html", "live")
 }
 
 // broadcastLogsToClients receives honeypot log data through a byte channel

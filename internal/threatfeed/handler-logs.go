@@ -13,8 +13,8 @@ import (
 // handleLogsMain serves a static page listing honeypot logs available for
 // viewing.
 func handleLogsMain(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs.html"))
-	_ = tmpl.Execute(w, nil)
+	tmpl := template.Must(template.ParseFS(templates, "templates/logs.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "logs.html", "logs")
 }
 
 // handleLogs directs the request to the appropriate log parser based on the
@@ -38,8 +38,8 @@ func handleLogSSH(w http.ResponseWriter) {
 	reader, err := l.open()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		tmpl := template.Must(template.ParseFS(templates, "templates/logs-error.html"))
-		_ = tmpl.Execute(w, err)
+		tmpl := template.Must(template.ParseFS(templates, "templates/logs-error.html", "templates/nav.html"))
+		_ = tmpl.ExecuteTemplate(w, "logs-error.html", map[string]any{"Error": err, "NavData": "logs"})
 		return
 	}
 	defer l.close()
@@ -71,8 +71,8 @@ func handleLogSSH(w http.ResponseWriter) {
 	}
 	slices.Reverse(data)
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs-ssh.html"))
-	_ = tmpl.Execute(w, data)
+	tmpl := template.Must(template.ParseFS(templates, "templates/logs-ssh.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "logs-ssh.html", map[string]any{"Data": data, "NavData": "logs"})
 }
 
 // handleLogHTTP serves the HTTP honeypot logs as a web page. It opens the
@@ -83,8 +83,8 @@ func handleLogHTTP(w http.ResponseWriter) {
 	reader, err := l.open()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		tmpl := template.Must(template.ParseFS(templates, "templates/logs-error.html"))
-		_ = tmpl.Execute(w, err)
+		tmpl := template.Must(template.ParseFS(templates, "templates/logs-error.html", "templates/nav.html"))
+		_ = tmpl.ExecuteTemplate(w, "logs-error.html", map[string]any{"Error": err, "NavData": "logs"})
 		return
 	}
 	defer l.close()
@@ -116,8 +116,8 @@ func handleLogHTTP(w http.ResponseWriter) {
 	}
 	slices.Reverse(data)
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs-http.html"))
-	_ = tmpl.Execute(w, data)
+	tmpl := template.Must(template.ParseFS(templates, "templates/logs-http.html", "templates/nav.html"))
+	_ = tmpl.ExecuteTemplate(w, "logs-http.html", map[string]any{"Data": data, "NavData": "logs"})
 }
 
 // logFiles represents open honeypot log files and their associate io.Reader.
