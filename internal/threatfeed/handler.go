@@ -22,6 +22,11 @@ import (
 //go:embed templates
 var templates embed.FS
 
+// parsedTemplates pre-parses and caches all HTML templates when the threat
+// feed server starts. This eliminates the need for HTTP handlers to re-parse
+// templates on each request.
+var parsedTemplates = template.Must(template.ParseFS(templates, "templates/*.html"))
+
 // handlePlain handles HTTP requests to serve the threat feed in plain text. It
 // returns a list of IP addresses that interacted with the honeypot servers.
 func handlePlain(w http.ResponseWriter, r *http.Request) {
@@ -281,15 +286,13 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 // delivers a static HTML document with information on accessing the threat
 // feed.
 func handleHome(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/home.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "home.html", "home")
+	_ = parsedTemplates.ExecuteTemplate(w, "home.html", "home")
 }
 
 // handleDocs serves a static page with documentation for accessing the threat
 // feed.
 func handleDocs(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/docs.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "docs.html", "docs")
+	_ = parsedTemplates.ExecuteTemplate(w, "docs.html", "docs")
 }
 
 // handleCSS serves a CSS stylesheet for styling HTML templates.
@@ -311,8 +314,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		NavData string
 	}
 	d := templateData{C: cfg, Version: config.Version, NavData: "config"}
-	tmpl := template.Must(template.ParseFS(templates, "templates/config.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "config.html", d)
+	_ = parsedTemplates.ExecuteTemplate(w, "config.html", d)
 }
 
 // handleHTML returns the threat feed as a web page for viewing in a browser.
@@ -347,8 +349,7 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 		m = "observations"
 	}
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/webfeed.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(
+	_ = parsedTemplates.ExecuteTemplate(
 		w,
 		"webfeed.html",
 		map[string]any{"Data": prepareFeed(opt), "SortDirection": d, "SortMethod": m, "NavData": "webfeed"},
@@ -459,6 +460,5 @@ func parseParams(r *http.Request) (feedOptions, error) {
 // response when a request is made to an undefined path.
 func handleNotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
-	tmpl := template.Must(template.ParseFS(templates, "templates/404.html"))
-	_ = tmpl.Execute(w, nil)
+	_ = parsedTemplates.ExecuteTemplate(w, "404.html", nil)
 }

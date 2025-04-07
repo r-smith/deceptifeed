@@ -3,7 +3,6 @@ package threatfeed
 import (
 	"cmp"
 	"encoding/json"
-	"html/template"
 	"io"
 	"net/http"
 	"os"
@@ -14,8 +13,7 @@ import (
 // handleLogsMain serves a static page listing honeypot logs available for
 // viewing.
 func handleLogsMain(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "logs.html", "logs")
+	_ = parsedTemplates.ExecuteTemplate(w, "logs.html", "logs")
 }
 
 // handleLogs directs the request to the appropriate log parser based on the
@@ -65,8 +63,7 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 // log files.
 func displayLogErrorPage(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs-error.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "logs-error.html", map[string]any{"Error": err, "NavData": "logs"})
+	_ = parsedTemplates.ExecuteTemplate(w, "logs-error.html", map[string]any{"Error": err, "NavData": "logs"})
 }
 
 // handleLogSSH serves the SSH honeypot logs as a web page. It opens the
@@ -107,8 +104,7 @@ func handleLogSSH(w http.ResponseWriter) {
 	}
 	slices.Reverse(data)
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs-ssh.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "logs-ssh.html", map[string]any{"Data": data, "NavData": "logs"})
+	_ = parsedTemplates.ExecuteTemplate(w, "logs-ssh.html", map[string]any{"Data": data, "NavData": "logs"})
 }
 
 // handleLogHTTP serves the HTTP honeypot logs as a web page. It opens the
@@ -149,8 +145,7 @@ func handleLogHTTP(w http.ResponseWriter) {
 	}
 	slices.Reverse(data)
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs-http.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(w, "logs-http.html", map[string]any{"Data": data, "NavData": "logs"})
+	_ = parsedTemplates.ExecuteTemplate(w, "logs-http.html", map[string]any{"Data": data, "NavData": "logs"})
 }
 
 // displayStats handles the processing and rendering of statistics for a given
@@ -178,8 +173,7 @@ func displayStats(w http.ResponseWriter, field fieldCounter) {
 		)
 	})
 
-	tmpl := template.Must(template.ParseFS(templates, "templates/logs-stats.html", "templates/nav.html"))
-	_ = tmpl.ExecuteTemplate(
+	_ = parsedTemplates.ExecuteTemplate(
 		w,
 		"logs-stats.html",
 		map[string]any{
