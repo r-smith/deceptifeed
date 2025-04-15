@@ -65,7 +65,7 @@ func determineConfig(cfg *config.Server) *responseConfig {
 		return &responseConfig{
 			mode:      modeDirectory,
 			fsRoot:    root,
-			fsHandler: http.FileServerFS(root.FS()),
+			fsHandler: http.FileServerFS(noDirectoryFS{root.FS()}),
 		}
 	}
 
