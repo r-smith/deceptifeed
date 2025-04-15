@@ -24,24 +24,78 @@ import (
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
-// Start initializes and starts an HTTP or HTTPS honeypot server. The server
-// is a simple HTTP server designed to log all details from incoming requests.
-// Optionally, a single static HTML file can be served as the homepage,
-// otherwise, the server will return only HTTP status codes to clients.
-// Interactions with the HTTP server are sent to the threat feed.
+// responseMode represents the HTTP response behavior for the honeypot.
+// Depending on the configuration, the honeypot can serve a built-in default
+// response, serve a specific file, or serve files from a specified directory.
+type responseMode int
+
+const (
+	modeDefault   responseMode = iota // Serve the built-in default response.
+	modeFile                          // Serve a specific file.
+	modeDirectory                     // Serve files from a specified directory.
+)
+
+// responseConfig defines how the honeypot serves HTTP responses. It includes
+// the response mode (default, file, or directory) and, for directory mode, an
+// http.FileServer and file descriptor to the directory.
+type responseConfig struct {
+	mode      responseMode
+	fsRoot    *os.Root
+	fsHandler http.Handler
+}
+
+// determineConfig reads the given configuration and returns a responseConfig,
+// selecting the honeypot's response mode based on whether the HomePagePath
+// setting is empty, a file, or a directory.
+func determineConfig(cfg *config.Server) *responseConfig {
+	if len(cfg.HomePagePath) == 0 {
+		return &responseConfig{mode: modeDefault}
+	}
+
+	info, err := os.Stat(cfg.HomePagePath)
+	if err != nil {
+		return &responseConfig{mode: modeDefault}
+	}
+
+	if info.IsDir() {
+		root, err := os.OpenRoot(cfg.HomePagePath)
+		if err != nil {
+			return &responseConfig{mode: modeDefault}
+		}
+		return &responseConfig{
+			mode:      modeDirectory,
+			fsRoot:    root,
+			fsHandler: http.FileServerFS(root.FS()),
+		}
+	}
+
+	return &responseConfig{
+		mode: modeFile,
+	}
+}
+
+// Start initializes and starts an HTTP or HTTPS honeypot server. It logs all
+// request details and updates the threat feed as needed. If a filesystem path
+// is specified in the configuration, the honeypot serves static content from
+// the path.
 func Start(cfg *config.Server) {
+	response := determineConfig(cfg)
+	if response.mode == modeDirectory {
+		defer response.fsRoot.Close()
+	}
+
 	switch cfg.Type {
 	case config.HTTP:
-		listenHTTP(cfg)
+		listenHTTP(cfg, response)
 	case config.HTTPS:
-		listenHTTPS(cfg)
+		listenHTTPS(cfg, response)
 	}
 }
 
 // listenHTTP initializes and starts an HTTP (plaintext) honeypot server.
-func listenHTTP(cfg *config.Server) {
+func listenHTTP(cfg *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers)))
+	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers), response))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
@@ -59,9 +113,9 @@ func listenHTTP(cfg *config.Server) {
 }
 
 // listenHTTP initializes and starts an HTTPS (encrypted) honeypot server.
-func listenHTTPS(cfg *config.Server) {
+func listenHTTPS(cfg *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers)))
+	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers), response))
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
@@ -93,13 +147,10 @@ func listenHTTPS(cfg *config.Server) {
 	}
 }
 
-// handleConnection is the handler for incoming HTTP and HTTPS client requests.
-// It logs the details of each request and generates responses based on the
-// requested URL. When the root or index.html is requested, it serves either an
-// HTML file specified in the configuration or a default page prompting for
-// basic HTTP authentication. Requests for any other URLs will return a 404
-// error to the client.
-func handleConnection(cfg *config.Server, customHeaders map[string]string) http.HandlerFunc {
+// handleConnection processes incoming HTTP and HTTPS client requests. It logs
+// the details of each request, updates the threat feed, and serves responses
+// based on the honeypot configuration.
+func handleConnection(cfg *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log details of the incoming HTTP request.
 		dst_ip, dst_port := getLocalAddr(r)
@@ -162,33 +213,44 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string) http.
 			threatfeed.Update(src)
 		}
 
-		// Apply any custom HTTP response headers.
+		// Apply optional custom HTTP response headers.
 		for header, value := range customHeaders {
 			w.Header().Set(header, value)
 		}
 
-		// Serve a response based on the requested URL. If the root URL or
-		// /index.html is requested, serve the homepage. For all other
-		// requests, serve the error page with a 404 Not Found response.
-		// Optionally, a single static HTML file may be specified for both the
-		// homepage and the error page. If no custom files are provided,
-		// default minimal responses will be served.
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-			// Serve the homepage response.
-			if len(cfg.HomePagePath) > 0 {
-				http.ServeFile(w, r, cfg.HomePagePath)
-			} else {
+		// Serve a response based on the honeypot configuration.
+		switch response.mode {
+		case modeDefault:
+			// Built-in default response.
+			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
+			} else {
+				serveErrorPage(w, r, cfg.ErrorPagePath)
 			}
-		} else {
-			// Serve the error page response.
-			w.WriteHeader(http.StatusNotFound)
-			if len(cfg.ErrorPagePath) > 0 {
-				http.ServeFile(w, r, cfg.ErrorPagePath)
+		case modeFile:
+			// Serve a single file.
+			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+				http.ServeFile(w, r, cfg.HomePagePath)
+			} else {
+				serveErrorPage(w, r, cfg.ErrorPagePath)
 			}
+		case modeDirectory:
+			// Serve files from a directory.
+			response.fsHandler.ServeHTTP(w, r)
 		}
 	}
+}
+
+// serveErrorPage serves an error HTTP response code and optional html page.
+func serveErrorPage(w http.ResponseWriter, r *http.Request, path string) {
+	if len(path) == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	http.ServeFile(w, r, path)
 }
 
 // shouldUpdateThreatFeed determines if the threat feed should be updated based
