@@ -1,11 +1,15 @@
 package threatfeed
 
 import (
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
 	"golang.org/x/net/websocket"
 )
@@ -91,9 +95,32 @@ func Start(c *config.Config) {
 		IdleTimeout:  0,
 	}
 
-	// Start the threat feed HTTP server.
-	fmt.Printf("Starting Threat Feed server on port: %s\n", c.ThreatFeed.Port)
-	if err := srv.ListenAndServe(); err != nil {
-		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped:", err)
+	// Start the threat feed (HTTP) server if TLS is not enabled.
+	if !c.ThreatFeed.EnableTLS {
+		fmt.Printf("Starting threat feed (HTTP) on port: %s\n", c.ThreatFeed.Port)
+		if err := srv.ListenAndServe(); err != nil {
+			fmt.Fprintln(os.Stderr, "The threat feed server has stopped:", err)
+		}
+		return
+	}
+
+	// Generate a self-signed cert if the provided key and cert aren't found.
+	if _, err := os.Stat(c.ThreatFeed.CertPath); errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Stat(c.ThreatFeed.KeyPath); errors.Is(err, fs.ErrNotExist) {
+			cert, err := certutil.GenerateSelfSigned(c.ThreatFeed.CertPath, c.ThreatFeed.KeyPath)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Failed to generate threat feed TLS certificate:", err)
+				return
+			}
+
+			// Add cert to server config.
+			srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+		}
+	}
+
+	// Start the threat feed (HTTPS) server.
+	fmt.Printf("Starting threat feed (HTTPS) on port: %s\n", c.ThreatFeed.Port)
+	if err := srv.ListenAndServeTLS(c.ThreatFeed.CertPath, c.ThreatFeed.KeyPath); err != nil {
+		fmt.Fprintln(os.Stderr, "The threat feed server has stopped:", err)
 	}
 }

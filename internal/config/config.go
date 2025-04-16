@@ -145,6 +145,9 @@ type ThreatFeed struct {
 	ExpiryHours       int    `xml:"threatExpiryHours"`
 	IsPrivateIncluded bool   `xml:"includePrivateIPs"`
 	ExcludeListPath   string `xml:"excludeListPath"`
+	EnableTLS         bool   `xml:"enableTLS"`
+	CertPath          string `xml:"certPath"`
+	KeyPath           string `xml:"keyPath"`
 }
 
 // Load reads an optional XML configuration file and unmarshals its contents
