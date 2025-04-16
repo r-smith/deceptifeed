@@ -2,10 +2,7 @@
 
 SOURCE := ./cmd/deceptifeed/
 BIN_DIRECTORY := ./bin/
-BIN_DEFAULT := deceptifeed
-BIN_LINUX := $(BIN_DEFAULT)_linux_amd64
-BIN_FREEBSD := $(BIN_DEFAULT)_freebsd_amd64
-BIN_WINDOWS := $(BIN_DEFAULT)_windows_amd64.exe
+BIN_DEFAULT := $(BIN_DIRECTORY)deceptifeed
 INSTALL_SCRIPT := ./scripts/install.sh
 UNINSTALL_SCRIPT := ./scripts/install.sh --uninstall
 VERSION := $(shell git describe --tags --dirty --broken)
@@ -17,8 +14,8 @@ CGO_ENABLED := 0
 build:
 	@echo "Building for current operating system..."
 	@mkdir -p $(BIN_DIRECTORY)
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DIRECTORY)$(BIN_DEFAULT) $(SOURCE)
-	@echo "Build complete: $(BIN_DIRECTORY)$(BIN_DEFAULT)"
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DEFAULT) $(SOURCE)
+	@echo "Build complete: $(BIN_DEFAULT)"
 	@echo
 
 .PHONY: all
@@ -28,28 +25,28 @@ all: build build-linux build-freebsd build-windows
 build-linux:
 	@echo "Building for Linux..."
 	@mkdir -p $(BIN_DIRECTORY)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DIRECTORY)$(BIN_LINUX) $(SOURCE)
-	@echo "Build complete: $(BIN_DIRECTORY)$(BIN_LINUX)"
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DEFAULT)_linux_x64 $(SOURCE)
+	@echo "Build complete: $(BIN_DEFAULT)_linux_x64"
 	@echo
 
 .PHONY: build-freebsd
 build-freebsd:
 	@echo "Building for FreeBSD..."
 	@mkdir -p $(BIN_DIRECTORY)
-	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DIRECTORY)$(BIN_FREEBSD) $(SOURCE)
-	@echo "Build complete: $(BIN_DIRECTORY)$(BIN_FREEBSD)"
+	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DEFAULT)_freebsd_x64 $(SOURCE)
+	@echo "Build complete: $(BIN_DEFAULT)_freebsd_x64"
 	@echo
 
 .PHONY: build-windows
 build-windows:
 	@echo "Building for Windows..."
 	@mkdir -p $(BIN_DIRECTORY)
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DIRECTORY)$(BIN_WINDOWS) $(SOURCE)
-	@echo "Build complete: $(BIN_DIRECTORY)$(BIN_WINDOWS)"
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DEFAULT)_windows_x64.exe $(SOURCE)
+	@echo "Build complete: $(BIN_DEFAULT)_windows_x64.exe"
 	@echo
 
 .PHONY: install
-install: $(BIN_DIRECTORY)$(BIN_DEFAULT)
+install: $(BIN_DEFAULT)
 	@bash $(INSTALL_SCRIPT)
 
 .PHONY: uninstall
