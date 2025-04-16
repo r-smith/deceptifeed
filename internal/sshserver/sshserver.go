@@ -139,7 +139,7 @@ func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
 		// Load the specified file and return the parsed private key.
 		privateKey, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read private key from '%s': %w", path, err)
+			return nil, fmt.Errorf("failed to read private key '%s': %w", path, err)
 		}
 		signer, err := ssh.ParsePrivateKey(privateKey)
 		if err != nil {
@@ -150,20 +150,19 @@ func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
 		// Generate and return a new private key.
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate RSA private key: %w", err)
+			return nil, fmt.Errorf("failed to generate private key: %w", err)
 		}
 
 		// Save the private key to disk.
 		if len(path) > 0 {
+			// Silently ignore any potential errors and continue.
 			_ = writePrivateKey(path, privateKey)
-			// If saving fails, ignore the errors and use the in-memory private
-			// key.
 		}
 
 		// Convert the key to ssh.Signer.
 		signer, err := ssh.NewSignerFromKey(privateKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert RSA key to SSH signer: %w", err)
+			return nil, fmt.Errorf("failed to convert key to SSH signer: %w", err)
 		}
 		return signer, nil
 	} else {
@@ -171,8 +170,7 @@ func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
 	}
 }
 
-// writePrivateKey saves a private key in PEM format to the specified file
-// path.
+// writePrivateKey saves a private key in PEM format to the specified path.
 func writePrivateKey(path string, privateKey *rsa.PrivateKey) error {
 	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	privPem := &pem.Block{
