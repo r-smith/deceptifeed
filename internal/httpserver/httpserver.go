@@ -219,6 +219,9 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 		case modeDefault:
 			// Built-in default response.
 			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+				if _, _, ok := r.BasicAuth(); ok {
+					time.Sleep(2 * time.Second)
+				}
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			} else {
