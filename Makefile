@@ -19,7 +19,7 @@ build:
 	@echo
 
 .PHONY: all
-all: build build-linux build-freebsd build-windows
+all: build build-linux build-linux-arm build-freebsd build-windows
 
 .PHONY: build-linux
 build-linux:
@@ -27,6 +27,14 @@ build-linux:
 	@mkdir -p $(BIN_DIRECTORY)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DEFAULT)_linux_x64 $(SOURCE)
 	@echo "Build complete: $(BIN_DEFAULT)_linux_x64"
+	@echo
+
+.PHONY: build-linux-arm
+build-linux-arm:
+	@echo "Building for Linux (ARM)..."
+	@mkdir -p $(BIN_DIRECTORY)
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(BUILD_OPTIONS) -o $(BIN_DEFAULT)_linux_ARM64 $(SOURCE)
+	@echo "Build complete: $(BIN_DEFAULT)_linux_ARM64"
 	@echo
 
 .PHONY: build-freebsd
