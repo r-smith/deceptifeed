@@ -2,6 +2,7 @@
 FROM golang:latest AS build-stage
 WORKDIR /build
 COPY . .
+RUN git update-index -q --refresh
 RUN make
 
 FROM alpine:latest
