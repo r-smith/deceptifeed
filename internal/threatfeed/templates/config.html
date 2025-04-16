@@ -29,7 +29,10 @@
                 </thead>
                 <tbody>
                     <tr><th>State</th><td>{{if .C.ThreatFeed.Enabled}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    <tr><th>Database</th><td class="blue">{{if .C.ThreatFeed.DatabasePath}}{{.C.ThreatFeed.DatabasePath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
+                    <tr><th>TLS</th><td>{{if .C.ThreatFeed.EnableTLS}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
+                    {{if .C.ThreatFeed.EnableTLS}}<tr><th>Certificate</th><td class="blue">{{if .C.ThreatFeed.CertPath}}{{.C.ThreatFeed.CertPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
+                    {{if .C.ThreatFeed.EnableTLS}}<tr><th>Private Key</th><td class="blue">{{if .C.ThreatFeed.KeyPath}}{{.C.ThreatFeed.KeyPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
+                    <tr><th>Threat Database</th><td class="blue">{{if .C.ThreatFeed.DatabasePath}}{{.C.ThreatFeed.DatabasePath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
                     <tr><th>Include Private IPs</th><td>{{if .C.ThreatFeed.IsPrivateIncluded}}<span class="red">Yes{{else}}<span class="green">No{{end}}</span></td></tr>
                     <tr><th>Expiry Hours</th><td class="orange">{{if eq .C.ThreatFeed.ExpiryHours 0}}<span class="gray">(never expire)</span>{{else}}{{.C.ThreatFeed.ExpiryHours}}{{end}}</td></tr>
                     <tr><th>Exclude List</th><td class="blue">{{if .C.ThreatFeed.ExcludeListPath}}{{.C.ThreatFeed.ExcludeListPath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
