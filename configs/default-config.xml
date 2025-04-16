@@ -14,6 +14,9 @@
     <threatExpiryHours>336</threatExpiryHours>
     <includePrivateIPs>false</includePrivateIPs>
     <excludeListPath></excludeListPath>
+    <enableTLS>false</enableTLS>
+    <certPath>/opt/deceptifeed/certs/threatfeed-cert.pem</certPath>
+    <keyPath>/opt/deceptifeed/certs/threatfeed-key.pem</keyPath>
   </threatFeed>
 
   <!-- Honeypot Server Configuration -->
