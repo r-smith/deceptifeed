@@ -2,17 +2,13 @@ package httpserver
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"log/slog"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
@@ -112,7 +109,7 @@ func listenHTTP(cfg *config.Server, response *responseConfig) {
 	}
 }
 
-// listenHTTP initializes and starts an HTTPS (encrypted) honeypot server.
+// listenHTTPS initializes and starts an HTTPS (encrypted) honeypot server.
 func listenHTTPS(cfg *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers), response))
@@ -126,10 +123,9 @@ func listenHTTPS(cfg *config.Server, response *responseConfig) {
 	}
 
 	// If the cert and key aren't found, generate a self-signed certificate.
-	if _, err := os.Stat(cfg.CertPath); os.IsNotExist(err) {
-		if _, err := os.Stat(cfg.KeyPath); os.IsNotExist(err) {
-			// Generate a self-signed certificate.
-			cert, err := generateSelfSignedCert(cfg.CertPath, cfg.KeyPath)
+	if _, err := os.Stat(cfg.CertPath); errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Stat(cfg.KeyPath); errors.Is(err, fs.ErrNotExist) {
+			cert, err := certutil.GenerateSelfSigned(cfg.CertPath, cfg.KeyPath)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Failed to generate HTTPS certificate:", err)
 				return
@@ -356,92 +352,4 @@ func getLocalAddr(r *http.Request) (ip string, port string) {
 		ip, port, _ = net.SplitHostPort(localAddr.String())
 	}
 	return ip, port
-}
-
-// generateSelfSignedCert creates a self-signed TLS certificate and private key
-// and returns the resulting tls.Certificate. If file paths are provided, the
-// certificate and key are also saved to disk.
-func generateSelfSignedCert(certPath string, keyPath string) (tls.Certificate, error) {
-	// Generate 2048-bit RSA private key.
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("failed to generate private key: %w", err)
-	}
-
-	// Set the certificate validity period to 10 years.
-	notBefore := time.Now()
-	notAfter := notBefore.AddDate(10, 0, 0)
-
-	// Generate a random serial number for the certificate.
-	serialNumber := make([]byte, 16)
-	_, err = rand.Read(serialNumber)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("failed to generate certificate serial number: %w", err)
-	}
-
-	// Set up the template for creating the certificate.
-	template := x509.Certificate{
-		SerialNumber:          new(big.Int).SetBytes(serialNumber),
-		Subject:               pkix.Name{CommonName: "localhost"},
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-	}
-
-	// Use the template to create a self-signed X.509 certificate.
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("failed to create certificate: %w", err)
-	}
-
-	certPEM := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
-	keyPEM := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
-
-	// Save the certificate and key to disk.
-	if len(certPath) > 0 && len(keyPath) > 0 {
-		_ = writeCertAndKey(certPEM, keyPEM, certPath, keyPath)
-		// If saving fails, ignore the errors and use the in-memory
-		// certificate.
-	}
-
-	// Parse the public certificate and private key bytes into a tls.Certificate.
-	cert, err := tls.X509KeyPair(pem.EncodeToMemory(certPEM), pem.EncodeToMemory(keyPEM))
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("failed to load certificate and private key: %w", err)
-	}
-
-	// Return the tls.Certificate.
-	return cert, nil
-}
-
-// writeCertAndKey saves the public certificate and private key in PEM format
-// to the specified file paths.
-func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath string) error {
-	// Save the certificate file to disk.
-	certFile, err := os.Create(certPath)
-	if err != nil {
-		return err
-	}
-	defer certFile.Close()
-
-	if err := pem.Encode(certFile, cert); err != nil {
-		return err
-	}
-
-	// Save the private key file to disk.
-	keyFile, err := os.Create(keyPath)
-	if err != nil {
-		return err
-	}
-	defer keyFile.Close()
-
-	// Limit key access to the owner only.
-	_ = keyFile.Chmod(0600)
-
-	if err := pem.Encode(keyFile, key); err != nil {
-		return err
-	}
-
-	return nil
 }
