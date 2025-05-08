@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"sync"
 
 	"golang.org/x/net/websocket"
@@ -65,7 +66,7 @@ func handleWebSocket(ws *websocket.Conn) {
 	if err != nil {
 		return
 	}
-	if netIP := net.ParseIP(ip); !netIP.IsPrivate() && !netIP.IsLoopback() {
+	if parsedIP, err := netip.ParseAddr(ip); err != nil || (!parsedIP.IsPrivate() && !parsedIP.IsLoopback()) {
 		return
 	}
 	fmt.Println("[Threat Feed]", ip, "established WebSocket connection")
