@@ -5,7 +5,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -65,11 +65,8 @@ var (
 func Update(ip string) {
 	// Check if the given IP string is a private address. The threat feed may
 	// be configured to include or exclude private IPs.
-	netIP := net.ParseIP(ip)
-	if netIP == nil || netIP.IsLoopback() {
-		return
-	}
-	if !cfg.ThreatFeed.IsPrivateIncluded && netIP.IsPrivate() {
+	parsedIP, err := netip.ParseAddr(ip)
+	if err != nil || parsedIP.IsLoopback() || (!cfg.ThreatFeed.IsPrivateIncluded && parsedIP.IsPrivate()) {
 		return
 	}
 

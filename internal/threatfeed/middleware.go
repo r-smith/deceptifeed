@@ -3,6 +3,7 @@ package threatfeed
 import (
 	"net"
 	"net/http"
+	"net/netip"
 )
 
 // enforcePrivateIP is a middleware that restricts access to the HTTP server
@@ -12,11 +13,11 @@ func enforcePrivateIP(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			http.Error(w, "Could not get IP", http.StatusInternalServerError)
+			http.Error(w, "", http.StatusForbidden)
 			return
 		}
 
-		if netIP := net.ParseIP(ip); !netIP.IsPrivate() && !netIP.IsLoopback() {
+		if parsedIP, err := netip.ParseAddr(ip); err != nil || (!parsedIP.IsPrivate() && !parsedIP.IsLoopback()) {
 			http.Error(w, "", http.StatusForbidden)
 			return
 		}
