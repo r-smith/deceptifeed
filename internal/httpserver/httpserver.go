@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"regexp"
 	"strings"
@@ -148,65 +149,100 @@ func listenHTTPS(cfg *config.Server, response *responseConfig) {
 // based on the honeypot configuration.
 func handleConnection(cfg *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Log details of the incoming HTTP request.
+		// Log connection details. The log fields and format differ based on
+		// whether a custom source IP header is configured.
 		dst_ip, dst_port := getLocalAddr(r)
 		src_ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		username, password, isAuth := r.BasicAuth()
-		if isAuth {
-			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+		logData := []slog.Attr{}
+		if len(cfg.SourceIPHeader) > 0 {
+			// A custom source IP header is configured. Set rem_ip to the
+			// original connecting IP and src_ip to the IP from the header. If
+			// the header is missing, invalid, contains multiple IPs, or if
+			// there a multiple headers with the same name, parsing will fail,
+			// and src_ip will fallback to the original connecting IP.
+			rem_ip := src_ip
+			header := r.Header[cfg.SourceIPHeader]
+			parsed := false
+			errMsg := ""
+			switch len(header) {
+			case 0:
+				errMsg = "Missing header " + cfg.SourceIPHeader
+			case 1:
+				v := header[0]
+				if _, err := netip.ParseAddr(v); err != nil {
+					if strings.Contains(v, ",") {
+						errMsg = "Multiple values in header " + cfg.SourceIPHeader
+					} else {
+						errMsg = "Invalid IP in header " + cfg.SourceIPHeader
+					}
+				} else {
+					parsed = true
+					src_ip = v
+				}
+			default:
+				errMsg = "Multiple instances of header " + cfg.SourceIPHeader
+			}
+
+			logData = append(logData,
 				slog.String("event_type", "http"),
+				slog.String("remote_ip", rem_ip),
 				slog.String("source_ip", src_ip),
+				slog.Bool("source_ip_parsed", parsed),
+			)
+			if !parsed {
+				logData = append(logData, slog.String("source_ip_error", errMsg))
+			}
+			logData = append(logData,
 				slog.String("server_ip", dst_ip),
 				slog.String("server_port", dst_port),
 				slog.String("server_name", config.GetHostname()),
-				slog.Group("event_details",
-					slog.String("method", r.Method),
-					slog.String("path", r.URL.Path),
-					slog.String("query", r.URL.RawQuery),
-					slog.String("user_agent", r.UserAgent()),
-					slog.String("protocol", r.Proto),
-					slog.String("host", r.Host),
-					slog.Group("basic_auth",
-						slog.String("username", username),
-						slog.String("password", password),
-					),
-					slog.Any("headers", flattenHeaders(r.Header)),
-				),
 			)
 		} else {
-			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+			// No custom source IP header is configured. Log the standard
+			// connection details, keeping src_ip as the remote connecting IP.
+			logData = append(logData,
 				slog.String("event_type", "http"),
 				slog.String("source_ip", src_ip),
 				slog.String("server_ip", dst_ip),
 				slog.String("server_port", dst_port),
 				slog.String("server_name", config.GetHostname()),
-				slog.Group("event_details",
-					slog.String("method", r.Method),
-					slog.String("path", r.URL.Path),
-					slog.String("query", r.URL.RawQuery),
-					slog.String("user_agent", r.UserAgent()),
-					slog.String("protocol", r.Proto),
-					slog.String("host", r.Host),
-					slog.Any("headers", flattenHeaders(r.Header)),
+			)
+		}
+
+		// Log standard HTTP request information.
+		eventDetails := []any{
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.String("query", r.URL.RawQuery),
+			slog.String("user_agent", r.UserAgent()),
+			slog.String("protocol", r.Proto),
+			slog.String("host", r.Host),
+			slog.Any("headers", flattenHeaders(r.Header)),
+		}
+
+		// If the request includes a "basic" Authorization header, decode and
+		// log the credentials.
+		if username, password, ok := r.BasicAuth(); ok {
+			eventDetails = append(eventDetails,
+				slog.Group("basic_auth",
+					slog.String("username", username),
+					slog.String("password", password),
 				),
 			)
 		}
 
+		// Combine log data and write the final log entry.
+		logData = append(logData, slog.Group("event_details", eventDetails...))
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
+
 		// Print a simplified version of the request to the console.
 		fmt.Printf("[HTTP] %s %s %s %s\n", src_ip, r.Method, r.URL.Path, r.URL.RawQuery)
 
-		// Update the threat feed with the source IP address from the request.
-		// If the configuration specifies an HTTP header to be used for the
-		// source IP, retrieve the header value and use it instead of the
-		// connecting IP.
+		// Update the threat feed using the source IP address (src_ip). If a
+		// custom header is configured, src_ip contains the IP extracted from
+		// the header. Otherwise, it contains the remote connecting IP.
 		if shouldUpdateThreatFeed(cfg, r) {
-			src := src_ip
-			if len(cfg.SourceIPHeader) > 0 {
-				if header := r.Header.Get(cfg.SourceIPHeader); len(header) > 0 {
-					src = header
-				}
-			}
-			threatfeed.Update(src)
+			threatfeed.Update(src_ip)
 		}
 
 		// Apply optional custom HTTP response headers.
