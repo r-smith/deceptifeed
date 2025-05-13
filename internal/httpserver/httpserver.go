@@ -166,26 +166,25 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 			errMsg := ""
 			switch len(header) {
 			case 0:
-				errMsg = "Missing header " + cfg.SourceIPHeader
+				errMsg = "missing header " + cfg.SourceIPHeader
 			case 1:
 				v := header[0]
 				if _, err := netip.ParseAddr(v); err != nil {
 					if strings.Contains(v, ",") {
-						errMsg = "Multiple values in header " + cfg.SourceIPHeader
+						errMsg = "multiple values in header " + cfg.SourceIPHeader
 					} else {
-						errMsg = "Invalid IP in header " + cfg.SourceIPHeader
+						errMsg = "invalid IP in header " + cfg.SourceIPHeader
 					}
 				} else {
 					parsed = true
 					src_ip = v
 				}
 			default:
-				errMsg = "Multiple instances of header " + cfg.SourceIPHeader
+				errMsg = "multiple instances of header " + cfg.SourceIPHeader
 			}
 
 			logData = append(logData,
 				slog.String("event_type", "http"),
-				slog.String("remote_ip", rem_ip),
 				slog.String("source_ip", src_ip),
 				slog.Bool("source_ip_parsed", parsed),
 			)
@@ -193,6 +192,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 				logData = append(logData, slog.String("source_ip_error", errMsg))
 			}
 			logData = append(logData,
+				slog.String("remote_ip", rem_ip),
 				slog.String("server_ip", dst_ip),
 				slog.String("server_port", dst_port),
 				slog.String("server_name", config.GetHostname()),
