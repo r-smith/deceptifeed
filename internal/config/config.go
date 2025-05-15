@@ -104,6 +104,7 @@ type Server struct {
 	Headers          []string        `xml:"headers>header"`
 	Prompts          []Prompt        `xml:"prompts>prompt"`
 	SendToThreatFeed bool            `xml:"sendToThreatFeed"`
+	UseProxyProtocol bool            `xml:"useProxyProtocol"`
 	Rules            Rules           `xml:"rules"`
 	SourceIPHeader   string          `xml:"sourceIpHeader"`
 	LogPath          string          `xml:"logPath"`
@@ -257,9 +258,15 @@ func (c *Config) InitializeLoggers() error {
 				io.MultiWriter(file, c.Monitor),
 				&slog.HandlerOptions{
 					ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-						// Remove 'message' and 'log level' fields from output.
-						if a.Key == slog.MessageKey || a.Key == slog.LevelKey {
+						switch a.Key {
+						case slog.MessageKey, slog.LevelKey:
+							// Remove default 'message' and 'log level' fields.
 							return slog.Attr{}
+						case "source_ip_error":
+							// Remove 'source_ip_error' field if it's empty.
+							if len(a.Value.String()) == 0 {
+								return slog.Attr{}
+							}
 						}
 						return a
 					},
