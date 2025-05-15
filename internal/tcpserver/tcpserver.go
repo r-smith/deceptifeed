@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
@@ -31,6 +32,13 @@ func Start(cfg *config.Server) {
 	}
 	defer listener.Close()
 
+	// Replace occurrences of "\n" with "\r\n". The configuration file uses
+	// "\n", but CRLF is expected for TCP protocols.
+	cfg.Banner = strings.ReplaceAll(cfg.Banner, "\\n", "\r\n")
+	for i := range cfg.Prompts {
+		cfg.Prompts[i].Text = strings.ReplaceAll(cfg.Prompts[i].Text, "\\n", "\r\n")
+	}
+
 	// Listen for and accept incoming connections.
 	for {
 		conn, err := listener.Accept()
@@ -48,21 +56,39 @@ func Start(cfg *config.Server) {
 // client interaction.
 func handleConnection(conn net.Conn, cfg *config.Server) {
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
-	// Print an optional banner. Replace any occurrences of the newline escape
-	// sequence "\\n" with "\r\n" (carriage return, line feed), used by
-	// protocols such as Telnet and SMTP.
-	if len(cfg.Banner) > 0 {
-		_, _ = conn.Write([]byte(strings.ReplaceAll(cfg.Banner, "\\n", "\r\n")))
+	// Record connection details.
+	dstIP, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
+	srcIP, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	var remIP string
+	var parsed bool
+	var errMsg string
+
+	// If Proxy Protocol is enabled, set remIP to the remote IP and extract the
+	// client IP from the proxy header into srcIP.
+	if cfg.UseProxyProtocol {
+		remIP = srcIP
+		if clientIP, err := proxyproto.ReadHeader(conn); err != nil {
+			errMsg = err.Error()
+		} else {
+			parsed = true
+			srcIP = clientIP
+		}
 	}
 
-	// Present the prompts from the server configuration to the connected
-	// client and record their responses.
+	// Set a connection deadline.
+	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
+
+	// Display initial banner to the client if configured.
+	if len(cfg.Banner) > 0 {
+		_, _ = conn.Write([]byte(cfg.Banner))
+	}
+
+	// Display configured prompts to the client and record the responses.
 	scanner := bufio.NewScanner(conn)
 	responses := make(map[string]string)
 	for i, prompt := range cfg.Prompts {
-		_, _ = conn.Write([]byte(strings.ReplaceAll(prompt.Text, "\\n", "\r\n")))
+		_, _ = conn.Write([]byte(prompt.Text))
 		scanner.Scan()
 		var key string
 		// Each prompt includes an optional Log field that serves as the key
@@ -70,7 +96,6 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		// the response will not be logged. If Log is omitted, the default key
 		// "data00" is used, where "00" is the index plus one.
 		if prompt.Log == "none" {
-			// Skip logging for this entry.
 			continue
 		} else if len(prompt.Log) > 0 {
 			key = prompt.Log
@@ -80,8 +105,8 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		responses[key] = scanner.Text()
 	}
 
-	// If no prompts are provided in the configuration, wait for the client to
-	// send data then record the received input.
+	// If no prompts are configured, wait for client input and record the
+	// received data.
 	if len(cfg.Prompts) == 0 {
 		scanner.Scan()
 		responses["data"] = scanner.Text()
@@ -99,24 +124,34 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		return
 	}
 
-	// Log the connection along with all responses received from the client.
-	dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
-	src_ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
+	// Log the connection and all responses received from the client.
+	logData := make([]slog.Attr, 0, 9)
+	logData = append(logData,
 		slog.String("event_type", "tcp"),
-		slog.String("source_ip", src_ip),
-		slog.String("server_ip", dst_ip),
-		slog.String("server_port", dst_port),
+		slog.String("source_ip", srcIP),
+	)
+	if cfg.UseProxyProtocol {
+		logData = append(logData,
+			slog.Bool("source_ip_parsed", parsed),
+			slog.String("source_ip_error", errMsg),
+			slog.String("remote_ip", remIP),
+		)
+	}
+	logData = append(logData,
+		slog.String("server_ip", dstIP),
+		slog.String("server_port", dstPort),
 		slog.String("server_name", config.GetHostname()),
 		slog.Any("event_details", responses),
 	)
+	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
 
 	// Print a simplified version of the interaction to the console.
-	fmt.Printf("[TCP] %s %q\n", src_ip, responsesToString(responses))
+	fmt.Printf("[TCP] %s %q\n", srcIP, responsesToString(responses))
 
-	// Update the threat feed with the source IP address from the interaction.
+	// Update the threat feed with srcIP. If Proxy Protocol is enabled, srcIP
+	// is taken from the proxy header. Otherwise, it's the connecting IP.
 	if cfg.SendToThreatFeed {
-		threatfeed.Update(src_ip)
+		threatfeed.Update(srcIP)
 	}
 }
 
