@@ -57,14 +57,14 @@ func Start(cfg *config.Server) {
 			// addresses, this may not correspond to the IP address that
 			// received the UDP data. However, this limitation is acceptable as
 			// the primary goal is to log the received data.
-			_, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
-			src_ip, _, _ := net.SplitHostPort(remoteAddr.String())
+			_, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
+			srcIP, _, _ := net.SplitHostPort(remoteAddr.String())
 			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
 				slog.String("event_type", "udp"),
-				slog.String("source_ip", src_ip+" [unreliable]"),
+				slog.String("source_ip", srcIP+" [unreliable]"),
 				slog.String("source_reliability", "unreliable"),
 				slog.String("server_ip", config.GetHostIP()),
-				slog.String("server_port", dst_port),
+				slog.String("server_port", dstPort),
 				slog.String("server_name", config.GetHostname()),
 				slog.Group("event_details",
 					slog.String("data", string(buffer[:n])),
@@ -72,7 +72,7 @@ func Start(cfg *config.Server) {
 			)
 
 			// Print a simplified version of the interaction to the console.
-			fmt.Printf("[UDP] %s Data: %q\n", src_ip, strings.TrimSpace(string(buffer[:n])))
+			fmt.Printf("[UDP] %s Data: %q\n", srcIP, strings.TrimSpace(string(buffer[:n])))
 		}()
 	}
 }
