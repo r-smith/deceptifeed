@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 	"golang.org/x/crypto/ssh"
 )
@@ -62,39 +63,6 @@ func Start(cfg *config.Server) {
 		return nil, fmt.Errorf("permission denied")
 	}
 
-	// Define the password authentication callback function.
-	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
-		// Log the the username and password submitted by the client.
-		dst_ip, dst_port, _ := net.SplitHostPort(conn.LocalAddr().String())
-		src_ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
-			slog.String("event_type", "ssh"),
-			slog.String("source_ip", src_ip),
-			slog.String("server_ip", dst_ip),
-			slog.String("server_port", dst_port),
-			slog.String("server_name", config.GetHostname()),
-			slog.Group("event_details",
-				slog.String("username", conn.User()),
-				slog.String("password", string(password)),
-				slog.String("ssh_client", string(conn.ClientVersion())),
-			),
-		)
-
-		// Print a simplified version of the request to the console.
-		fmt.Printf("[SSH] %s Username: %q Password: %q\n", src_ip, conn.User(), string(password))
-
-		// Update the threat feed with the source IP address from the request.
-		if cfg.SendToThreatFeed {
-			threatfeed.Update(src_ip)
-		}
-
-		// Insert fixed delay to mimic PAM.
-		time.Sleep(2 * time.Second)
-
-		// Reject the authentication request.
-		return nil, fmt.Errorf("invalid username or password")
-	}
-
 	// Start the SSH server.
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -110,21 +78,87 @@ func Start(cfg *config.Server) {
 			continue
 		}
 
-		go handleConnection(conn, sshConfig)
+		go handleConnection(conn, sshConfig, cfg)
 	}
 }
 
 // handleConnection manages incoming SSH client connections. It performs the
 // handshake and handles authentication callbacks.
-func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
+func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Server) {
 	defer conn.Close()
+
+	// Record connection details.
+	dstIP, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
+	srcIP, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	var remIP string
+	var errMsg string
+	var parsed bool
+
+	// If Proxy Protocol is enabled, set remIP to the remote IP and extract the
+	// client IP from the proxy header into srcIP.
+	if cfg.UseProxyProtocol {
+		remIP = srcIP
+		if clientIP, err := proxyproto.ReadHeader(conn); err != nil {
+			errMsg = err.Error()
+		} else {
+			parsed = true
+			srcIP = clientIP
+		}
+	}
+
+	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
+
+	// Set the password authentication callback function. This function is
+	// called after a successful SSH handshake. It logs the credentials,
+	// updates the threat feed, then responds to the client that auth failed.
+	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+		// Log the authentication attempt.
+		logData := make([]slog.Attr, 0, 9)
+		logData = append(logData,
+			slog.String("event_type", "ssh"),
+			slog.String("source_ip", srcIP),
+		)
+		if cfg.UseProxyProtocol {
+			logData = append(logData,
+				slog.Bool("source_ip_parsed", parsed),
+				slog.String("source_ip_error", errMsg),
+				slog.String("remote_ip", remIP),
+			)
+		}
+		logData = append(logData,
+			slog.String("server_ip", dstIP),
+			slog.String("server_port", dstPort),
+			slog.String("server_name", config.GetHostname()),
+			slog.Group("event_details",
+				slog.String("username", conn.User()),
+				slog.String("password", string(password)),
+				slog.String("ssh_client", string(conn.ClientVersion())),
+			),
+		)
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
+
+		// Print a simplified version of the request to the console.
+		fmt.Printf("[SSH] %s Username: %q Password: %q\n", srcIP, conn.User(), string(password))
+
+		// Update the threat feed with srcIP. If Proxy Protocol is enabled,
+		// srcIP is from the proxy header. Otherwise, it's the connecting IP.
+		if cfg.SendToThreatFeed {
+			threatfeed.Update(srcIP)
+		}
+
+		// Insert a fixed delay between authentication attempts.
+		time.Sleep(2 * time.Second)
+
+		// Reject the authentication request.
+		return nil, fmt.Errorf("invalid username or password")
+	}
 
 	// Perform handshake and authentication. Authentication callbacks are
 	// defined in the SSH server configuration. Since authentication requests
 	// are always rejected, this function will consistently return an error,
 	// and no further connection handling is necessary.
-	sshConn, _, _, err := ssh.NewServerConn(conn, config)
+	sshConn, _, _, err := ssh.NewServerConn(conn, sshConfig)
 	if err != nil {
 		return
 	}
