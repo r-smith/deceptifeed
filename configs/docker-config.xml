@@ -28,6 +28,7 @@
       <port>2222</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <useProxyProtocol>false</useProxyProtocol>
       <keyPath>key-ssh-private.pem</keyPath>
       <banner>SSH-2.0-OpenSSH_9.6</banner>
     </server>
@@ -38,6 +39,7 @@
       <port>8080</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <sourceIpHeader></sourceIpHeader>
       <rules>
         <!-- Update the threat feed if any of the following rules match: -->
         <include target="path" negate="true">(?i)^(/|/index\.html|/favicon\.ico|/robots\.txt|/sitemap\.xml|/\.well-known/\w+\.txt)$</include>
@@ -55,6 +57,7 @@
       <port>8443</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <sourceIpHeader></sourceIpHeader>
       <certPath>key-https-public.pem</certPath>
       <keyPath>key-https-private.pem</keyPath>
       <rules>
@@ -75,6 +78,7 @@
       <port>2323</port>
       <logEnabled>true</logEnabled>
       <sendToThreatFeed>true</sendToThreatFeed>
+      <useProxyProtocol>false</useProxyProtocol>
       <banner>\nUser Access Verification\n\n</banner>
       <prompts>
         <prompt log="username">Username: </prompt>
