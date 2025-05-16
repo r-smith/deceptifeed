@@ -149,21 +149,21 @@ func listenHTTPS(cfg *config.Server, response *responseConfig) {
 // based on the honeypot configuration.
 func handleConnection(cfg *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Log connection details. The log fields and format differ based on
-		// whether a custom source IP header is configured.
-		dst_ip, dst_port := getLocalAddr(r)
-		src_ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		logData := []slog.Attr{}
+		// Record connection details.
+		dstIP, dstPort := getLocalAddr(r)
+		srcIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+		var remIP string
+		var parsed bool
+		var errMsg string
+
+		// If a custom source IP header is configured, set remIP to the remote
+		// IP and extract the client IP from the header into srcIP.
 		if len(cfg.SourceIPHeader) > 0 {
-			// A custom source IP header is configured. Set rem_ip to the
-			// original connecting IP and src_ip to the IP from the header. If
-			// the header is missing, invalid, contains multiple IPs, or if
-			// there a multiple headers with the same name, parsing will fail,
-			// and src_ip will fallback to the original connecting IP.
-			rem_ip := src_ip
+			// If the custom header is missing, invalid, contains multiple IPs,
+			// or if there a multiple headers with the same name, parsing will
+			// fail, and srcIP will fallback to the original connecting IP.
+			remIP = srcIP
 			header := r.Header[cfg.SourceIPHeader]
-			parsed := false
-			errMsg := ""
 			switch len(header) {
 			case 0:
 				errMsg = "missing header " + cfg.SourceIPHeader
@@ -177,39 +177,33 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 					}
 				} else {
 					parsed = true
-					src_ip = v
+					srcIP = v
 				}
 			default:
 				errMsg = "multiple instances of header " + cfg.SourceIPHeader
 			}
-
-			logData = append(logData,
-				slog.String("event_type", "http"),
-				slog.String("source_ip", src_ip),
-				slog.Bool("source_ip_parsed", parsed),
-			)
-			if !parsed {
-				logData = append(logData, slog.String("source_ip_error", errMsg))
-			}
-			logData = append(logData,
-				slog.String("remote_ip", rem_ip),
-				slog.String("server_ip", dst_ip),
-				slog.String("server_port", dst_port),
-				slog.String("server_name", config.GetHostname()),
-			)
-		} else {
-			// No custom source IP header is configured. Log the standard
-			// connection details, keeping src_ip as the remote connecting IP.
-			logData = append(logData,
-				slog.String("event_type", "http"),
-				slog.String("source_ip", src_ip),
-				slog.String("server_ip", dst_ip),
-				slog.String("server_port", dst_port),
-				slog.String("server_name", config.GetHostname()),
-			)
 		}
 
-		// Log standard HTTP request information.
+		// Log the connection details.
+		logData := make([]slog.Attr, 0, 9)
+		logData = append(logData,
+			slog.String("event_type", "http"),
+			slog.String("source_ip", srcIP),
+		)
+		if len(cfg.SourceIPHeader) > 0 {
+			logData = append(logData,
+				slog.Bool("source_ip_parsed", parsed),
+				slog.String("source_ip_error", errMsg),
+				slog.String("remote_ip", remIP),
+			)
+		}
+		logData = append(logData,
+			slog.String("server_ip", dstIP),
+			slog.String("server_port", dstPort),
+			slog.String("server_name", config.GetHostname()),
+		)
+
+		// Log the HTTP request information.
 		eventDetails := []any{
 			slog.String("method", r.Method),
 			slog.String("path", r.URL.Path),
@@ -236,13 +230,12 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
 
 		// Print a simplified version of the request to the console.
-		fmt.Printf("[HTTP] %s %s %s %s\n", src_ip, r.Method, r.URL.Path, r.URL.RawQuery)
+		fmt.Printf("[HTTP] %s %s %s %s\n", srcIP, r.Method, r.URL.Path, r.URL.RawQuery)
 
-		// Update the threat feed using the source IP address (src_ip). If a
-		// custom header is configured, src_ip contains the IP extracted from
-		// the header. Otherwise, it contains the remote connecting IP.
+		// Update the threat feed with srcIP. If Proxy Protocol is enabled, srcIP
+		// is taken from the proxy header. Otherwise, it's the connecting IP.
 		if shouldUpdateThreatFeed(cfg, r) {
-			threatfeed.Update(src_ip)
+			threatfeed.Update(srcIP)
 		}
 
 		// Apply optional custom HTTP response headers.
