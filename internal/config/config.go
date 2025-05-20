@@ -222,7 +222,6 @@ func validateRegexRules(rules Rules) error {
 func (c *Config) InitializeLoggers() error {
 	const maxSize = 50
 	c.Monitor = logmonitor.New()
-
 	openedLogFiles := make(map[string]*slog.Logger)
 
 	for i := range c.Servers {
@@ -232,14 +231,14 @@ func (c *Config) InitializeLoggers() error {
 
 		logPath := c.Servers[i].LogPath
 
-		// If no log path is specified or if logging is disabled, discard logs.
+		// If no log path is specified or logging is disabled, write to a log
+		// monitor for live monitoring. No log data is written to disk.
 		if len(logPath) == 0 || !c.Servers[i].LogEnabled {
-			c.Servers[i].Logger = slog.New(slog.DiscardHandler)
+			c.Servers[i].Logger = slog.New(slog.NewJSONHandler(c.Monitor, nil))
 			continue
 		}
 
-		// Check if this log path has already been opened. If so, reuse the
-		// logger.
+		// Reuse the logger if this log path has already been opened.
 		if logger, exists := openedLogFiles[logPath]; exists {
 			c.Servers[i].Logger = logger
 			continue
