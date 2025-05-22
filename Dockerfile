@@ -3,7 +3,7 @@ FROM golang:latest AS build-stage
 WORKDIR /build
 COPY . .
 RUN git update-index -q --refresh
-RUN make
+RUN make clean build
 
 FROM alpine:latest
 RUN apk add --no-cache tzdata
