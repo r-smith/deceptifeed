@@ -36,7 +36,7 @@ const serverTimeout = 2 * time.Second
 // 2-second deadline on conn. If parsing fails, it returns an error. Callers
 // should reset the deadline after this function returns to extend the timeout.
 func ReadHeader(conn net.Conn) (string, error) {
-	conn.SetDeadline(time.Now().Add(serverTimeout))
+	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
 	reader := bufio.NewReader(conn)
 	peek, err := reader.Peek(12)
