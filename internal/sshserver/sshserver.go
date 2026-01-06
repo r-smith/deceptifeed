@@ -2,8 +2,7 @@ package sshserver
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
+	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -182,7 +181,7 @@ func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
 		return signer, nil
 	} else if os.IsNotExist(err) {
 		// Generate and return a new private key.
-		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		_, privateKey, err := ed25519.GenerateKey(nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate private key: %w", err)
 		}
@@ -205,10 +204,14 @@ func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
 }
 
 // writePrivateKey saves a private key in PEM format to the specified path.
-func writePrivateKey(path string, privateKey *rsa.PrivateKey) error {
-	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+func writePrivateKey(path string, privateKey any) error {
+	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return err
+	}
+
 	privPem := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
+		Type:  "PRIVATE KEY",
 		Bytes: privBytes,
 	}
 
