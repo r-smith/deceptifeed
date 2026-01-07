@@ -5,14 +5,19 @@ import (
 	"os"
 )
 
-// GetHostname returns the system's hostname, defaulting to "localhost" if it
-// cannot be determined.
+// GetHostname returns the system's hostname. It first checks for a value
+// provided via environment variable, then falls back to the name reported by
+// the OS.
 func GetHostname() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "localhost"
+	if h, ok := os.LookupEnv("DECEPTIFEED_HOSTNAME"); ok {
+		return h
 	}
-	return hostname
+
+	if h, err := os.Hostname(); err == nil {
+		return h
+	}
+
+	return ""
 }
 
 // GetHostIP returns the local IP address of the system, defaulting to
