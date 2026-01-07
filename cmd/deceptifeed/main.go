@@ -106,6 +106,9 @@ func main() {
 	}
 	defer cfg.CloseLogFiles()
 
+	// Resolve the system's hostname for identification in logs.
+	config.InitHostname()
+
 	// Initialize a WaitGroup, as each server operates in its own goroutine.
 	// The WaitGroup counter is set to the number of configured honeypot
 	// servers, plus one additional count for the threat feed server.

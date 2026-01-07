@@ -18,6 +18,11 @@ import (
 // tag. Refer to the Makefile in the project root for details on how it's set.
 var Version = "undefined"
 
+// Hostname identifies the system running Deceptifeed and is primarily used
+// with honeypot logs. It is set once at startup from the DECEPTIFEED_HOSTNAME
+// environment variable or the OS-reported name.
+var Hostname string
+
 // This block of constants defines the default application settings when no
 // configuration file is provided.
 const (

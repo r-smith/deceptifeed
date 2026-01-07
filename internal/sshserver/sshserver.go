@@ -129,7 +129,7 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 		logData = append(logData,
 			slog.String("server_ip", dstIP),
 			slog.String("server_port", dstPort),
-			slog.String("server_name", config.GetHostname()),
+			slog.String("server_name", config.Hostname),
 			slog.Group("event_details",
 				slog.String("username", conn.User()),
 				slog.String("password", string(password)),

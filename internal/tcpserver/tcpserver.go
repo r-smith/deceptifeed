@@ -141,7 +141,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 	logData = append(logData,
 		slog.String("server_ip", dstIP),
 		slog.String("server_port", dstPort),
-		slog.String("server_name", config.GetHostname()),
+		slog.String("server_name", config.Hostname),
 		slog.Any("event_details", responses),
 	)
 	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)

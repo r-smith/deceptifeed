@@ -5,10 +5,16 @@ import (
 	"os"
 )
 
-// GetHostname returns the system's hostname. It first checks for a value
+// InitHostname resolves the system's hostname and stores it in the global
+// Hostname variable. It should be called once during application startup.
+func InitHostname() {
+	Hostname = getHostname()
+}
+
+// getHostname returns the system's hostname. It first checks for a value
 // provided via environment variable, then falls back to the name reported by
 // the OS.
-func GetHostname() string {
+func getHostname() string {
 	if h, ok := os.LookupEnv("DECEPTIFEED_HOSTNAME"); ok {
 		return h
 	}

@@ -65,7 +65,7 @@ func Start(cfg *config.Server) {
 				slog.String("source_reliability", "unreliable"),
 				slog.String("server_ip", config.GetHostIP()),
 				slog.String("server_port", dstPort),
-				slog.String("server_name", config.GetHostname()),
+				slog.String("server_name", config.Hostname),
 				slog.Group("event_details",
 					slog.String("data", string(buffer[:n])),
 				),

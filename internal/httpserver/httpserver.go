@@ -201,7 +201,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 		logData = append(logData,
 			slog.String("server_ip", dstIP),
 			slog.String("server_port", dstPort),
-			slog.String("server_name", config.GetHostname()),
+			slog.String("server_name", config.Hostname),
 		)
 
 		// Log the HTTP request information.
