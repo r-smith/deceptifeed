@@ -152,17 +152,18 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 		// Record connection details.
 		dstIP, dstPort := getLocalAddr(r)
 		srcIP, _, _ := net.SplitHostPort(r.RemoteAddr)
-		var remIP string
+		var proxyIP string
 		var parsed bool
 		var errMsg string
 
-		// If a custom source IP header is configured, set remIP to the remote
-		// IP and extract the client IP from the header into srcIP.
+		// If a custom source IP header is configured, set proxyIP to the IP
+		// address of the proxy server (the IP that connected to the honeypot),
+		// and extract the original client IP from the HTTP header into srcIP.
 		if len(cfg.SourceIPHeader) > 0 {
 			// If the custom header is missing, invalid, contains multiple IPs,
 			// or if there a multiple headers with the same name, parsing will
 			// fail, and srcIP will fallback to the original connecting IP.
-			remIP = srcIP
+			proxyIP = srcIP
 			header := r.Header[cfg.SourceIPHeader]
 			switch len(header) {
 			case 0:
@@ -194,7 +195,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 			logData = append(logData,
 				slog.Bool("source_ip_parsed", parsed),
 				slog.String("source_ip_error", errMsg),
-				slog.String("remote_ip", remIP),
+				slog.String("proxy_ip", proxyIP),
 			)
 		}
 		logData = append(logData,

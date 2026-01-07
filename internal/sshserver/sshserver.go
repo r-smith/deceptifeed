@@ -89,19 +89,20 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 	// Record connection details.
 	dstIP, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
 	srcIP, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	var remIP string
+	var proxyIP string
 	var errMsg string
 	var parsed bool
 
-	// If Proxy Protocol is enabled, set remIP to the remote IP and extract the
+	// If Proxy Protocol is enabled, set proxyIP to the IP address of the proxy
+	// server (the IP that connected to the honeypot), and extract the original
 	// client IP from the proxy header into srcIP.
 	if cfg.UseProxyProtocol {
-		remIP = srcIP
-		if clientIP, err := proxyproto.ReadHeader(conn); err != nil {
+		proxyIP = srcIP
+		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
 			errMsg = err.Error()
 		} else {
 			parsed = true
-			srcIP = clientIP
+			srcIP = extractedIP
 		}
 	}
 
@@ -122,7 +123,7 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 			logData = append(logData,
 				slog.Bool("source_ip_parsed", parsed),
 				slog.String("source_ip_error", errMsg),
-				slog.String("remote_ip", remIP),
+				slog.String("proxy_ip", proxyIP),
 			)
 		}
 		logData = append(logData,
