@@ -126,9 +126,8 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 	}
 
 	// Log the connection and all responses received from the client.
-	logData := make([]slog.Attr, 0, 9)
+	logData := make([]slog.Attr, 0, 8)
 	logData = append(logData,
-		slog.String("event_type", "tcp"),
 		slog.String("source_ip", srcIP),
 	)
 	if cfg.UseProxyProtocol {
@@ -144,7 +143,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		slog.String("server_name", config.Hostname),
 		slog.Any("event_details", responses),
 	)
-	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
+	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", logData...)
 
 	// Print a simplified version of the interaction to the console.
 	fmt.Printf("[TCP] %s %q\n", srcIP, responsesToString(responses))

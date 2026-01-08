@@ -114,9 +114,8 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 	// updates the threat feed, then responds to the client that auth failed.
 	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		// Log the authentication attempt.
-		logData := make([]slog.Attr, 0, 9)
+		logData := make([]slog.Attr, 0, 8)
 		logData = append(logData,
-			slog.String("event_type", "ssh"),
 			slog.String("source_ip", srcIP),
 		)
 		if cfg.UseProxyProtocol {
@@ -136,7 +135,7 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 				slog.String("ssh_client", string(conn.ClientVersion())),
 			),
 		)
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", logData...)
 
 		// Print a simplified version of the request to the console.
 		fmt.Printf("[SSH] %s Username: %q Password: %q\n", srcIP, conn.User(), string(password))

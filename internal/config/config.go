@@ -263,8 +263,11 @@ func (c *Config) InitializeLoggers() error {
 				&slog.HandlerOptions{
 					ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 						switch a.Key {
-						case slog.MessageKey, slog.LevelKey:
-							// Remove default 'message' and 'log level' fields.
+						case slog.MessageKey:
+							// Rename the default 'msg' field to 'event_type'.
+							return slog.String("event_type", a.Value.String())
+						case slog.LevelKey:
+							// Remove the default 'level' field.
 							return slog.Attr{}
 						case "source_ip_error":
 							// Remove 'source_ip_error' field if it's empty.

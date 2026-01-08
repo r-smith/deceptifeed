@@ -59,8 +59,7 @@ func Start(cfg *config.Server) {
 			// the primary goal is to log the received data.
 			_, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
 			srcIP, _, _ := net.SplitHostPort(remoteAddr.String())
-			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "",
-				slog.String("event_type", "udp"),
+			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "udp",
 				slog.String("source_ip", srcIP+" [unreliable]"),
 				slog.String("source_reliability", "unreliable"),
 				slog.String("server_ip", config.GetHostIP()),

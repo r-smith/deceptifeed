@@ -186,9 +186,8 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 		}
 
 		// Log the connection details.
-		logData := make([]slog.Attr, 0, 9)
+		logData := make([]slog.Attr, 0, 8)
 		logData = append(logData,
-			slog.String("event_type", "http"),
 			slog.String("source_ip", srcIP),
 		)
 		if len(cfg.SourceIPHeader) > 0 {
@@ -228,7 +227,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 
 		// Combine log data and write the final log entry.
 		logData = append(logData, slog.Group("event_details", eventDetails...))
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "", logData...)
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
 
 		// Print a simplified version of the request to the console.
 		fmt.Printf("[HTTP] %s %s %s %s\n", srcIP, r.Method, r.URL.Path, r.URL.RawQuery)
