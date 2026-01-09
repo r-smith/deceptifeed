@@ -84,7 +84,7 @@ func Start(cfg *config.Server) {
 
 // handleConnection manages incoming SSH client connections. It performs the
 // handshake and handles authentication callbacks.
-func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Server) {
+func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.Server) {
 	defer conn.Close()
 
 	// Record connection details and handle Proxy Protocol if enabled.
@@ -107,14 +107,17 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
-	// Set the password authentication callback function. This function is
-	// called after a successful SSH handshake. It logs the credentials,
-	// updates the threat feed, then responds to the client that auth failed.
+	// Because we modify the callbacks, clone the config per each connection.
+	sshConfig := *baseConfig
+
+	// PasswordCallback is called during the SSH handshake when a client
+	// requests password authentication. It logs the credentials, updates the
+	// threat feed, then rejects the authentication attempt.
 	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		d := slog.Group("event_details",
-				slog.String("username", conn.User()),
-				slog.String("password", string(password)),
-				slog.String("ssh_client", string(conn.ClientVersion())),
+			slog.String("username", conn.User()),
+			slog.String("password", string(password)),
+			slog.String("ssh_client", string(conn.ClientVersion())),
 		)
 		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
@@ -130,11 +133,11 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 		return nil, fmt.Errorf("invalid username or password")
 	}
 
-	// Perform handshake and authentication. Authentication callbacks are
-	// defined in the SSH server configuration. Since authentication requests
-	// are always rejected, this function will consistently return an error,
-	// and no further connection handling is necessary.
-	sshConn, _, _, err := ssh.NewServerConn(conn, sshConfig)
+	// Perform the SSH handshake with authentication callbacks defined in
+	// sshConfig. Since all authentication attempts are rejected (return an
+	// error), NewServerConn always closes the connection and returns an error.
+	// No further connection or channel handling is necessary.
+	sshConn, _, _, err := ssh.NewServerConn(conn, &sshConfig)
 	if err != nil {
 		return
 	}
