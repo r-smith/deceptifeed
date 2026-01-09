@@ -111,14 +111,12 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 	// called after a successful SSH handshake. It logs the credentials,
 	// updates the threat feed, then responds to the client that auth failed.
 	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
-		logData = append(logData,
-			slog.Group("event_details",
+		d := slog.Group("event_details",
 				slog.String("username", conn.User()),
 				slog.String("password", string(password)),
 				slog.String("ssh_client", string(conn.ClientVersion())),
-			),
 		)
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", logData...)
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
 		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
 
