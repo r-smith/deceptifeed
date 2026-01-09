@@ -118,6 +118,7 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.S
 			slog.String("username", conn.User()),
 			slog.String("password", string(password)),
 			slog.String("ssh_client", string(conn.ClientVersion())),
+			slog.String("auth_method", "password"),
 		)
 		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
