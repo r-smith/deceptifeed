@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
@@ -57,25 +58,22 @@ func Start(cfg *config.Server) {
 func handleConnection(conn net.Conn, cfg *config.Server) {
 	defer conn.Close()
 
-	// Record connection details.
-	dstIP, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
-	srcIP, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	var proxyIP string
-	var parsed bool
-	var errMsg string
+	// Record the connection details and handle Proxy Protocol if enabled.
+	evt := eventdata.Connection{}
+	evt.ServerIP, evt.ServerPort, _ = net.SplitHostPort(conn.LocalAddr().String())
+	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 
-	// If Proxy Protocol is enabled, set proxyIP to the IP address of the proxy
-	// server (the IP that connected to the honeypot), and extract the original
-	// client IP from the proxy header into srcIP.
 	if cfg.UseProxyProtocol {
-		proxyIP = srcIP
+		evt.ProxyIP = evt.SourceIP
 		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
-			errMsg = err.Error()
+			evt.ProxyError = err.Error()
 		} else {
-			parsed = true
-			srcIP = extractedIP
+			evt.ProxyParsed = true
+			evt.SourceIP = extractedIP
 		}
 	}
+
+	logData := prepareLog(&evt, cfg)
 
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
@@ -87,7 +85,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 
 	// Display configured prompts to the client and record the responses.
 	scanner := bufio.NewScanner(conn)
-	responses := make(map[string]string)
+	responses := make(map[string]string, len(cfg.Prompts))
 	for i, prompt := range cfg.Prompts {
 		_, _ = conn.Write([]byte(prompt.Text))
 		scanner.Scan()
@@ -125,34 +123,35 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		return
 	}
 
-	// Log the connection and all responses received from the client.
-	logData := make([]slog.Attr, 0, 8)
-	logData = append(logData,
-		slog.String("source_ip", srcIP),
+	// Log the event and update the threat feed.
+	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
+
+	fmt.Printf("[TCP] %s %q\n", evt.SourceIP, responsesToString(responses))
+
+	if cfg.SendToThreatFeed {
+		threatfeed.Update(evt.SourceIP)
+	}
+}
+
+// preparelog builds structured log fields from network connection metadata.
+func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
+	d := make([]slog.Attr, 0, 8)
+	d = append(d,
+		slog.String("source_ip", evt.SourceIP),
 	)
 	if cfg.UseProxyProtocol {
-		logData = append(logData,
-			slog.Bool("source_ip_parsed", parsed),
-			slog.String("source_ip_error", errMsg),
-			slog.String("proxy_ip", proxyIP),
+		d = append(d,
+			slog.Bool("source_ip_parsed", evt.ProxyParsed),
+			slog.String("source_ip_error", evt.ProxyError),
+			slog.String("proxy_ip", evt.ProxyIP),
 		)
 	}
-	logData = append(logData,
-		slog.String("server_ip", dstIP),
-		slog.String("server_port", dstPort),
+	d = append(d,
+		slog.String("server_ip", evt.ServerIP),
+		slog.String("server_port", evt.ServerPort),
 		slog.String("server_name", config.Hostname),
-		slog.Any("event_details", responses),
 	)
-	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", logData...)
-
-	// Print a simplified version of the interaction to the console.
-	fmt.Printf("[TCP] %s %q\n", srcIP, responsesToString(responses))
-
-	// Update the threat feed with srcIP. If Proxy Protocol is enabled, srcIP
-	// is taken from the proxy header. Otherwise, it's the connecting IP.
-	if cfg.SendToThreatFeed {
-		threatfeed.Update(srcIP)
-	}
+	return d
 }
 
 // responsesToString converts a map of responses from custom prompts into a

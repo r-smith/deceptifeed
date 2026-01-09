@@ -19,6 +19,7 @@ import (
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
@@ -150,60 +151,41 @@ func listenHTTPS(cfg *config.Server, response *responseConfig) {
 func handleConnection(cfg *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Record connection details.
-		dstIP, dstPort := getLocalAddr(r)
-		srcIP, _, _ := net.SplitHostPort(r.RemoteAddr)
-		var proxyIP string
-		var parsed bool
-		var errMsg string
+		evt := eventdata.Connection{}
+		evt.ServerIP, evt.ServerPort = getLocalAddr(r)
+		evt.SourceIP, _, _ = net.SplitHostPort(r.RemoteAddr)
 
-		// If a custom source IP header is configured, set proxyIP to the IP
-		// address of the proxy server (the IP that connected to the honeypot),
-		// and extract the original client IP from the HTTP header into srcIP.
+		// If configured to use a proxy header, extract the client IP and
+		// record proxy information.
 		if len(cfg.SourceIPHeader) > 0 {
-			// If the custom header is missing, invalid, contains multiple IPs,
-			// or if there a multiple headers with the same name, parsing will
-			// fail, and srcIP will fallback to the original connecting IP.
-			proxyIP = srcIP
+			// If the header is missing, invalid, contains multiple IPs, or if
+			// there a multiple headers with the same name, parsing will fail,
+			// and SourceIP will contain the IP that connected to the honeypot.
+			evt.ProxyIP = evt.SourceIP
 			header := r.Header[cfg.SourceIPHeader]
 			switch len(header) {
 			case 0:
-				errMsg = "missing header " + cfg.SourceIPHeader
+				evt.ProxyError = "missing header " + cfg.SourceIPHeader
 			case 1:
 				v := header[0]
 				if _, err := netip.ParseAddr(v); err != nil {
 					if strings.Contains(v, ",") {
-						errMsg = "multiple values in header " + cfg.SourceIPHeader
+						evt.ProxyError = "multiple values in header " + cfg.SourceIPHeader
 					} else {
-						errMsg = "invalid IP in header " + cfg.SourceIPHeader
+						evt.ProxyError = "invalid IP in header " + cfg.SourceIPHeader
 					}
 				} else {
-					parsed = true
-					srcIP = v
+					evt.ProxyParsed = true
+					evt.SourceIP = v
 				}
 			default:
-				errMsg = "multiple instances of header " + cfg.SourceIPHeader
+				evt.ProxyError = "multiple instances of header " + cfg.SourceIPHeader
 			}
 		}
 
-		// Log the connection details.
-		logData := make([]slog.Attr, 0, 8)
-		logData = append(logData,
-			slog.String("source_ip", srcIP),
-		)
-		if len(cfg.SourceIPHeader) > 0 {
-			logData = append(logData,
-				slog.Bool("source_ip_parsed", parsed),
-				slog.String("source_ip_error", errMsg),
-				slog.String("proxy_ip", proxyIP),
-			)
-		}
-		logData = append(logData,
-			slog.String("server_ip", dstIP),
-			slog.String("server_port", dstPort),
-			slog.String("server_name", config.Hostname),
-		)
+		logData := prepareLog(&evt, cfg)
 
-		// Log the HTTP request information.
+		// Record the HTTP request information.
 		eventDetails := []any{
 			slog.String("method", r.Method),
 			slog.String("path", r.URL.Path),
@@ -215,7 +197,7 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 		}
 
 		// If the request includes a "basic" Authorization header, decode and
-		// log the credentials.
+		// record the credentials.
 		if username, password, ok := r.BasicAuth(); ok {
 			eventDetails = append(eventDetails,
 				slog.Group("basic_auth",
@@ -225,20 +207,17 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 			)
 		}
 
-		// Combine log data and write the final log entry.
+		// Log the event and update the threat feed.
 		logData = append(logData, slog.Group("event_details", eventDetails...))
 		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
 
-		// Print a simplified version of the request to the console.
-		fmt.Printf("[HTTP] %s %s %s %s\n", srcIP, r.Method, r.URL.Path, r.URL.RawQuery)
+		fmt.Printf("[HTTP] %s %s %s %s\n", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
 
-		// Update the threat feed with srcIP. If Proxy Protocol is enabled, srcIP
-		// is taken from the proxy header. Otherwise, it's the connecting IP.
 		if shouldUpdateThreatFeed(cfg, r) {
-			threatfeed.Update(srcIP)
+			threatfeed.Update(evt.SourceIP)
 		}
 
-		// Apply optional custom HTTP response headers.
+		// Add any configured headers to the HTTP response.
 		for header, value := range customHeaders {
 			w.Header().Set(header, value)
 		}
@@ -268,6 +247,27 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 			response.fsHandler.ServeHTTP(w, r)
 		}
 	}
+}
+
+// preparelog builds structured log fields from network connection metadata.
+func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
+	d := make([]slog.Attr, 0, 8)
+	d = append(d,
+		slog.String("source_ip", evt.SourceIP),
+	)
+	if cfg.UseProxyProtocol {
+		d = append(d,
+			slog.Bool("source_ip_parsed", evt.ProxyParsed),
+			slog.String("source_ip_error", evt.ProxyError),
+			slog.String("proxy_ip", evt.ProxyIP),
+		)
+	}
+	d = append(d,
+		slog.String("server_ip", evt.ServerIP),
+		slog.String("server_port", evt.ServerPort),
+		slog.String("server_name", config.Hostname),
+	)
+	return d
 }
 
 // serveErrorPage serves an error HTTP response code and optional html page.

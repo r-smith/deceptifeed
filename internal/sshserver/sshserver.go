@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 	"golang.org/x/crypto/ssh"
@@ -86,25 +87,22 @@ func Start(cfg *config.Server) {
 func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Server) {
 	defer conn.Close()
 
-	// Record connection details.
-	dstIP, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
-	srcIP, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	var proxyIP string
-	var errMsg string
-	var parsed bool
+	// Record connection details and handle Proxy Protocol if enabled.
+	evt := eventdata.Connection{}
+	evt.ServerIP, evt.ServerPort, _ = net.SplitHostPort(conn.LocalAddr().String())
+	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 
-	// If Proxy Protocol is enabled, set proxyIP to the IP address of the proxy
-	// server (the IP that connected to the honeypot), and extract the original
-	// client IP from the proxy header into srcIP.
 	if cfg.UseProxyProtocol {
-		proxyIP = srcIP
+		evt.ProxyIP = evt.SourceIP
 		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
-			errMsg = err.Error()
+			evt.ProxyError = err.Error()
 		} else {
-			parsed = true
-			srcIP = extractedIP
+			evt.ProxyParsed = true
+			evt.SourceIP = extractedIP
 		}
 	}
+
+	logData := prepareLog(&evt, cfg)
 
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
@@ -113,22 +111,7 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 	// called after a successful SSH handshake. It logs the credentials,
 	// updates the threat feed, then responds to the client that auth failed.
 	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
-		// Log the authentication attempt.
-		logData := make([]slog.Attr, 0, 8)
 		logData = append(logData,
-			slog.String("source_ip", srcIP),
-		)
-		if cfg.UseProxyProtocol {
-			logData = append(logData,
-				slog.Bool("source_ip_parsed", parsed),
-				slog.String("source_ip_error", errMsg),
-				slog.String("proxy_ip", proxyIP),
-			)
-		}
-		logData = append(logData,
-			slog.String("server_ip", dstIP),
-			slog.String("server_port", dstPort),
-			slog.String("server_name", config.Hostname),
 			slog.Group("event_details",
 				slog.String("username", conn.User()),
 				slog.String("password", string(password)),
@@ -137,19 +120,15 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 		)
 		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", logData...)
 
-		// Print a simplified version of the request to the console.
-		fmt.Printf("[SSH] %s Username: %q Password: %q\n", srcIP, conn.User(), string(password))
+		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
 
-		// Update the threat feed with srcIP. If Proxy Protocol is enabled,
-		// srcIP is from the proxy header. Otherwise, it's the connecting IP.
 		if cfg.SendToThreatFeed {
-			threatfeed.Update(srcIP)
+			threatfeed.Update(evt.SourceIP)
 		}
 
-		// Insert a fixed delay between authentication attempts.
+		// Insert a fixed delay, then reject the authentication attempt.
 		time.Sleep(2 * time.Second)
 
-		// Reject the authentication request.
 		return nil, fmt.Errorf("invalid username or password")
 	}
 
@@ -162,6 +141,27 @@ func handleConnection(conn net.Conn, sshConfig *ssh.ServerConfig, cfg *config.Se
 		return
 	}
 	defer sshConn.Close()
+}
+
+// preparelog builds structured log fields from network connection metadata.
+func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
+	d := make([]slog.Attr, 0, 8)
+	d = append(d,
+		slog.String("source_ip", evt.SourceIP),
+	)
+	if cfg.UseProxyProtocol {
+		d = append(d,
+			slog.Bool("source_ip_parsed", evt.ProxyParsed),
+			slog.String("source_ip_error", evt.ProxyError),
+			slog.String("proxy_ip", evt.ProxyIP),
+		)
+	}
+	d = append(d,
+		slog.String("server_ip", evt.ServerIP),
+		slog.String("server_port", evt.ServerPort),
+		slog.String("server_name", config.Hostname),
+	)
+	return d
 }
 
 // loadOrGeneratePrivateKey attempts to load a private key from the specified
