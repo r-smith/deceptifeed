@@ -43,10 +43,10 @@ func Start(c *config.Config) {
 	// Periodically delete expired entries and save the current threat feed to
 	// disk.
 	ticker := time.NewTicker(saveInterval)
+	defer ticker.Stop()
 	go func() {
 		for range ticker.C {
-			if dataChanged {
-				dataChanged = false
+			if dataChanged.CompareAndSwap(true, false) {
 				deleteExpired()
 				if err := saveCSV(); err != nil {
 					fmt.Fprintln(os.Stderr, "Error saving Threat Feed data:", err)

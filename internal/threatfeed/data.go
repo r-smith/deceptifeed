@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -51,7 +52,7 @@ var (
 
 	// dataChanged indicates whether the IoC map has been modified since the
 	// last time it was saved to disk.
-	dataChanged = false
+	dataChanged atomic.Bool
 
 	// csvHeader defines the header row for saved threat feed data.
 	csvHeader = []string{"ip", "added", "last_seen", "observations"}
@@ -88,7 +89,7 @@ func Update(ip string) {
 	}
 	mu.Unlock()
 
-	dataChanged = true
+	dataChanged.Store(true)
 }
 
 // deleteExpired deletes expired threat feed entries from the IoC map.
