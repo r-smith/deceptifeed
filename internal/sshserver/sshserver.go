@@ -22,12 +22,9 @@ import (
 // automatically disconnected, set to 30 seconds.
 const serverTimeout = 30 * time.Second
 
-// Start initializes and starts an SSH honeypot server. The SSH server is
-// designed to log the usernames and passwords submitted in authentication
-// requests. It is not possible for clients to log in to the honeypot server,
-// as authentication is the only function handled by the server. Clients
-// receive authentication failure responses for every login attempt.
-// Interactions with the SSH server are sent to the threat feed.
+// Start launches an SSH honeypot server that logs credentials and reports
+// activity to the threat feed. All authentication attempts are rejected. It is
+// not possible to "login" to the server.
 func Start(cfg *config.Server) {
 	fmt.Printf("Starting SSH server on port: %s\n", cfg.Port)
 	sshConfig := &ssh.ServerConfig{}
@@ -40,27 +37,11 @@ func Start(cfg *config.Server) {
 	}
 	sshConfig.AddHostKey(privateKey)
 
-	// If a banner string is provided in the configuration, use it as the SSH
-	// server version string advertised to connecting clients. This allows
-	// the honeypot server to mimic the appearance of other common SSH servers,
-	// such as OpenSSH on Debian, Ubuntu, FreeBSD, or Raspberry Pi.
+	// Set the SSH server identification string advertised to clients.
 	if len(cfg.Banner) > 0 {
 		sshConfig.ServerVersion = cfg.Banner
 	} else {
 		sshConfig.ServerVersion = config.DefaultBannerSSH
-	}
-
-	// Define the public key authentication callback function.
-	sshConfig.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-		// This public key authentication function rejects all requests.
-		// Currently, no data is logged. Useful information may include:
-		// `key.Type()` and `ssh.FingerprintSHA256(key)`.
-
-		// Short, intentional delay.
-		time.Sleep(200 * time.Millisecond)
-
-		// Reject the authentication request.
-		return nil, fmt.Errorf("permission denied")
 	}
 
 	// Start the SSH server.
@@ -87,11 +68,12 @@ func Start(cfg *config.Server) {
 func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.Server) {
 	defer conn.Close()
 
-	// Record connection details and handle Proxy Protocol if enabled.
+	// Capture connection metadata.
 	evt := eventdata.Connection{}
 	evt.ServerIP, evt.ServerPort, _ = net.SplitHostPort(conn.LocalAddr().String())
 	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 
+	// Handle Proxy Protocol.
 	if cfg.UseProxyProtocol {
 		evt.ProxyIP = evt.SourceIP
 		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
@@ -102,50 +84,20 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.S
 		}
 	}
 
+	// Prepare log and apply callbacks to ssh config.
 	logData := prepareLog(&evt, cfg)
+	sshConfig := configureCallbacks(baseConfig, cfg, &evt, logData)
 
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
-	// Because we modify the callbacks, clone the config per each connection.
-	sshConfig := *baseConfig
-
-	// PasswordCallback is called during the SSH handshake when a client
-	// requests password authentication. It logs the credentials, updates the
-	// threat feed, then rejects the authentication attempt.
-	sshConfig.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
-		d := slog.Group("event_details",
-			slog.String("username", conn.User()),
-			slog.String("password", string(password)),
-			slog.String("ssh_client", string(conn.ClientVersion())),
-			slog.String("auth_method", "password"),
-		)
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
-
-		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
-
-		if cfg.SendToThreatFeed {
-			threatfeed.Update(evt.SourceIP)
-		}
-
-		// Insert a fixed delay, then reject the authentication attempt.
-		time.Sleep(2 * time.Second)
-
-		return nil, fmt.Errorf("invalid username or password")
-	}
-
-	// Perform the SSH handshake with authentication callbacks defined in
-	// sshConfig. Since all authentication attempts are rejected (return an
-	// error), NewServerConn always closes the connection and returns an error.
-	// No further connection or channel handling is necessary.
-	sshConn, _, _, err := ssh.NewServerConn(conn, &sshConfig)
-	if err != nil {
-		return
-	}
-	defer sshConn.Close()
+	// Perform the SSH handshake. Because all authentication attempts are
+	// rejected (return an error), NewServerConn never opens a connection. No
+	// further connection or channel handling is necessary.
+	_, _, _, _ = ssh.NewServerConn(conn, sshConfig)
 }
 
-// preparelog builds structured log fields from network connection metadata.
+// prepareLog builds structured log fields from network connection metadata.
 func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
@@ -164,6 +116,45 @@ func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
 		slog.String("server_name", config.Hostname),
 	)
 	return d
+}
+
+// configureCallbacks attaches authentication callbacks to a base SSH config.
+// The callbacks log authentication attempts and update the threat feed.
+func configureCallbacks(base *ssh.ServerConfig, cfg *config.Server, evt *eventdata.Connection, logData []slog.Attr) *ssh.ServerConfig {
+	conf := *base
+
+	// Password authentication: Log the credentials, update the threat feed,
+	// then reject the attempt.
+	conf.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+		d := slog.Group("event_details",
+			slog.String("username", conn.User()),
+			slog.String("password", string(password)),
+			slog.String("ssh_client", string(conn.ClientVersion())),
+			slog.String("auth_method", "password"),
+		)
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
+
+		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
+
+		if cfg.SendToThreatFeed {
+			threatfeed.Update(evt.SourceIP)
+		}
+
+		// Insert a fixed delay, then reject the authentication attempt.
+		time.Sleep(2 * time.Second)
+		return nil, fmt.Errorf("invalid username or password")
+	}
+
+	// Publickey authentication: Reject the attempt.
+	conf.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+		// Information to log:
+		// `key.Type()` and `ssh.FingerprintSHA256(key)`.
+
+		// Reject the authentication request.
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	return &conf
 }
 
 // loadOrGeneratePrivateKey attempts to load a private key from the specified
