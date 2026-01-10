@@ -121,23 +121,32 @@
                         break;
                     }
                     case 'ssh': {
+                        // Display username.
                         const usernameLabel = document.createElement('span');
                         usernameLabel.textContent = 'User: ';
                         usernameLabel.className = 'magenta';
                         const username = document.createTextNode(d.event_details.username);
 
-                        const br = document.createElement('br');
-
-                        const passwordLabel = document.createElement('span');
-                        passwordLabel.textContent = 'Pass: ';
-                        passwordLabel.className = 'magenta';
-                        const password = document.createTextNode(d.event_details.password);
-
                         eventDetails.appendChild(usernameLabel);
                         eventDetails.appendChild(username);
-                        eventDetails.appendChild(br);
-                        eventDetails.appendChild(passwordLabel);
-                        eventDetails.appendChild(password);
+                        eventDetails.appendChild(document.createElement('br'));
+
+                        // Check auth method.
+                        if (d.event_details.auth_method == 'publickey') {
+                            // Public key auth.
+                            const pkLabel = document.createElement('span');
+                            pkLabel.textContent = 'Public Key Authentication';
+                            pkLabel.className = 'gray';
+                            eventDetails.appendChild(pkLabel);
+                        } else {
+                            // Password auth.
+                            const passwordLabel = document.createElement('span');
+                            passwordLabel.textContent = 'Pass: ';
+                            passwordLabel.className = 'magenta';
+                            const password = document.createTextNode(d.event_details.password);
+                            eventDetails.appendChild(passwordLabel);
+                            eventDetails.appendChild(password);
+                        }
 
                         break;
                     }
