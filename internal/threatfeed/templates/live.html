@@ -132,7 +132,7 @@
                         eventDetails.appendChild(document.createElement('br'));
 
                         // Check auth method.
-                        if (d.event_details.auth_method == 'publickey') {
+                        if (d.event_details.auth_method === 'publickey') {
                             // Public key auth.
                             const pkLabel = document.createElement('span');
                             pkLabel.textContent = 'Public Key Authentication';
