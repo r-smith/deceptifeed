@@ -145,12 +145,29 @@ func configureCallbacks(base *ssh.ServerConfig, cfg *config.Server, evt *eventda
 		return nil, fmt.Errorf("invalid username or password")
 	}
 
-	// Publickey authentication: Reject the attempt.
+	// Publickey authentication: Log the key hash and username, update the
+	// threat feed, then reject the attempt. Note: The logged key is unverified
+	// because the login is rejected before the client proves key ownership.
 	conf.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-		// Information to log:
-		// `key.Type()` and `ssh.FingerprintSHA256(key)`.
+		d := slog.Group("event_details",
+			slog.String("username", conn.User()),
+			slog.String("ssh_client", string(conn.ClientVersion())),
+			slog.String("auth_method", "publickey"),
+			slog.Group("publickey",
+				slog.String("type", key.Type()),
+				slog.String("fingerprint_sha256", ssh.FingerprintSHA256(key)),
+				slog.Bool("is_verified", false),
+			),
+		)
+		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
-		// Reject the authentication request.
+		fmt.Printf("[SSH] %s Username: %q (publickey authentication attempt)\n", evt.SourceIP, conn.User())
+
+		if cfg.SendToThreatFeed {
+			threatfeed.Update(evt.SourceIP)
+		}
+
+		// Reject the authentication attempt.
 		return nil, fmt.Errorf("permission denied")
 	}
 
