@@ -1,5 +1,9 @@
 package logmonitor
 
+import (
+	"bytes"
+)
+
 // Monitor is an io.Writer that sends bytes written to its Write method to an
 // underlying byte channel. This allows other packages to receive the data from
 // the channel. Writes are non-blocking. If there is no receiver, the data is
@@ -15,20 +19,19 @@ type Monitor struct {
 // New creates a new Monitor ready for I/O operations. The underlying `Channel`
 // should have a receiver to capture and process the data.
 func New() *Monitor {
-	channel := make(chan []byte, 2)
 	return &Monitor{
-		Channel: channel,
+		Channel: make(chan []byte, 10),
 	}
 }
 
-// Write sends the bytes from p to the underlying Monitor's channel. If there
-// is no receiver for the channel, the data is silently discarded. Write always
+// Write sends the bytes from p to the underlying channel. If there is no
+// active receiver, the data is discarded to prevent blocking. Write always
 // returns n = len(p) and err = nil.
 func (m *Monitor) Write(p []byte) (n int, err error) {
 	select {
-	case m.Channel <- p:
-		return len(p), nil
+	case m.Channel <- bytes.Clone(p):
 	default:
-		return len(p), nil
 	}
+
+	return len(p), nil
 }
