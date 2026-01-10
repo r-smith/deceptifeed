@@ -66,8 +66,8 @@ func GenerateSelfSigned(certPath string, keyPath string) (tls.Certificate, error
 // writeCertAndKey saves the public certificate and private key in PEM format
 // to the specified paths.
 func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath string) error {
-	// Save the certificate file to disk.
-	certFile, err := os.Create(certPath)
+	// Write the certificate.
+	certFile, err := os.OpenFile(certPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -77,15 +77,12 @@ func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath s
 		return err
 	}
 
-	// Save the private key file to disk.
-	keyFile, err := os.Create(keyPath)
+	// Write the private key.
+	keyFile, err := os.OpenFile(keyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 	defer keyFile.Close()
-
-	// Limit key access to the owner only.
-	_ = keyFile.Chmod(0600)
 
 	if err := pem.Encode(keyFile, key); err != nil {
 		return err

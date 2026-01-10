@@ -217,17 +217,11 @@ func writePrivateKey(path string, privateKey any) error {
 		Bytes: privBytes,
 	}
 
-	file, err := os.Create(path)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Limit key access to the owner only.
-	_ = file.Chmod(0600)
-
-	if err := pem.Encode(file, privPem); err != nil {
-		return err
-	}
-	return nil
+	return pem.Encode(file, privPem)
 }
