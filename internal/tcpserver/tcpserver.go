@@ -24,20 +24,20 @@ const serverTimeout = 30 * time.Second
 // Start initializes and starts a generic TCP honeypot server. It presents
 // custom prompts to connected clients and logs their responses. Interactions
 // with the TCP server are sent to the threat feed.
-func Start(cfg *config.Server) {
-	fmt.Printf("Starting TCP server on port: %s\n", cfg.Port)
-	listener, err := net.Listen("tcp", ":"+cfg.Port)
+func Start(srv *config.Server) {
+	fmt.Printf("Starting TCP server on port: %s\n", srv.Port)
+	listener, err := net.Listen("tcp", ":"+srv.Port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The TCP server on port %s has stopped: %v\n", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The TCP server on port %s has stopped: %v\n", srv.Port, err)
 		return
 	}
 	defer listener.Close()
 
 	// Replace occurrences of "\n" with "\r\n". The configuration file uses
 	// "\n", but CRLF is expected for TCP protocols.
-	cfg.Banner = strings.ReplaceAll(cfg.Banner, "\\n", "\r\n")
-	for i := range cfg.Prompts {
-		cfg.Prompts[i].Text = strings.ReplaceAll(cfg.Prompts[i].Text, "\\n", "\r\n")
+	srv.Banner = strings.ReplaceAll(srv.Banner, "\\n", "\r\n")
+	for i := range srv.Prompts {
+		srv.Prompts[i].Text = strings.ReplaceAll(srv.Prompts[i].Text, "\\n", "\r\n")
 	}
 
 	// Listen for and accept incoming connections.
@@ -47,7 +47,7 @@ func Start(cfg *config.Server) {
 			continue
 		}
 
-		go handleConnection(conn, cfg)
+		go handleConnection(conn, srv)
 	}
 }
 
@@ -55,7 +55,7 @@ func Start(cfg *config.Server) {
 // server. It presents custom prompts to the client, records and logs their
 // responses, and then disconnects the client. This function manages the entire
 // client interaction.
-func handleConnection(conn net.Conn, cfg *config.Server) {
+func handleConnection(conn net.Conn, srv *config.Server) {
 	defer conn.Close()
 
 	// Record the connection details and handle Proxy Protocol if enabled.
@@ -63,7 +63,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 	evt.ServerIP, evt.ServerPort, _ = net.SplitHostPort(conn.LocalAddr().String())
 	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 
-	if cfg.UseProxyProtocol {
+	if srv.UseProxyProtocol {
 		evt.ProxyIP = evt.SourceIP
 		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
 			evt.ProxyError = err.Error()
@@ -73,20 +73,20 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		}
 	}
 
-	logData := prepareLog(&evt, cfg)
+	logData := prepareLog(&evt, srv)
 
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
 	// Display initial banner to the client if configured.
-	if len(cfg.Banner) > 0 {
-		_, _ = conn.Write([]byte(cfg.Banner))
+	if srv.Banner != "" {
+		_, _ = conn.Write([]byte(srv.Banner))
 	}
 
 	// Display configured prompts to the client and record the responses.
 	scanner := bufio.NewScanner(conn)
-	responses := make(map[string]string, len(cfg.Prompts))
-	for i, prompt := range cfg.Prompts {
+	responses := make(map[string]string, len(srv.Prompts))
+	for i, prompt := range srv.Prompts {
 		_, _ = conn.Write([]byte(prompt.Text))
 		scanner.Scan()
 		var key string
@@ -96,7 +96,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 		// "data00" is used, where "00" is the index plus one.
 		if prompt.Log == "none" {
 			continue
-		} else if len(prompt.Log) > 0 {
+		} else if prompt.Log != "" {
 			key = prompt.Log
 		} else {
 			key = fmt.Sprintf("data%02d", i+1)
@@ -106,7 +106,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 
 	// If no prompts are configured, wait for client input and record the
 	// received data.
-	if len(cfg.Prompts) == 0 {
+	if len(srv.Prompts) == 0 {
 		scanner.Scan()
 		responses["data"] = scanner.Text()
 	}
@@ -114,7 +114,7 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 	// Check if the client sent any data. If not, exit without logging.
 	didProvideData := false
 	for _, v := range responses {
-		if len(v) > 0 {
+		if v != "" {
 			didProvideData = true
 			break
 		}
@@ -124,22 +124,22 @@ func handleConnection(conn net.Conn, cfg *config.Server) {
 	}
 
 	// Log the event and update the threat feed.
-	cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
+	srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
 
 	fmt.Printf("[TCP] %s %q\n", evt.SourceIP, responsesToString(responses))
 
-	if cfg.SendToThreatFeed {
+	if srv.SendToThreatFeed {
 		threatfeed.Update(evt.SourceIP)
 	}
 }
 
 // preparelog builds structured log fields from network connection metadata.
-func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
+func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
 		slog.String("source_ip", evt.SourceIP),
 	)
-	if cfg.UseProxyProtocol {
+	if srv.UseProxyProtocol {
 		d = append(d,
 			slog.Bool("source_ip_parsed", evt.ProxyParsed),
 			slog.String("source_ip_error", evt.ProxyError),

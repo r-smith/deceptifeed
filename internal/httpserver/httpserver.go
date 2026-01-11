@@ -46,25 +46,25 @@ type responseConfig struct {
 // determineConfig reads the given configuration and returns a responseConfig,
 // selecting the honeypot's response mode based on whether the HomePagePath
 // setting is empty, a file, or a directory.
-func determineConfig(cfg *config.Server) *responseConfig {
-	if len(cfg.HomePagePath) == 0 {
+func determineConfig(srv *config.Server) *responseConfig {
+	if srv.HomePagePath == "" {
 		return &responseConfig{mode: modeDefault}
 	}
 
-	info, err := os.Stat(cfg.HomePagePath)
+	info, err := os.Stat(srv.HomePagePath)
 	if err != nil {
 		return &responseConfig{mode: modeDefault}
 	}
 
 	if info.IsDir() {
-		root, err := os.OpenRoot(cfg.HomePagePath)
+		root, err := os.OpenRoot(srv.HomePagePath)
 		if err != nil {
 			return &responseConfig{mode: modeDefault}
 		}
 		return &responseConfig{
 			mode:      modeDirectory,
 			fsRoot:    root,
-			fsHandler: withCustomError(http.FileServerFS(noDirectoryFS{root.FS()}), cfg.ErrorPagePath),
+			fsHandler: withCustomError(http.FileServerFS(noDirectoryFS{root.FS()}), srv.ErrorPagePath),
 		}
 	}
 
@@ -77,26 +77,26 @@ func determineConfig(cfg *config.Server) *responseConfig {
 // request details and updates the threat feed as needed. If a filesystem path
 // is specified in the configuration, the honeypot serves static content from
 // the path.
-func Start(cfg *config.Server) {
-	response := determineConfig(cfg)
+func Start(srv *config.Server) {
+	response := determineConfig(srv)
 	if response.mode == modeDirectory {
 		defer response.fsRoot.Close()
 	}
 
-	switch cfg.Type {
+	switch srv.Type {
 	case config.HTTP:
-		listenHTTP(cfg, response)
+		listenHTTP(srv, response)
 	case config.HTTPS:
-		listenHTTPS(cfg, response)
+		listenHTTPS(srv, response)
 	}
 }
 
 // listenHTTP initializes and starts an HTTP (plaintext) honeypot server.
-func listenHTTP(cfg *config.Server, response *responseConfig) {
+func listenHTTP(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers), response))
-	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
+	mux.HandleFunc("/", handleConnection(srv, parseCustomHeaders(srv.Headers), response))
+	s := &http.Server{
+		Addr:         ":" + srv.Port,
 		Handler:      mux,
 		ErrorLog:     log.New(io.Discard, "", log.LstdFlags),
 		ReadTimeout:  5 * time.Second,
@@ -105,18 +105,18 @@ func listenHTTP(cfg *config.Server, response *responseConfig) {
 	}
 
 	// Start the HTTP server.
-	fmt.Printf("Starting HTTP server on port: %s\n", cfg.Port)
-	if err := srv.ListenAndServe(); err != nil {
-		fmt.Fprintf(os.Stderr, "The HTTP server on port %s has stopped: %v\n", cfg.Port, err)
+	fmt.Printf("Starting HTTP server on port: %s\n", srv.Port)
+	if err := s.ListenAndServe(); err != nil {
+		fmt.Fprintf(os.Stderr, "The HTTP server on port %s has stopped: %v\n", srv.Port, err)
 	}
 }
 
 // listenHTTPS initializes and starts an HTTPS (encrypted) honeypot server.
-func listenHTTPS(cfg *config.Server, response *responseConfig) {
+func listenHTTPS(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(cfg, parseCustomHeaders(cfg.Headers), response))
-	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
+	mux.HandleFunc("/", handleConnection(srv, parseCustomHeaders(srv.Headers), response))
+	s := &http.Server{
+		Addr:         ":" + srv.Port,
 		Handler:      mux,
 		ErrorLog:     log.New(io.Discard, "", log.LstdFlags),
 		ReadTimeout:  5 * time.Second,
@@ -125,30 +125,30 @@ func listenHTTPS(cfg *config.Server, response *responseConfig) {
 	}
 
 	// If the cert and key aren't found, generate a self-signed certificate.
-	if _, err := os.Stat(cfg.CertPath); errors.Is(err, fs.ErrNotExist) {
-		if _, err := os.Stat(cfg.KeyPath); errors.Is(err, fs.ErrNotExist) {
-			cert, err := certutil.GenerateSelfSigned(cfg.CertPath, cfg.KeyPath)
+	if _, err := os.Stat(srv.CertPath); errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Stat(srv.KeyPath); errors.Is(err, fs.ErrNotExist) {
+			cert, err := certutil.GenerateSelfSigned(srv.CertPath, srv.KeyPath)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Failed to generate HTTPS certificate:", err)
 				return
 			}
 
 			// Add cert to server config.
-			srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+			s.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 		}
 	}
 
 	// Start the HTTPS server.
-	fmt.Printf("Starting HTTPS server on port: %s\n", cfg.Port)
-	if err := srv.ListenAndServeTLS(cfg.CertPath, cfg.KeyPath); err != nil {
-		fmt.Fprintf(os.Stderr, "The HTTPS server on port %s has stopped: %v\n", cfg.Port, err)
+	fmt.Printf("Starting HTTPS server on port: %s\n", srv.Port)
+	if err := s.ListenAndServeTLS(srv.CertPath, srv.KeyPath); err != nil {
+		fmt.Fprintf(os.Stderr, "The HTTPS server on port %s has stopped: %v\n", srv.Port, err)
 	}
 }
 
 // handleConnection processes incoming HTTP and HTTPS client requests. It logs
 // the details of each request, updates the threat feed, and serves responses
 // based on the honeypot configuration.
-func handleConnection(cfg *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
+func handleConnection(srv *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Record connection details.
 		evt := eventdata.Connection{}
@@ -157,33 +157,33 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 
 		// If configured to use a proxy header, extract the client IP and
 		// record proxy information.
-		if len(cfg.SourceIPHeader) > 0 {
+		if srv.SourceIPHeader != "" {
 			// If the header is missing, invalid, contains multiple IPs, or if
 			// there a multiple headers with the same name, parsing will fail,
 			// and SourceIP will contain the IP that connected to the honeypot.
 			evt.ProxyIP = evt.SourceIP
-			header := r.Header[cfg.SourceIPHeader]
+			header := r.Header[srv.SourceIPHeader]
 			switch len(header) {
 			case 0:
-				evt.ProxyError = "missing header " + cfg.SourceIPHeader
+				evt.ProxyError = "missing header " + srv.SourceIPHeader
 			case 1:
 				v := header[0]
 				if _, err := netip.ParseAddr(v); err != nil {
 					if strings.Contains(v, ",") {
-						evt.ProxyError = "multiple values in header " + cfg.SourceIPHeader
+						evt.ProxyError = "multiple values in header " + srv.SourceIPHeader
 					} else {
-						evt.ProxyError = "invalid IP in header " + cfg.SourceIPHeader
+						evt.ProxyError = "invalid IP in header " + srv.SourceIPHeader
 					}
 				} else {
 					evt.ProxyParsed = true
 					evt.SourceIP = v
 				}
 			default:
-				evt.ProxyError = "multiple instances of header " + cfg.SourceIPHeader
+				evt.ProxyError = "multiple instances of header " + srv.SourceIPHeader
 			}
 		}
 
-		logData := prepareLog(&evt, cfg)
+		logData := prepareLog(&evt, srv)
 
 		// Record the HTTP request information.
 		eventDetails := []any{
@@ -209,11 +209,11 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 
 		// Log the event and update the threat feed.
 		logData = append(logData, slog.Group("event_details", eventDetails...))
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
 
 		fmt.Printf("[HTTP] %s %s %s %s\n", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
 
-		if shouldUpdateThreatFeed(cfg, r) {
+		if shouldUpdateThreatFeed(srv, r) {
 			threatfeed.Update(evt.SourceIP)
 		}
 
@@ -233,14 +233,14 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			} else {
-				serveErrorPage(w, r, cfg.ErrorPagePath)
+				serveErrorPage(w, r, srv.ErrorPagePath)
 			}
 		case modeFile:
 			// Serve a single file.
 			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-				http.ServeFile(w, r, cfg.HomePagePath)
+				http.ServeFile(w, r, srv.HomePagePath)
 			} else {
-				serveErrorPage(w, r, cfg.ErrorPagePath)
+				serveErrorPage(w, r, srv.ErrorPagePath)
 			}
 		case modeDirectory:
 			// Serve files from a directory.
@@ -250,12 +250,12 @@ func handleConnection(cfg *config.Server, customHeaders map[string]string, respo
 }
 
 // preparelog builds structured log fields from network connection metadata.
-func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
+func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
 		slog.String("source_ip", evt.SourceIP),
 	)
-	if cfg.UseProxyProtocol {
+	if srv.UseProxyProtocol {
 		d = append(d,
 			slog.Bool("source_ip_parsed", evt.ProxyParsed),
 			slog.String("source_ip_error", evt.ProxyError),
@@ -272,7 +272,7 @@ func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
 
 // serveErrorPage serves an error HTTP response code and optional html page.
 func serveErrorPage(w http.ResponseWriter, r *http.Request, path string) {
-	if len(path) == 0 {
+	if path == "" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -283,16 +283,16 @@ func serveErrorPage(w http.ResponseWriter, r *http.Request, path string) {
 
 // shouldUpdateThreatFeed determines if the threat feed should be updated based
 // on the server's configured rules.
-func shouldUpdateThreatFeed(cfg *config.Server, r *http.Request) bool {
+func shouldUpdateThreatFeed(srv *config.Server, r *http.Request) bool {
 	// Return false if `sendToThreatFeed`` is disabled, or if the request
 	// matches an `exclude` rule.
-	if !cfg.SendToThreatFeed || checkRuleMatches(cfg.Rules.Exclude, r) {
+	if !srv.SendToThreatFeed || checkRuleMatches(srv.Rules.Exclude, r) {
 		return false
 	}
 
 	// Return true if no `include` rules are defined. Otherwise, return whether
 	// the request matches any of the `include` rules.
-	return len(cfg.Rules.Include) == 0 || checkRuleMatches(cfg.Rules.Include, r)
+	return len(srv.Rules.Include) == 0 || checkRuleMatches(srv.Rules.Include, r)
 }
 
 // checkRuleMatches checks if a request matches any of the specified rules.

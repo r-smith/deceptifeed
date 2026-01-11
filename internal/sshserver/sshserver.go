@@ -25,29 +25,29 @@ const serverTimeout = 30 * time.Second
 // Start launches an SSH honeypot server that logs credentials and reports
 // activity to the threat feed. All authentication attempts are rejected. It is
 // not possible to "login" to the server.
-func Start(cfg *config.Server) {
-	fmt.Printf("Starting SSH server on port: %s\n", cfg.Port)
+func Start(srv *config.Server) {
+	fmt.Printf("Starting SSH server on port: %s\n", srv.Port)
 	sshConfig := &ssh.ServerConfig{}
 
 	// Load or generate a private key and add it to the SSH configuration.
-	privateKey, err := loadOrGeneratePrivateKey(cfg.KeyPath)
+	privateKey, err := loadOrGeneratePrivateKey(srv.KeyPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", srv.Port, err)
 		return
 	}
 	sshConfig.AddHostKey(privateKey)
 
 	// Set the SSH server identification string advertised to clients.
-	if len(cfg.Banner) > 0 {
-		sshConfig.ServerVersion = cfg.Banner
-	} else {
+	if srv.Banner == "" {
 		sshConfig.ServerVersion = config.DefaultBannerSSH
+	} else {
+		sshConfig.ServerVersion = srv.Banner
 	}
 
 	// Start the SSH server.
-	listener, err := net.Listen("tcp", ":"+cfg.Port)
+	listener, err := net.Listen("tcp", ":"+srv.Port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", srv.Port, err)
 		return
 	}
 	defer listener.Close()
@@ -59,13 +59,13 @@ func Start(cfg *config.Server) {
 			continue
 		}
 
-		go handleConnection(conn, sshConfig, cfg)
+		go handleConnection(conn, sshConfig, srv)
 	}
 }
 
 // handleConnection manages incoming SSH client connections. It performs the
 // handshake and handles authentication callbacks.
-func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.Server) {
+func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.Server) {
 	defer conn.Close()
 
 	// Capture connection metadata.
@@ -74,7 +74,7 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.S
 	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 
 	// Handle Proxy Protocol.
-	if cfg.UseProxyProtocol {
+	if srv.UseProxyProtocol {
 		evt.ProxyIP = evt.SourceIP
 		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
 			evt.ProxyError = err.Error()
@@ -85,8 +85,8 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.S
 	}
 
 	// Prepare log and apply callbacks to ssh config.
-	logData := prepareLog(&evt, cfg)
-	sshConfig := configureCallbacks(baseConfig, cfg, &evt, logData)
+	logData := prepareLog(&evt, srv)
+	sshConfig := configureCallbacks(baseConfig, srv, &evt, logData)
 
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
@@ -98,12 +98,12 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, cfg *config.S
 }
 
 // prepareLog builds structured log fields from network connection metadata.
-func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
+func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
 		slog.String("source_ip", evt.SourceIP),
 	)
-	if cfg.UseProxyProtocol {
+	if srv.UseProxyProtocol {
 		d = append(d,
 			slog.Bool("source_ip_parsed", evt.ProxyParsed),
 			slog.String("source_ip_error", evt.ProxyError),
@@ -120,7 +120,7 @@ func prepareLog(evt *eventdata.Connection, cfg *config.Server) []slog.Attr {
 
 // configureCallbacks attaches authentication callbacks to a base SSH config.
 // The callbacks log authentication attempts and update the threat feed.
-func configureCallbacks(base *ssh.ServerConfig, cfg *config.Server, evt *eventdata.Connection, logData []slog.Attr) *ssh.ServerConfig {
+func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventdata.Connection, logData []slog.Attr) *ssh.ServerConfig {
 	conf := *base
 
 	// Password authentication: Log the credentials, update the threat feed,
@@ -132,11 +132,11 @@ func configureCallbacks(base *ssh.ServerConfig, cfg *config.Server, evt *eventda
 			slog.String("ssh_client", string(conn.ClientVersion())),
 			slog.String("auth_method", "password"),
 		)
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
 		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
 
-		if cfg.SendToThreatFeed {
+		if srv.SendToThreatFeed {
 			threatfeed.Update(evt.SourceIP)
 		}
 
@@ -159,11 +159,11 @@ func configureCallbacks(base *ssh.ServerConfig, cfg *config.Server, evt *eventda
 				slog.Bool("is_verified", false),
 			),
 		)
-		cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
 		fmt.Printf("[SSH] %s Username: %q (publickey authentication attempt)\n", evt.SourceIP, conn.User())
 
-		if cfg.SendToThreatFeed {
+		if srv.SendToThreatFeed {
 			threatfeed.Update(evt.SourceIP)
 		}
 
@@ -197,7 +197,7 @@ func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
 		}
 
 		// Save the private key to disk.
-		if len(path) > 0 {
+		if path != "" {
 			// Silently ignore any potential errors and continue.
 			_ = writePrivateKey(path, privateKey)
 		}
