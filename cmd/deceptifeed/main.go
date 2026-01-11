@@ -2,13 +2,16 @@ package main
 
 import (
 	"cmp"
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"slices"
 	"strconv"
 	"sync"
+	"syscall"
 
 	"github.com/r-smith/deceptifeed/internal/config"
 	"github.com/r-smith/deceptifeed/internal/httpserver"
@@ -54,7 +57,7 @@ func main() {
 
 	// If the `-config` flag is not provided, use "config.xml" from the current
 	// directory if the file exists.
-	if len(*configPath) == 0 {
+	if *configPath == "" {
 		if _, err := os.Stat("config.xml"); err == nil {
 			*configPath = "config.xml"
 			fmt.Printf("Using configuration file: '%v'\n", *configPath)
@@ -64,10 +67,10 @@ func main() {
 	// If a config file is specified (via the `-config` flag or "config.xml"),
 	// load it. Otherwise, configure the app using the command line flags and
 	// default settings.
-	if len(*configPath) > 0 {
+	if *configPath != "" {
 		cfgFromFile, err := config.Load(*configPath)
 		if err != nil {
-			log.Fatalln("Shutting down. Failed to load configuration file:", err)
+			log.Fatalln("Failed to load configuration file:", err)
 		}
 		cfg = *cfgFromFile
 	} else {
@@ -95,59 +98,77 @@ func main() {
 		if err != nil {
 			return 0
 		}
-		t := cmp.Compare(p1, p2)
-		return t
+		return cmp.Compare(p1, p2)
 	})
 
-	// Initialize structured loggers for each honeypot server.
+	// Initialize loggers.
 	err := cfg.InitializeLoggers()
 	if err != nil {
-		log.Fatalln("Shutting down. Failed to initialize logging:", err)
+		log.Fatalln("Failed to initialize logging:", err)
 	}
 	defer cfg.CloseLogFiles()
 
 	// Resolve the system's hostname for identification in logs.
 	config.InitHostname()
 
-	// Initialize a WaitGroup, as each server operates in its own goroutine.
-	// The WaitGroup counter is set to the number of configured honeypot
-	// servers, plus one additional count for the threat feed server.
+	// Setup signal context. Note: Graceful shutdown is not yet implemented.
+	// For now, only a shutdown message is printed before exiting.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Start the threatfeed and honeypots.
+	run(ctx, &cfg)
+}
+
+// run spawns the threatfeed and configured honeypot servers, and blocks until
+// the program is terminated.
+func run(ctx context.Context, cfg *config.Config) {
 	var wg sync.WaitGroup
-	wg.Add(len(cfg.Servers) + 1)
 
 	// Start the threat feed.
-	go func() {
-		defer wg.Done()
-
-		if !cfg.ThreatFeed.Enabled {
-			return
-		}
-
-		threatfeed.Start(&cfg)
-	}()
-
-	// Start the honeypot servers.
-	for _, server := range cfg.Servers {
+	if cfg.ThreatFeed.Enabled {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
-			if !server.Enabled || len(server.Port) == 0 {
-				return
-			}
-
-			switch server.Type {
-			case config.HTTP, config.HTTPS:
-				httpserver.Start(&server)
-			case config.SSH:
-				sshserver.Start(&server)
-			case config.TCP:
-				tcpserver.Start(&server)
-			case config.UDP:
-				udpserver.Start(&server)
-			}
+			threatfeed.Start(cfg)
 		}()
 	}
 
-	// Wait for all servers to end.
-	wg.Wait()
+	// Start the honeypots.
+	for _, server := range cfg.Servers {
+		if !server.Enabled || server.Port == "" {
+			continue
+		}
+
+		wg.Add(1)
+		go func(s config.Server) {
+			defer wg.Done()
+
+			switch s.Type {
+			case config.HTTP, config.HTTPS:
+				httpserver.Start(&s)
+			case config.SSH:
+				sshserver.Start(&s)
+			case config.TCP:
+				tcpserver.Start(&s)
+			case config.UDP:
+				udpserver.Start(&s)
+			}
+		}(server)
+	}
+
+	// Create a channel to signal if all servers stop.
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Block until all servers stop naturally or interrupt signal is received.
+	select {
+	case <-done:
+		fmt.Println("All servers stopped.")
+	case <-ctx.Done():
+		fmt.Println("\nShutting down...")
+	}
 }
