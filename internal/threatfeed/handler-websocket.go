@@ -13,16 +13,20 @@ import (
 // maxRecentMessages is the maximum number of recent log messages to store.
 const maxRecentMessages = 100
 
+// wsClient represents a single WebSocket client with a dedicated channel.
+type wsClient struct {
+	conn *websocket.Conn
+	send chan string
+}
+
 var (
-	// muWSClients is to ensure threat-safe access to wsClients.
-	muWSClients sync.Mutex
+	// wsMu protects access to wsClient and wsRecentMessages.
+	wsMu sync.Mutex
 
-	// wsClients holds the connected WebSocket clients and is used to broadcast
-	// messages to all clients.
-	wsClients = make(map[*websocket.Conn]bool)
+	// wsClients holds the connected WebSocket clients.
+	wsClients = make(map[*wsClient]struct{})
 
-	// wsRecentMessages stores the most recent log messages. These messages
-	// are sent to clients when they first connect.
+	// wsRecentMessages stores the most recent log messages.
 	wsRecentMessages = make([]string, 0, maxRecentMessages*1.5)
 )
 
@@ -37,58 +41,95 @@ func handleLiveIndex(w http.ResponseWriter, r *http.Request) {
 // sent to all connected WebSocket clients. It also stores recent log data in a
 // cache for newly connected clients.
 func broadcastLogsToClients() {
+	var clientsBuf []*wsClient
+
 	for msg := range cfg.Monitor.Channel {
-		wsRecentMessages = append(wsRecentMessages, string(msg))
+		m := string(msg)
+
+		wsMu.Lock()
+		// Update recent message cache.
+		wsRecentMessages = append(wsRecentMessages, m)
 		if len(wsRecentMessages) > maxRecentMessages {
 			wsRecentMessages = wsRecentMessages[1:]
 		}
 
-		muWSClients.Lock()
-		for client := range wsClients {
-			_ = websocket.Message.Send(client, string(msg))
+		// Add clients to buffer (first reset it, but keep the capacity).
+		clientsBuf = clientsBuf[:0]
+		for c := range wsClients {
+			clientsBuf = append(clientsBuf, c)
 		}
-		muWSClients.Unlock()
+		wsMu.Unlock()
+
+		// Broadcast to clients.
+		for _, c := range clientsBuf {
+			select {
+			case c.send <- m:
+			default:
+				// Drop messages for slow clients.
+			}
+		}
 	}
 }
 
-// handleWebSocket establishes and maintains WebSocket connections with clients
-// and performs cleanup when clients disconnect.
+// handleWebSocket establishes and maintains WebSocket connections.
 func handleWebSocket(ws *websocket.Conn) {
-	defer func() {
-		muWSClients.Lock()
-		delete(wsClients, ws)
-		muWSClients.Unlock()
-		_ = ws.Close()
-	}()
-
 	// Enforce private IPs.
 	ip, _, err := net.SplitHostPort(ws.Request().RemoteAddr)
 	if err != nil {
+		_ = ws.Close()
 		return
 	}
 	if parsedIP, err := netip.ParseAddr(ip); err != nil || (!parsedIP.IsPrivate() && !parsedIP.IsLoopback()) {
+		_ = ws.Close()
 		return
 	}
-	fmt.Println("[Threat Feed]", ip, "established WebSocket connection")
 
-	// Add newly connected client to map.
-	muWSClients.Lock()
-	wsClients[ws] = true
-	muWSClients.Unlock()
-
-	// Send the cache of recent log messages to the new client.
-	for _, msg := range wsRecentMessages {
-		_ = websocket.Message.Send(ws, msg)
+	// Initialize client.
+	client := &wsClient{
+		conn: ws,
+		send: make(chan string, 32),
 	}
-	// Send a message informing the client that we're done sending the initial
-	// cache of log messages.
-	_ = websocket.Message.Send(ws, "---end---")
 
-	// Keep WebSocket open.
+	// Register client and copy current message cache.
+	wsMu.Lock()
+	wsClients[client] = struct{}{}
+	count := len(wsClients)
+	recent := append([]string(nil), wsRecentMessages...)
+	wsMu.Unlock()
+	fmt.Printf("[THREATFEED] %s established websocket connection (total: %d)\n", ip, count)
+
+	// Ensure cleanup.
+	defer func() {
+		wsMu.Lock()
+		delete(wsClients, client)
+		count = len(wsClients)
+		wsMu.Unlock()
+		_ = ws.Close()
+		fmt.Printf("[THREATFEED] %s closed websocket connection (total: %d)\n", ip, count)
+	}()
+
+	// Goroutine to send messages to clients. Read from the 'send' channel and
+	// push to the WebSocket.
+	go func() {
+		for msg := range client.send {
+			if err := websocket.Message.Send(client.conn, msg); err != nil {
+				// Stop goroutine if send fails.
+				return
+			}
+		}
+	}()
+
+	// Push initial cached messages.
+	for _, msg := range recent {
+		client.send <- msg
+	}
+	client.send <- "---end---"
+
+	// Block here to keep connection alive / wait for client to disconnect.
 	var message string
 	for {
-		err := websocket.Message.Receive(ws, &message)
-		if err != nil {
+		if err := websocket.Message.Receive(ws, &message); err != nil {
+			// Connection lost or closed.
 			break
 		}
 	}
