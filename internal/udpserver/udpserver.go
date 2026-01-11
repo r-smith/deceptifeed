@@ -6,72 +6,68 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/r-smith/deceptifeed/internal/config"
 )
 
-// Start initializes and starts a generic UDP honeypot server. It listens on
-// the specified port, logging any received data without responding back to the
-// client. Since UDP is connectionless, clients are unaware of the server's
-// existence and that it is actively listening and recording data sent to the
-// port. Note that source IP addresses for UDP packets are unreliable due to
-// potential spoofing. As a result, interactions with the UDP server are not
-// added to the threat feed.
-func Start(cfg *config.Server) {
-	fmt.Printf("Starting UDP server on port: %s\n", cfg.Port)
-	port, err := strconv.Atoi(cfg.Port)
+// Start launches a passive UDP honeypot that listens on the specified port. It
+// records incoming packet data, but does not respond. The server is invisible
+// to network scanners.
+//
+// Because UDP is connectionless and prone to IP spoofing, source IP addresses
+// are considered unreliable. For this reason, the UDP server does not
+// integrate with the threatfeed.
+func Start(srv *config.Server) {
+	fmt.Printf("Starting UDP server on port: %s\n", srv.Port)
+	addr, err := net.ResolveUDPAddr("udp", ":"+srv.Port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", srv.Port, err)
 		return
 	}
 
 	// Start the UDP server.
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: port})
+	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", cfg.Port, err)
+		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", srv.Port, err)
 		return
 	}
 	defer conn.Close()
 
-	// Listen for and accept incoming data, with a maximum size of 1024 bytes.
-	buffer := make([]byte, 1024)
+	// Store the server's local IP and port.
+	_, srvPort, _ := net.SplitHostPort(conn.LocalAddr().String())
+	srvIP := config.GetHostIP()
+
+	// Reusable buffer to store incoming data.
+	buf := make([]byte, 1024)
+
+	// Listen for and capture incoming UDP packets.
 	for {
-		n, remoteAddr, err := conn.ReadFrom(buffer)
+		n, remoteAddr, err := conn.ReadFrom(buf)
 		if err != nil {
 			continue
 		}
 
-		go func() {
-			// The UDP server has received incoming data from a client. Log the
-			// interaction and the received data. Because the source IP address
-			// and port may be spoofed, an "[unreliable]" tag is added to both
-			// the source IP and source port.
-			//
-			// Note:
-			// Go's listenUDP does not capture the local IP address that
-			// received the UDP packet. To assist with logging, call
-			// config.GetHostIP(), which returns the first active local IP
-			// address found on the system. On systems with multiple IP
-			// addresses, this may not correspond to the IP address that
-			// received the UDP data. However, this limitation is acceptable as
-			// the primary goal is to log the received data.
-			_, dstPort, _ := net.SplitHostPort(conn.LocalAddr().String())
-			srcIP, _, _ := net.SplitHostPort(remoteAddr.String())
-			cfg.Logger.LogAttrs(context.Background(), slog.LevelInfo, "udp",
-				slog.String("source_ip", srcIP+" [unreliable]"),
+		// UDP packet received. Capture the data and source IP address.
+		capturedData := string(buf[:n])
+		srcIP, _, _ := net.SplitHostPort(remoteAddr.String())
+
+		// Log the received data. Because the source IP may be spoofed, an
+		// "[unreliable]" tag is added.
+		go func(data string, ip string) {
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "udp",
+				slog.String("source_ip", ip+" [unreliable]"),
 				slog.String("source_reliability", "unreliable"),
-				slog.String("server_ip", config.GetHostIP()),
-				slog.String("server_port", dstPort),
+				slog.String("server_ip", srvIP),
+				slog.String("server_port", srvPort),
 				slog.String("server_name", config.Hostname),
 				slog.Group("event_details",
-					slog.String("data", string(buffer[:n])),
+					slog.String("data", data),
 				),
 			)
 
-			// Print a simplified version of the interaction to the console.
-			fmt.Printf("[UDP] %s Data: %q\n", srcIP, strings.TrimSpace(string(buffer[:n])))
-		}()
+			// Print to the console.
+			fmt.Printf("[UDP] %s Data: %q\n", ip, strings.TrimSpace(data))
+		}(capturedData, srcIP)
 	}
 }
