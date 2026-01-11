@@ -22,11 +22,11 @@ type File struct {
 
 // OpenFile opens the named file for appending. If successful, methods on the
 // returned File can be used for I/O. When writing to the file, it will
-// automatically rotate once the file size exceeds the maxSize (specified in
+// automatically rotate once the file size exceeds maxSizeMB (specified in
 // megabytes).
-func OpenFile(name string, maxSize int) (*File, error) {
-	if maxSize < 1 {
-		return nil, fmt.Errorf("maxSize must be greater than 0")
+func OpenFile(name string, maxSizeMB int) (*File, error) {
+	if maxSizeMB < 1 {
+		return nil, fmt.Errorf("maxSizeMB must be greater than 0")
 	}
 
 	// Open the file for appending.
@@ -45,7 +45,7 @@ func OpenFile(name string, maxSize int) (*File, error) {
 	return &File{
 		file:    file,
 		name:    name,
-		maxSize: int64(maxSize) * 1024 * 1024, // Convert to megabytes
+		maxSize: int64(maxSizeMB) * 1024 * 1024, // Convert MB to bytes
 		size:    stat.Size(),
 	}, nil
 }
@@ -55,39 +55,39 @@ func OpenFile(name string, maxSize int) (*File, error) {
 // with the original name. If a file with the ".1" suffix already exists, it is
 // replaced.
 func (f *File) rotate() error {
-	if f.size > f.maxSize {
-		// Retrieve the file information for the current file to capture its
-		// permissions. Any errors encountered are handled later and do not
-		// affect the rotation process.
-		info, statErr := f.file.Stat()
-
-		// Close the current file.
-		if err := f.file.Close(); err != nil {
-			return fmt.Errorf("can't close file: %w", err)
-		}
-
-		// Rename the file with a ".1" suffix.
-		if err := os.Rename(f.name, f.name+".1"); err != nil {
-			return fmt.Errorf("can't rename file: %w", err)
-		}
-
-		// Open a new file with the original name.
-		file, err := os.OpenFile(f.name, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-		if err != nil {
-			return fmt.Errorf("can't create new file: %w", err)
-		}
-
-		// Apply the original permissions to the new file. This is a
-		// best-effort operation that only runs if the previous os.Stat call
-		// was successful. Any errors from chmod are ignored.
-		if statErr == nil {
-			_ = file.Chmod(info.Mode().Perm())
-		}
-
-		// Reassign file and reset the size.
-		f.file = file
-		f.size = 0
+	if f.file == nil {
+		return fmt.Errorf("file already closed")
 	}
+
+	// Return if rotation isn't needed.
+	if f.size < f.maxSize {
+		return nil
+	}
+
+	// Capture the current file's permissions, defaulting to 0644.
+	info, _ := f.file.Stat()
+	mode := os.FileMode(0644)
+	if info != nil {
+		mode = info.Mode().Perm()
+	}
+
+	// Close the current file. Proceed even if Close returns an error to keep
+	// the logger operational.
+	_ = f.file.Close()
+
+	// Rotate the file to ".1". Proceed even if Rename returns an error to keep
+	// the logger operational.
+	_ = os.Rename(f.name, f.name+".1")
+
+	// Open new file with the original permissions.
+	newFile, err := os.OpenFile(f.name, os.O_APPEND|os.O_WRONLY|os.O_CREATE, mode)
+	if err != nil {
+		return fmt.Errorf("can't open new file: %w", err)
+	}
+
+	// Reassign file and reset the size.
+	f.file = newFile
+	f.size = 0
 	return nil
 }
 
@@ -99,10 +99,14 @@ func (f *File) Write(b []byte) (n int, err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	if f.file == nil {
+		return 0, os.ErrClosed
+	}
+
 	// Rotate the log file if needed.
 	err = f.rotate()
 	if err != nil {
-		return 0, fmt.Errorf("log rotate: %w", err)
+		return 0, fmt.Errorf("logrotate failed: %w", err)
 	}
 
 	// Write the data and update the size.
@@ -116,6 +120,10 @@ func (f *File) Write(b []byte) (n int, err error) {
 func (f *File) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if f.file == nil {
+		return nil
+	}
 
 	err := f.file.Close()
 	f.file = nil
