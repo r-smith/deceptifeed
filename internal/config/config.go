@@ -221,10 +221,10 @@ func validateRegexRules(rules Rules) error {
 	return nil
 }
 
-// InitializeLoggers creates structured loggers for each server. It opens log
-// files using the server's specified log path, defaulting to the global log
-// path if none is provided.
-func (c *Config) InitializeLoggers() error {
+// InitLoggers creates structured loggers for each server. It opens log files
+// using the server's specified log path, defaulting to the global log path if
+// none is provided.
+func (c *Config) InitLoggers() error {
 	const maxSize = 50
 	c.Monitor = logmonitor.New()
 	openedLogFiles := make(map[string]*slog.Logger)

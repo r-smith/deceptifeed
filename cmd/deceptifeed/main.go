@@ -102,7 +102,7 @@ func main() {
 	})
 
 	// Initialize loggers.
-	err := cfg.InitializeLoggers()
+	err := cfg.InitLoggers()
 	if err != nil {
 		log.Fatalln("Failed to initialize logging:", err)
 	}
