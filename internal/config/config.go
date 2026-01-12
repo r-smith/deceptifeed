@@ -35,6 +35,7 @@ const (
 	DefaultThreatExpiryHours    = 336
 	DefaultThreatDatabasePath   = "deceptifeed-database.csv"
 	DefaultThreatIncludePrivate = true
+	DefaultHTTPErrorCode        = 404
 	DefaultLogPath              = "deceptifeed-log.txt"
 	DefaultHomePagePath         = ""
 	DefaultCertPathHTTPS        = "deceptifeed-https.crt"
@@ -102,6 +103,7 @@ type Server struct {
 	KeyPath          string            `xml:"keyPath"`
 	HomePagePath     string            `xml:"homePagePath"`
 	ErrorPagePath    string            `xml:"errorPagePath"`
+	ErrorCode        int               `xml:"errorCode"`
 	Banner           string            `xml:"banner"`
 	Headers          []string          `xml:"headers>header"`
 	CustomHeaders    map[string]string `xml:"-"`

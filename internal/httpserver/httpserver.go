@@ -272,15 +272,20 @@ func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 
 // serveErrorPage serves an error HTTP response code and optional html page.
 func serveErrorPage(w http.ResponseWriter, r *http.Request, srv *config.Server) {
+	code := srv.ErrorCode
+	if code == 0 {
+		code = config.DefaultHTTPErrorCode
+	}
+
 	// If no custom HTML file is provided, just send the status code.
 	if srv.ErrorPagePath == "" {
-		w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(code)
 		return
 	}
 
 	// Serve custom HTML file with content type and status code set.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusNotFound)
+	w.WriteHeader(code)
 	http.ServeFile(w, r, srv.ErrorPagePath)
 }
 
