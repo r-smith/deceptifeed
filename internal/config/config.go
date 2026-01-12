@@ -23,8 +23,6 @@ var Version = "undefined"
 // environment variable or the OS-reported name.
 var Hostname string
 
-// This block of constants defines the default application settings when no
-// configuration file is provided.
 const (
 	DefaultEnableHTTP           = true
 	DefaultEnableHTTPS          = true
@@ -45,8 +43,8 @@ const (
 	DefaultBannerSSH            = "SSH-2.0-OpenSSH_9.9"
 )
 
-// ServerType represents the different types of honeypot servers that can be
-// deployed. Each type has its own specific handlers and behavior.
+// ServerType identifies the protocol used by a honeypot server. It determines
+// how the server listens, respons, and logs activity.
 type ServerType int
 
 const (
@@ -85,9 +83,8 @@ func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// Config holds the configuration settings for the application. It contains the
-// logger, settings for managing a threat feed, and the collection of honeypot
-// servers that are configured to run.
+// Config stores the application's settings. It includes honeypot configuration,
+// threatfeed configuration, and loggers.
 type Config struct {
 	LogPath    string              `xml:"defaultLogPath"`
 	Servers    []Server            `xml:"honeypotServers>server"`
@@ -96,7 +93,7 @@ type Config struct {
 	Monitor    *logmonitor.Monitor `xml:"-"`
 }
 
-// Server represents a honeypot server with its relevant settings.
+// Server defines the settings for honeypot servers.
 type Server struct {
 	Type             ServerType      `xml:"type,attr"`
 	Enabled          bool            `xml:"enabled"`
@@ -118,32 +115,31 @@ type Server struct {
 	Logger           *slog.Logger    `xml:"-"`
 }
 
+// Rules define the criteria for reporting client IPs to the threatfeed.
 type Rules struct {
 	Include []Rule `xml:"include"`
 	Exclude []Rule `xml:"exclude"`
 }
 
+// Rule represents a regex pattern.
 type Rule struct {
 	Target  string `xml:"target,attr"`
 	Pattern string `xml:",chardata"`
 	Negate  bool   `xml:"negate,attr"`
 }
 
-// Prompt represents a text prompt that can be displayed to connecting clients
-// when using the TCP-type honeypot server. Each prompt waits for input and
-// logs the response. A Server can include multiple prompts which are displayed
-// one at a time. The optional Log field gives a description when logging the
-// response.
+// Prompt defines a text prompt used by TCP honeypots. It displays the message,
+// waits for client input, and logs the response. If multiple prompts are
+// configured, they are displayed sequentially.
 type Prompt struct {
 	Text string `xml:",chardata"`
-	Log  string `xml:"log,attr"`
+
+	// Log is an optional label used when logging the client's response. When
+	// set to "none", the response is not logged.
+	Log string `xml:"log,attr"`
 }
 
-// ThreatFeed represents an optional HTTP server that serves a list of IP
-// addresses observed interacting with your honeypot servers. This server
-// outputs data in a format compatible with most enterprise firewalls, which
-// can be configured to automatically block communication with IP addresses
-// appearing in the threat feed.
+// ThreatFeed defines the settings for the threatfeed server.
 type ThreatFeed struct {
 	Enabled           bool   `xml:"enabled"`
 	Port              string `xml:"port"`
@@ -156,10 +152,8 @@ type ThreatFeed struct {
 	KeyPath           string `xml:"keyPath"`
 }
 
-// Load reads an optional XML configuration file and unmarshals its contents
-// into a Config struct. Any errors encountered opening or decoding the file
-// are returned. When decoding is successful, the populated Config struct is
-// returned.
+// Load reads an XML configuration file, decodes it into a Config struct, and
+// applies sever defaults.
 func Load(filename string) (*Config, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -168,6 +162,8 @@ func Load(filename string) (*Config, error) {
 	defer file.Close()
 
 	var config Config
+
+	// Resolve the absolute path.
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		config.FilePath = filename
@@ -175,46 +171,68 @@ func Load(filename string) (*Config, error) {
 		config.FilePath = absPath
 	}
 
-	xmlBytes, _ := io.ReadAll(file)
-	err = xml.Unmarshal(xmlBytes, &config)
-	if err != nil {
+	// Decode the XML.
+	decoder := xml.NewDecoder(file)
+	if err := decoder.Decode(&config); err != nil {
 		return nil, err
 	}
 
-	for i := range config.Servers {
-		// Use the global log path if the server log path is not specified.
-		if len(config.Servers[i].LogPath) == 0 {
-			config.Servers[i].LogPath = config.LogPath
-		}
-
-		// Validate regex rules.
-		if err := validateRegexRules(config.Servers[i].Rules); err != nil {
-			return nil, err
-		}
-
-		// Use the default SSH banner if no banner is specified.
-		if config.Servers[i].Type == SSH && len(config.Servers[i].Banner) == 0 {
-			config.Servers[i].Banner = DefaultBannerSSH
-		}
-
-		// Explicitly disable threat feed for UDP honeypots.
-		if config.Servers[i].Type == UDP {
-			config.Servers[i].SendToThreatFeed = false
-		}
+	// Finalizae honeypot configuration.
+	if err := config.prepare(); err != nil {
+		return nil, err
 	}
 
 	return &config, nil
 }
 
-// validateRegexRules checks the validity of regex patterns in the rules.
-func validateRegexRules(rules Rules) error {
-	for _, rule := range rules.Include {
-		if _, err := regexp.Compile(rule.Pattern); err != nil {
+// prepare finalizes the configuration for each honeypot server. It applies
+// defaults, ensures a log path is defined, and ensures rules are compiled.
+func (c *Config) prepare() error {
+	for i := range c.Servers {
+		s := &c.Servers[i]
+
+		// Use the global log path if the server log path is not specified.
+		if s.LogPath == "" {
+			s.LogPath = c.LogPath
+		}
+
+		// Use the default SSH banner if no banner is specified.
+		if s.Type == SSH && s.Banner == "" {
+			s.Banner = DefaultBannerSSH
+		}
+
+		// Explicitly disable threatfeed for UDP honeypots.
+		if s.Type == UDP {
+			s.SendToThreatFeed = false
+		}
+
+		// Validate and compile regex rules.
+		if err := s.compileRules(); err != nil {
+			return fmt.Errorf("server on port %s: %w", s.Port, err)
+		}
+	}
+	return nil
+}
+
+func (s *Server) compileRules() error {
+	// Include rules.
+	for i := range s.Rules.Include {
+		rule := &s.Rules.Include[i]
+
+		// Compile.
+		_, err := regexp.Compile(rule.Pattern)
+		if err != nil {
 			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
 		}
 	}
-	for _, rule := range rules.Exclude {
-		if _, err := regexp.Compile(rule.Pattern); err != nil {
+
+	// Exclude rules.
+	for i := range s.Rules.Exclude {
+		rule := &s.Rules.Exclude[i]
+
+		// Compile.
+		_, err := regexp.Compile(rule.Pattern)
+		if err != nil {
 			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
 		}
 	}
@@ -238,7 +256,7 @@ func (c *Config) InitLoggers() error {
 
 		// If no log path is specified or logging is disabled, write to a log
 		// monitor for live monitoring. No log data is written to disk.
-		if len(logPath) == 0 || !c.Servers[i].LogEnabled {
+		if logPath == "" || !c.Servers[i].LogEnabled {
 			c.Servers[i].Logger = slog.New(slog.NewJSONHandler(c.Monitor, nil))
 			continue
 		}
@@ -271,7 +289,7 @@ func (c *Config) InitLoggers() error {
 							return slog.Attr{}
 						case "source_ip_error":
 							// Remove 'source_ip_error' field if it's empty.
-							if len(a.Value.String()) == 0 {
+							if a.Value.String() == "" {
 								return slog.Attr{}
 							}
 						}
