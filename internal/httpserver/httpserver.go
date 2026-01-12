@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
-	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -299,30 +299,22 @@ func shouldUpdateThreatFeed(srv *config.Server, r *http.Request) bool {
 func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 	match := false
 	for _, rule := range rules {
-		// Ignore errors from regexp.Compile. Regular expression patterns are
-		// validated at application startup.
-		rx, _ := regexp.Compile(rule.Pattern)
-
-		switch strings.ToLower(rule.Target) {
-		case "path":
-			match = rx.MatchString(r.URL.Path)
-		case "query":
-			match = rx.MatchString(r.URL.RawQuery)
-		case "method":
-			match = rx.MatchString(r.Method)
-		case "host":
-			match = rx.MatchString(r.Host)
-		case "user-agent":
-			match = rx.MatchString(r.UserAgent())
+		// Note the title case. Target strings are pre-processed using
+		// http.CanonicalHeaderKey during startup.
+		switch rule.Target {
+		case "Path":
+			match = rule.Re.MatchString(r.URL.Path)
+		case "Query":
+			match = rule.Re.MatchString(r.URL.RawQuery)
+		case "Method":
+			match = rule.Re.MatchString(r.Method)
+		case "Host":
+			match = rule.Re.MatchString(r.Host)
+		case "User-Agent":
+			match = rule.Re.MatchString(r.UserAgent())
 		default:
-			header, ok := r.Header[http.CanonicalHeaderKey(rule.Target)]
-			if ok {
-				for _, v := range header {
-					if rx.MatchString(v) {
+			if slices.ContainsFunc(r.Header[rule.Target], rule.Re.MatchString) {
 						match = true
-						break
-					}
-				}
 			}
 		}
 

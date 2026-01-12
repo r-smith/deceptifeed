@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -123,9 +124,10 @@ type Rules struct {
 
 // Rule represents a regex pattern.
 type Rule struct {
-	Target  string `xml:"target,attr"`
-	Pattern string `xml:",chardata"`
-	Negate  bool   `xml:"negate,attr"`
+	Target  string         `xml:"target,attr"`
+	Pattern string         `xml:",chardata"`
+	Negate  bool           `xml:"negate,attr"`
+	Re      *regexp.Regexp `xml:"-"`
 }
 
 // Prompt defines a text prompt used by TCP honeypots. It displays the message,
@@ -214,27 +216,38 @@ func (c *Config) prepare() error {
 	return nil
 }
 
+// compileRules pre-compiles and stores Include and Exclude rules that may
+// appear in a honeypot configuration. It also converts rule Targets to
+// canonical format ("path" to "Path", "user-agent" to "User-Agent").
 func (s *Server) compileRules() error {
 	// Include rules.
 	for i := range s.Rules.Include {
 		rule := &s.Rules.Include[i]
 
+		// Canonicalize `Target`.
+		rule.Target = http.CanonicalHeaderKey(rule.Target)
+
 		// Compile.
-		_, err := regexp.Compile(rule.Pattern)
+		re, err := regexp.Compile(rule.Pattern)
 		if err != nil {
 			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
 		}
+		rule.Re = re
 	}
 
 	// Exclude rules.
 	for i := range s.Rules.Exclude {
 		rule := &s.Rules.Exclude[i]
 
+		// Canonicalize `Target`.
+		rule.Target = http.CanonicalHeaderKey(rule.Target)
+
 		// Compile.
-		_, err := regexp.Compile(rule.Pattern)
+		re, err := regexp.Compile(rule.Pattern)
 		if err != nil {
 			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
 		}
+		rule.Re = re
 	}
 	return nil
 }
