@@ -228,6 +228,7 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 			// Serve a 401 with the WWW-Authenticate header set. This results
 			// in a login prompt when visiting in a browser.
 			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+				// Use direct map assignment to keep "WWW" casing.
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			} else {
@@ -273,6 +274,12 @@ func serveErrorPage(w http.ResponseWriter, r *http.Request, srv *config.Server) 
 	code := srv.ErrorCode
 	if code == 0 {
 		code = config.DefaultHTTPErrorCode
+	}
+
+	// If the status code is set to 401, insert a basic auth header.
+	if code == http.StatusUnauthorized {
+		// Use direct map assignment to keep "WWW" casing.
+		w.Header()["WWW-Authenticate"] = []string{"Basic"}
 	}
 
 	// If no custom HTML file is provided, just send the status code.
