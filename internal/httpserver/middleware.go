@@ -2,13 +2,15 @@ package httpserver
 
 import (
 	"net/http"
+
+	"github.com/r-smith/deceptifeed/internal/config"
 )
 
 // withCustomError is a middleware that intercepts 4xx/5xx HTTP error responses
 // and replaces them with a custom error response.
-func withCustomError(next http.Handler, errorPath string) http.HandlerFunc {
+func withCustomError(next http.Handler, srv *config.Server) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		e := &errorInterceptor{origWriter: w, origRequest: r, errorPath: errorPath}
+		e := &errorInterceptor{origWriter: w, origRequest: r, srv: srv}
 		next.ServeHTTP(e, r)
 	})
 }
@@ -19,7 +21,7 @@ type errorInterceptor struct {
 	origWriter  http.ResponseWriter
 	origRequest *http.Request
 	overridden  bool
-	errorPath   string
+	srv         *config.Server
 }
 
 // WriteHeader intercepts error response codes (4xx or 5xx) to serve a custom
@@ -27,7 +29,7 @@ type errorInterceptor struct {
 func (e *errorInterceptor) WriteHeader(statusCode int) {
 	if statusCode >= 400 && statusCode <= 599 {
 		e.overridden = true
-		serveErrorPage(e.origWriter, e.origRequest, e.errorPath)
+		serveErrorPage(e.origWriter, e.origRequest, e.srv)
 		return
 	}
 	e.origWriter.WriteHeader(statusCode)

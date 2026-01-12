@@ -64,7 +64,7 @@ func determineConfig(srv *config.Server) *responseConfig {
 		return &responseConfig{
 			mode:      modeDirectory,
 			fsRoot:    root,
-			fsHandler: withCustomError(http.FileServerFS(noDirectoryFS{root.FS()}), srv.ErrorPagePath),
+			fsHandler: withCustomError(http.FileServerFS(noDirectoryFS{root.FS()}), srv),
 		}
 	}
 
@@ -233,14 +233,14 @@ func handleConnection(srv *config.Server, customHeaders map[string]string, respo
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			} else {
-				serveErrorPage(w, r, srv.ErrorPagePath)
+				serveErrorPage(w, r, srv)
 			}
 		case modeFile:
 			// Serve a single file.
 			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 				http.ServeFile(w, r, srv.HomePagePath)
 			} else {
-				serveErrorPage(w, r, srv.ErrorPagePath)
+				serveErrorPage(w, r, srv)
 			}
 		case modeDirectory:
 			// Serve files from a directory.
@@ -271,14 +271,17 @@ func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 }
 
 // serveErrorPage serves an error HTTP response code and optional html page.
-func serveErrorPage(w http.ResponseWriter, r *http.Request, path string) {
-	if path == "" {
+func serveErrorPage(w http.ResponseWriter, r *http.Request, srv *config.Server) {
+	// If no custom HTML file is provided, just send the status code.
+	if srv.ErrorPagePath == "" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	// Serve custom HTML file with content type and status code set.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusNotFound)
-	http.ServeFile(w, r, path)
+	http.ServeFile(w, r, srv.ErrorPagePath)
 }
 
 // shouldUpdateThreatFeed determines if the threat feed should be updated based
