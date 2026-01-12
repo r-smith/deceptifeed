@@ -94,7 +94,7 @@ func Start(srv *config.Server) {
 // listenHTTP initializes and starts an HTTP (plaintext) honeypot server.
 func listenHTTP(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(srv, parseCustomHeaders(srv.Headers), response))
+	mux.HandleFunc("/", handleConnection(srv, response))
 	s := &http.Server{
 		Addr:         ":" + srv.Port,
 		Handler:      mux,
@@ -114,7 +114,7 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 // listenHTTPS initializes and starts an HTTPS (encrypted) honeypot server.
 func listenHTTPS(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(srv, parseCustomHeaders(srv.Headers), response))
+	mux.HandleFunc("/", handleConnection(srv, response))
 	s := &http.Server{
 		Addr:         ":" + srv.Port,
 		Handler:      mux,
@@ -148,7 +148,7 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 // handleConnection processes incoming HTTP and HTTPS client requests. It logs
 // the details of each request, updates the threat feed, and serves responses
 // based on the honeypot configuration.
-func handleConnection(srv *config.Server, customHeaders map[string]string, response *responseConfig) http.HandlerFunc {
+func handleConnection(srv *config.Server, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Record connection details.
 		evt := eventdata.Connection{}
@@ -217,8 +217,8 @@ func handleConnection(srv *config.Server, customHeaders map[string]string, respo
 			threatfeed.Update(evt.SourceIP)
 		}
 
-		// Add any configured headers to the HTTP response.
-		for header, value := range customHeaders {
+		// Apply custom headers from the configuration to the HTTP response.
+		for header, value := range srv.CustomHeaders {
 			w.Header().Set(header, value)
 		}
 
@@ -329,24 +329,6 @@ func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 		}
 	}
 	return false
-}
-
-// parseCustomHeaders takes a slice of header strings in the format of
-// "Name: Value", and returns a map of the Name-Value pairs. For example, given
-// the input:
-// `[]{"Server: Microsoft-IIS/8.5", "X-Powered-By: ASP.NET"}`, the function
-// would return a map with "Server" and "X-Powered-By" as keys, each linked to
-// their corresponding values.
-func parseCustomHeaders(headers []string) map[string]string {
-	result := make(map[string]string)
-
-	for _, header := range headers {
-		kv := strings.SplitN(header, ":", 2)
-		if len(kv) == 2 {
-			result[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-		}
-	}
-	return result
 }
 
 // flattenHeaders converts HTTP headers from an http.Request from the format of

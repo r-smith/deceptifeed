@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -45,7 +44,7 @@ const (
 )
 
 // ServerType identifies the protocol used by a honeypot server. It determines
-// how the server listens, respons, and logs activity.
+// how the server listens, responds, and logs activity.
 type ServerType int
 
 const (
@@ -96,24 +95,25 @@ type Config struct {
 
 // Server defines the settings for honeypot servers.
 type Server struct {
-	Type             ServerType      `xml:"type,attr"`
-	Enabled          bool            `xml:"enabled"`
-	Port             string          `xml:"port"`
-	CertPath         string          `xml:"certPath"`
-	KeyPath          string          `xml:"keyPath"`
-	HomePagePath     string          `xml:"homePagePath"`
-	ErrorPagePath    string          `xml:"errorPagePath"`
-	Banner           string          `xml:"banner"`
-	Headers          []string        `xml:"headers>header"`
-	Prompts          []Prompt        `xml:"prompts>prompt"`
-	SendToThreatFeed bool            `xml:"sendToThreatFeed"`
-	UseProxyProtocol bool            `xml:"useProxyProtocol"`
-	Rules            Rules           `xml:"rules"`
-	SourceIPHeader   string          `xml:"sourceIpHeader"`
-	LogPath          string          `xml:"logPath"`
-	LogEnabled       bool            `xml:"logEnabled"`
-	LogFile          *logrotate.File `xml:"-"`
-	Logger           *slog.Logger    `xml:"-"`
+	Type             ServerType        `xml:"type,attr"`
+	Enabled          bool              `xml:"enabled"`
+	Port             string            `xml:"port"`
+	CertPath         string            `xml:"certPath"`
+	KeyPath          string            `xml:"keyPath"`
+	HomePagePath     string            `xml:"homePagePath"`
+	ErrorPagePath    string            `xml:"errorPagePath"`
+	Banner           string            `xml:"banner"`
+	Headers          []string          `xml:"headers>header"`
+	CustomHeaders    map[string]string `xml:"-"`
+	Prompts          []Prompt          `xml:"prompts>prompt"`
+	SendToThreatFeed bool              `xml:"sendToThreatFeed"`
+	UseProxyProtocol bool              `xml:"useProxyProtocol"`
+	Rules            Rules             `xml:"rules"`
+	SourceIPHeader   string            `xml:"sourceIpHeader"`
+	LogPath          string            `xml:"logPath"`
+	LogEnabled       bool              `xml:"logEnabled"`
+	LogFile          *logrotate.File   `xml:"-"`
+	Logger           *slog.Logger      `xml:"-"`
 }
 
 // Rules define the criteria for reporting client IPs to the threatfeed.
@@ -208,46 +208,13 @@ func (c *Config) prepare() error {
 			s.SendToThreatFeed = false
 		}
 
+		// Parse headers to a map[string]string (used by http.Header().Set()).
+		s.CustomHeaders = parseCustomHeaders(s.Headers)
+
 		// Validate and compile regex rules.
 		if err := s.compileRules(); err != nil {
 			return fmt.Errorf("server on port %s: %w", s.Port, err)
 		}
-	}
-	return nil
-}
-
-// compileRules pre-compiles and stores Include and Exclude rules that may
-// appear in a honeypot configuration. It also converts rule Targets to
-// canonical format ("path" to "Path", "user-agent" to "User-Agent").
-func (s *Server) compileRules() error {
-	// Include rules.
-	for i := range s.Rules.Include {
-		rule := &s.Rules.Include[i]
-
-		// Canonicalize `Target`.
-		rule.Target = http.CanonicalHeaderKey(rule.Target)
-
-		// Compile.
-		re, err := regexp.Compile(rule.Pattern)
-		if err != nil {
-			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
-		}
-		rule.Re = re
-	}
-
-	// Exclude rules.
-	for i := range s.Rules.Exclude {
-		rule := &s.Rules.Exclude[i]
-
-		// Canonicalize `Target`.
-		rule.Target = http.CanonicalHeaderKey(rule.Target)
-
-		// Compile.
-		re, err := regexp.Compile(rule.Pattern)
-		if err != nil {
-			return fmt.Errorf("invalid regex pattern: %s", rule.Pattern)
-		}
-		rule.Re = re
 	}
 	return nil
 }
