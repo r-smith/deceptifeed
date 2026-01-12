@@ -225,11 +225,9 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 		// Serve a response based on the honeypot configuration.
 		switch response.mode {
 		case modeDefault:
-			// Built-in default response.
+			// Serve a 401 with the WWW-Authenticate header set. This results
+			// in a login prompt when visiting in a browser.
 			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-				if _, _, ok := r.BasicAuth(); ok {
-					time.Sleep(2 * time.Second)
-				}
 				w.Header()["WWW-Authenticate"] = []string{"Basic"}
 				w.WriteHeader(http.StatusUnauthorized)
 			} else {
