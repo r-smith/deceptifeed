@@ -94,25 +94,37 @@ func Update(ip netip.Addr) {
 	dataChanged.Store(true)
 }
 
-// deleteExpired deletes expired threat feed entries from the IoC map.
+// deleteExpired deletes expired threatfeed entries from the IoC map.
 func deleteExpired() {
+	if cfg.ThreatFeed.ExpiryHours <= 0 {
+		return
+	}
+
+	cutoff := time.Now().Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours))
+	isModified := false
+
 	mu.Lock()
 	defer mu.Unlock()
 
-	for key, value := range iocData {
-		if value.expired() {
-			delete(iocData, key)
+	for ip, ioc := range iocData {
+		if ioc.lastSeen.Before(cutoff) {
+			delete(iocData, ip)
+			isModified = true
 		}
+	}
+
+	if isModified {
+		dataChanged.Store(true)
 	}
 }
 
-// expired returns whether an IoC is considered expired based on the last
-// seen date and the configured expiry hours.
-func (ioc *IOC) expired() bool {
+// expired evaluates the age of an IoC. It returns true if the duration between
+// its lastSeen time and the proided time exceeds the configured expiry hours.
+func (ioc *IOC) expired(at time.Time) bool {
 	if cfg.ThreatFeed.ExpiryHours <= 0 {
 		return false
 	}
-	return ioc.lastSeen.Before(time.Now().Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours)))
+	return ioc.lastSeen.Before(at.Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours)))
 }
 
 // loadCSV loads existing threat feed data from a CSV file. If found, it
