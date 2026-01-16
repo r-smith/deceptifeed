@@ -45,7 +45,7 @@ var (
 	// map is then updated by `Update` whenever a potential attacker interacts
 	// with a honeypot server. The threat feed served to clients is generated
 	// based on the data in this map.
-	iocData = make(map[string]*IOC)
+	iocData = make(map[netip.Addr]*IOC)
 
 	// mu is to ensure thread-safe access to iocData.
 	mu sync.Mutex
@@ -71,11 +71,12 @@ func Update(ip netip.Addr) {
 		return
 	}
 
-	ipStr := ip.String()
-
 	now := time.Now()
+
 	mu.Lock()
-	if ioc, exists := iocData[ipStr]; exists {
+	defer mu.Unlock()
+
+	if ioc, exists := iocData[ip]; exists {
 		// Update existing entry.
 		ioc.lastSeen = now
 		if ioc.observations < maxObservations {
@@ -83,13 +84,12 @@ func Update(ip netip.Addr) {
 		}
 	} else {
 		// Create a new entry.
-		iocData[ipStr] = &IOC{
+		iocData[ip] = &IOC{
 			added:        now,
 			lastSeen:     now,
 			observations: 1,
 		}
 	}
-	mu.Unlock()
 
 	dataChanged.Store(true)
 }
@@ -157,7 +157,11 @@ func loadCSV() error {
 	var lastSeen time.Time
 	var count int
 	for _, record := range records[1:] {
-		ip := record[0]
+		// Parse IP into a netip.Addr.
+		ip, err := netip.ParseAddr(record[0])
+		if err != nil {
+			continue
+		}
 
 		// Parse added, defaulting to current time.
 		added = time.Now()

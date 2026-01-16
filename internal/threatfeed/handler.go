@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -258,8 +259,10 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 			case stix.Sighting:
 				timestamp = v.LastSeen
 			case stix.ObservableIP:
-				if ioc, found := iocData[v.Value]; found {
-					timestamp = ioc.lastSeen
+				if addr, err := netip.ParseAddr(v.Value); err == nil {
+					if ioc, found := iocData[addr.Unmap()]; found {
+						timestamp = ioc.lastSeen
+					}
 				}
 			case stix.Identity:
 				timestamp = v.Created

@@ -86,24 +86,23 @@ loop:
 			continue
 		}
 
-		parsedIP, err := netip.ParseAddr(ip)
-		if err != nil || (parsedIP.IsPrivate() && !cfg.ThreatFeed.IsPrivateIncluded) {
-			continue
-		}
-
-		for _, prefix := range excludedCIDR {
-			if prefix.Contains(parsedIP) {
-				continue loop
-			}
-		}
-
 		if _, found := excludedIPs[ip]; found {
 			continue
 		}
 
+		if ip.IsPrivate() && !cfg.ThreatFeed.IsPrivateIncluded {
+			continue
+		}
+
+		for _, prefix := range excludedCIDR {
+			if prefix.Contains(ip) {
+				continue loop
+			}
+		}
+
 		threats = append(threats, feedEntry{
-			IP:           ip,
-			IPBytes:      parsedIP,
+			IP:           ip.String(),
+			IPBytes:      ip,
 			Added:        ioc.added,
 			LastSeen:     ioc.lastSeen,
 			Observations: ioc.observations,
@@ -120,7 +119,7 @@ loop:
 // should contain an IP address or CIDR. It returns a map of the unique IPs and
 // a slice of the CIDR ranges found in the file. The file may include comments
 // using "#". The "#" symbol on a line and everything after is ignored.
-func parseExcludeList(filepath string) (map[string]struct{}, []netip.Prefix, error) {
+func parseExcludeList(filepath string) (map[netip.Addr]struct{}, []netip.Prefix, error) {
 	if len(filepath) == 0 {
 		return nil, nil, nil
 	}
@@ -133,7 +132,7 @@ func parseExcludeList(filepath string) (map[string]struct{}, []netip.Prefix, err
 
 	// `ips` stores individual IPs to exclude, and `cidr` stores CIDR networks
 	// to exclude.
-	ips := make(map[string]struct{})
+	ips := make(map[netip.Addr]struct{})
 	cidr := []netip.Prefix{}
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -148,12 +147,18 @@ func parseExcludeList(filepath string) (map[string]struct{}, []netip.Prefix, err
 			continue
 		}
 
+		// Try to parse as CIDR.
 		if prefix, err := netip.ParsePrefix(line); err == nil {
 			cidr = append(cidr, prefix)
-		} else {
-			ips[line] = struct{}{}
+			continue
+		}
+
+		// Try to parse as single IP.
+		if addr, err := netip.ParseAddr(line); err == nil {
+			ips[addr.Unmap()] = struct{}{}
 		}
 	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, nil, err
 	}
