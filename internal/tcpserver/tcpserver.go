@@ -72,7 +72,13 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Handle Proxy Protocol.
 	if srv.UseProxyProtocol {
 		evt.ProxyIP = evt.SourceIP
-		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
+		newConn, extractedIP, err := proxyproto.ReadHeader(conn)
+
+		if newConn != nil {
+			conn = newConn
+		}
+
+		if err != nil {
 			evt.ProxyError = err.Error()
 		} else {
 			evt.ProxyParsed = true
