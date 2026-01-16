@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
@@ -70,8 +71,13 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 
 	// Capture connection metadata.
 	evt := eventdata.Connection{}
-	evt.ServerIP, evt.ServerPort, _ = net.SplitHostPort(conn.LocalAddr().String())
-	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
+	if addr, ok := conn.LocalAddr().(*net.TCPAddr); ok {
+		evt.ServerIP = addr.AddrPort().Addr().Unmap()
+		evt.ServerPort = addr.AddrPort().Port()
+	}
+	if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		evt.SourceIP = addr.AddrPort().Addr().Unmap()
+	}
 
 	// Handle Proxy Protocol.
 	if srv.UseProxyProtocol {
@@ -101,18 +107,18 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
-		slog.String("source_ip", evt.SourceIP),
+		slog.Any("source_ip", evt.SourceIP),
 	)
 	if srv.UseProxyProtocol {
 		d = append(d,
 			slog.Bool("source_ip_parsed", evt.ProxyParsed),
 			slog.String("source_ip_error", evt.ProxyError),
-			slog.String("proxy_ip", evt.ProxyIP),
+			slog.Any("proxy_ip", evt.ProxyIP),
 		)
 	}
 	d = append(d,
-		slog.String("server_ip", evt.ServerIP),
-		slog.String("server_port", evt.ServerPort),
+		slog.Any("server_ip", evt.ServerIP),
+		slog.String("server_port", strconv.FormatUint(uint64(evt.ServerPort), 10)),
 		slog.String("server_name", config.Hostname),
 	)
 	return d

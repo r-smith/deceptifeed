@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -153,7 +154,9 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 		// Record connection details.
 		evt := eventdata.Connection{}
 		evt.ServerIP, evt.ServerPort = getLocalAddr(r)
-		evt.SourceIP, _, _ = net.SplitHostPort(r.RemoteAddr)
+		if addr, err := netip.ParseAddrPort(r.RemoteAddr); err == nil {
+			evt.SourceIP = addr.Addr().Unmap()
+		}
 
 		// If configured to use a proxy header, extract the client IP and
 		// record proxy information.
@@ -167,8 +170,8 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 			case 0:
 				evt.ProxyError = "missing header " + srv.SourceIPHeader
 			case 1:
-				v := header[0]
-				if _, err := netip.ParseAddr(v); err != nil {
+				v := strings.TrimSpace(header[0])
+				if ip, err := netip.ParseAddr(v); err != nil {
 					if strings.Contains(v, ",") {
 						evt.ProxyError = "multiple values in header " + srv.SourceIPHeader
 					} else {
@@ -176,7 +179,7 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 					}
 				} else {
 					evt.ProxyParsed = true
-					evt.SourceIP = v
+					evt.SourceIP = ip.Unmap()
 				}
 			default:
 				evt.ProxyError = "multiple instances of header " + srv.SourceIPHeader
@@ -252,18 +255,18 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
-		slog.String("source_ip", evt.SourceIP),
+		slog.Any("source_ip", evt.SourceIP),
 	)
 	if srv.UseProxyProtocol {
 		d = append(d,
 			slog.Bool("source_ip_parsed", evt.ProxyParsed),
 			slog.String("source_ip_error", evt.ProxyError),
-			slog.String("proxy_ip", evt.ProxyIP),
+			slog.Any("proxy_ip", evt.ProxyIP),
 		)
 	}
 	d = append(d,
-		slog.String("server_ip", evt.ServerIP),
-		slog.String("server_port", evt.ServerPort),
+		slog.Any("server_ip", evt.ServerIP),
+		slog.String("server_port", strconv.FormatUint(uint64(evt.ServerPort), 10)),
 		slog.String("server_name", config.Hostname),
 	)
 	return d
@@ -327,7 +330,7 @@ func checkRuleMatches(rules []config.Rule, r *http.Request) bool {
 			match = rule.Re.MatchString(r.UserAgent())
 		default:
 			if slices.ContainsFunc(r.Header[rule.Target], rule.Re.MatchString) {
-						match = true
+				match = true
 			}
 		}
 
@@ -361,14 +364,23 @@ func flattenHeaders(headers map[string][]string) map[string]string {
 	return newHeaders
 }
 
-// getLocalAddr retrieves the local IP address and port from the given HTTP
-// request. If the local address is not found, it returns empty strings.
-func getLocalAddr(r *http.Request) (ip string, port string) {
+// getLocalAddr returns the local IP address and port from a given HTTP
+// request.
+func getLocalAddr(r *http.Request) (ip netip.Addr, port uint16) {
 	localAddr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
 	if !ok {
-		return "", ""
-	} else {
-		ip, port, _ = net.SplitHostPort(localAddr.String())
+		return netip.Addr{}, 0
 	}
-	return ip, port
+
+	// Parse as a TCP address.
+	if addr, ok := localAddr.(*net.TCPAddr); ok {
+		return addr.AddrPort().Addr().Unmap(), addr.AddrPort().Port()
+	}
+
+	// Fallback: If not TCP, use the string parser.
+	if addr, err := netip.ParseAddrPort(localAddr.String()); err == nil {
+		return addr.Addr().Unmap(), addr.Port()
+	}
+
+	return netip.Addr{}, 0
 }

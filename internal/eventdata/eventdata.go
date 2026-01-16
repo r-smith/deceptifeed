@@ -1,25 +1,27 @@
 package eventdata
 
+import "net/netip"
+
 // Connection describes network metadata for incoming honeypot connections.
 type Connection struct {
 	// SourceIP is the client IP address interacting with the honeypot. When
 	// the honeypot is configured to run behind a proxy and the proxy header is
 	// successfully parsed, this field contains the client IP extracted from
 	// the header.
-	SourceIP string
+	SourceIP netip.Addr
 
 	// ServerIP is the IP address of the honeypot server that accepted the
 	// connection.
-	ServerIP string
+	ServerIP netip.Addr
 
 	// ServerPort is the TCP or UDP port of the honeypot server that received
 	// the connection.
-	ServerPort string
+	ServerPort uint16
 
 	// ProxyIP is the IP address of the upstream proxy that forwarded the
 	// connection to the honeypot. It is only set when the the honeypot is
 	// configured to run behind a proxy.
-	ProxyIP string
+	ProxyIP netip.Addr
 
 	// ProxyParsed indicates whether a client IP was successfully extracted
 	// from a proxy header.

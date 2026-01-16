@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,11 +59,17 @@ func Start(srv *config.Server) {
 func handleConnection(conn net.Conn, srv *config.Server) {
 	defer conn.Close()
 
-	// Record the connection details and handle Proxy Protocol if enabled.
+	// Record the connection metadata.
 	evt := eventdata.Connection{}
-	evt.ServerIP, evt.ServerPort, _ = net.SplitHostPort(conn.LocalAddr().String())
-	evt.SourceIP, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
+	if addr, ok := conn.LocalAddr().(*net.TCPAddr); ok {
+		evt.ServerIP = addr.AddrPort().Addr().Unmap()
+		evt.ServerPort = addr.AddrPort().Port()
+	}
+	if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		evt.SourceIP = addr.AddrPort().Addr().Unmap()
+	}
 
+	// Handle Proxy Protocol.
 	if srv.UseProxyProtocol {
 		evt.ProxyIP = evt.SourceIP
 		if extractedIP, err := proxyproto.ReadHeader(conn); err != nil {
@@ -78,7 +85,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
-	// Display initial banner to the client if configured.
+	// Display configured banner to client.
 	if srv.Banner != "" {
 		_, _ = conn.Write([]byte(srv.Banner))
 	}
@@ -137,18 +144,18 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d := make([]slog.Attr, 0, 8)
 	d = append(d,
-		slog.String("source_ip", evt.SourceIP),
+		slog.Any("source_ip", evt.SourceIP),
 	)
 	if srv.UseProxyProtocol {
 		d = append(d,
 			slog.Bool("source_ip_parsed", evt.ProxyParsed),
 			slog.String("source_ip_error", evt.ProxyError),
-			slog.String("proxy_ip", evt.ProxyIP),
+			slog.Any("proxy_ip", evt.ProxyIP),
 		)
 	}
 	d = append(d,
-		slog.String("server_ip", evt.ServerIP),
-		slog.String("server_port", evt.ServerPort),
+		slog.Any("server_ip", evt.ServerIP),
+		slog.String("server_port", strconv.FormatUint(uint64(evt.ServerPort), 10)),
 		slog.String("server_name", config.Hostname),
 	)
 	return d

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 
@@ -50,13 +51,16 @@ func Start(srv *config.Server) {
 
 		// UDP packet received. Capture the data and source IP address.
 		capturedData := string(buf[:n])
-		srcIP, _, _ := net.SplitHostPort(remoteAddr.String())
+		var srcIP netip.Addr
+		if addr, ok := remoteAddr.(*net.UDPAddr); ok {
+			srcIP = addr.AddrPort().Addr().Unmap()
+		}
 
 		// Log the received data. Because the source IP may be spoofed, an
 		// "[unreliable]" tag is added.
-		go func(data string, ip string) {
+		go func(data string, ip netip.Addr) {
 			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "udp",
-				slog.String("source_ip", ip+" [unreliable]"),
+				slog.String("source_ip", ip.String()+" [unreliable]"),
 				slog.String("source_reliability", "unreliable"),
 				slog.String("server_ip", srvIP),
 				slog.String("server_port", srvPort),

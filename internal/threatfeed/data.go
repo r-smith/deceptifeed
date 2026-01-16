@@ -63,17 +63,19 @@ var (
 // with the honeypot. If the source IP address is already in the threat feed,
 // its last-seen timestamp is updated, and its observation count is
 // incremented. Otherwise, the IP address is added as a new entry.
-func Update(ip string) {
+func Update(ip netip.Addr) {
 	// Check if the given IP string is a private address. The threat feed may
 	// be configured to include or exclude private IPs.
-	parsedIP, err := netip.ParseAddr(ip)
-	if err != nil || parsedIP.IsLoopback() || (!cfg.ThreatFeed.IsPrivateIncluded && parsedIP.IsPrivate()) {
+	ip = ip.Unmap()
+	if !ip.IsValid() || ip.IsLoopback() || (!cfg.ThreatFeed.IsPrivateIncluded && ip.IsPrivate()) {
 		return
 	}
 
+	ipStr := ip.String()
+
 	now := time.Now()
 	mu.Lock()
-	if ioc, exists := iocData[ip]; exists {
+	if ioc, exists := iocData[ipStr]; exists {
 		// Update existing entry.
 		ioc.lastSeen = now
 		if ioc.observations < maxObservations {
@@ -81,7 +83,7 @@ func Update(ip string) {
 		}
 	} else {
 		// Create a new entry.
-		iocData[ip] = &IOC{
+		iocData[ipStr] = &IOC{
 			added:        now,
 			lastSeen:     now,
 			observations: 1,
