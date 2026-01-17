@@ -167,7 +167,7 @@ Here is a breakdown of the arguments:
 - **Honeypot Servers:**
   - Run any number of honeypot services simultaneously.
   - Honeypots are low interaction (no simulated environments for attackers to access).
-  - **SSH honeyot:** Record and reject login attempts to a fake SSH service.
+  - **SSH honeypot:** Record and reject login attempts to a fake SSH service.
   - **HTTP/HTTPS honeypot:** Record requested URLs and HTTP headers.
   - **Generic TCP/UDP services:** Record data sent by connecting clients.
 - **Threat Feed Server:**
