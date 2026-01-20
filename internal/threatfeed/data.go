@@ -188,38 +188,65 @@ func loadCSV() error {
 	return nil
 }
 
-// saveCSV writes the current threat feed to a CSV file. This CSV file ensures
-// the threat feed data persists across application restarts. It is not the
-// active threat feed.
+// saveCSV performs an atomic save of the threatfeed to a CSV file. This file
+// ensures the threatfeed persists across restarts. It is separate from the
+// live in-memory feed.
 func saveCSV() error {
-	f, err := os.OpenFile(cfg.ThreatFeed.DatabasePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	// Copy iocData to a temporary slice, to minimize lock time.
+	mu.Lock()
+	type entry struct {
+		ip              netip.Addr
+		added, lastSeen time.Time
+		observations    int
+	}
+	tempData := make([]entry, 0, len(iocData))
+	for ip, ioc := range iocData {
+		tempData = append(tempData, entry{ip, ioc.added, ioc.lastSeen, ioc.observations})
+	}
+	mu.Unlock()
+
+	// Prepare a temp file.
+	tempPath := cfg.ThreatFeed.DatabasePath + ".tmp"
+	f, err := os.OpenFile(tempPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
+	defer os.Remove(tempPath)
 	defer f.Close()
 
+	// 64KB buffered writer.
 	w := bufio.NewWriterSize(f, 65536)
-	_, err = w.WriteString(strings.Join(csvHeader, ",") + "\n")
-	if err != nil {
+
+	// Write the header row.
+	if _, err := w.WriteString(strings.Join(csvHeader, ",") + "\n"); err != nil {
 		return err
 	}
-
-	mu.Lock()
-	for ip, ioc := range iocData {
-		_, err = w.WriteString(
-			fmt.Sprintf(
-				"%s,%s,%s,%d\n",
-				ip,
+	// Write the entries.
+	for _, ioc := range tempData {
+		_, err := fmt.Fprintf(w, "%s,%s,%s,%d\n",
+			ioc.ip,
 				ioc.added.Format(dateFormat),
 				ioc.lastSeen.Format(dateFormat),
 				ioc.observations,
-			),
 		)
 		if err != nil {
 			return err
 		}
 	}
-	mu.Unlock()
 
-	return w.Flush()
+	// Flush the buffer and commit to storage.
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+
+	// Explicitly close temp file before the rename.
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	// Replace (or create) the database file with the temp file.
+	return os.Rename(tempPath, cfg.ThreatFeed.DatabasePath)
 }
