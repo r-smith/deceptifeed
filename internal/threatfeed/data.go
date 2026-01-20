@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"net/netip"
 	"os"
 	"strconv"
@@ -144,43 +145,50 @@ func loadCSV() error {
 	defer f.Close()
 
 	reader := csv.NewReader(f)
+
+	// Read and discard the header line.
 	reader.FieldsPerRecord = -1
-	records, err := reader.ReadAll()
-	if err != nil {
+	if _, err := reader.Read(); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		return err
 	}
-	if len(records) < 2 {
-		return nil
-	}
 
-	var added time.Time
-	var lastSeen time.Time
-	var count int
-	for _, record := range records[1:] {
-		// Parse IP into a netip.Addr.
-		ip, err := netip.ParseAddr(record[0])
+	// Process remaining lines with 4 fields required per line.
+	reader.FieldsPerRecord = 4
+	for {
+		record, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// Skip over lines with the wrong number of fields.
+			continue
+		}
+
+		// Parse IP.
+		ip, err := netip.ParseAddr(strings.TrimSpace(record[0]))
 		if err != nil {
 			continue
 		}
 
 		// Parse added, defaulting to current time.
-		added = time.Now()
-		if len(record) > 1 && record[1] != "" {
-			added, _ = time.Parse(dateFormat, record[1])
+		added, err := time.Parse(dateFormat, record[1])
+		if err != nil {
+			added = time.Now()
 		}
 
 		// Parse lastSeen, defaulting to current time.
-		lastSeen = time.Now()
-		if len(record) > 2 && record[2] != "" {
-			lastSeen, _ = time.Parse(dateFormat, record[2])
+		lastSeen, err := time.Parse(dateFormat, record[2])
+		if err != nil {
+			lastSeen = time.Now()
 		}
 
 		// Parse observation count, defaulting to 1.
-		count = 1
-		if len(record) > 3 && record[3] != "" {
-			if parsedCount, err := strconv.Atoi(record[3]); err == nil {
-				count = parsedCount
-			}
+		count, err := strconv.Atoi(strings.TrimSpace(record[3]))
+		if err != nil {
+			count = 1
 		}
 
 		iocData[ip] = &IOC{added: added, lastSeen: lastSeen, observations: count}
