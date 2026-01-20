@@ -194,14 +194,14 @@ func loadCSV() error {
 func saveCSV() error {
 	// Copy iocData to a temporary slice, to minimize lock time.
 	mu.Lock()
-	type entry struct {
-		ip              netip.Addr
-		added, lastSeen time.Time
-		observations    int
-	}
-	tempData := make([]entry, 0, len(iocData))
+	tempData := make([]feedEntry, 0, len(iocData))
 	for ip, ioc := range iocData {
-		tempData = append(tempData, entry{ip, ioc.added, ioc.lastSeen, ioc.observations})
+		tempData = append(tempData, feedEntry{
+			IP:           ip,
+			Added:        ioc.added,
+			LastSeen:     ioc.lastSeen,
+			Observations: ioc.observations,
+		})
 	}
 	mu.Unlock()
 
@@ -224,25 +224,23 @@ func saveCSV() error {
 	// Write the entries.
 	for _, ioc := range tempData {
 		_, err := fmt.Fprintf(w, "%s,%s,%s,%d\n",
-			ioc.ip,
-				ioc.added.Format(dateFormat),
-				ioc.lastSeen.Format(dateFormat),
-				ioc.observations,
+			ioc.IP,
+			ioc.Added.Format(dateFormat),
+			ioc.LastSeen.Format(dateFormat),
+			ioc.Observations,
 		)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Flush the buffer and commit to storage.
+	// Flush the buffer, commit to storage, and close the temp file.
 	if err := w.Flush(); err != nil {
 		return err
 	}
 	if err := f.Sync(); err != nil {
 		return err
 	}
-
-	// Explicitly close temp file before the rename.
 	if err := f.Close(); err != nil {
 		return err
 	}
