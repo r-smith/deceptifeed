@@ -2,7 +2,11 @@ package logmonitor
 
 import (
 	"bytes"
+	"io"
 )
+
+// Compile-time check to ensure Monitor staisfies the io.Writer interface.
+var _ io.Writer = (*Monitor)(nil)
 
 // Monitor is an io.Writer that sends bytes written to its Write method to an
 // underlying byte channel. This allows other packages to receive the data from

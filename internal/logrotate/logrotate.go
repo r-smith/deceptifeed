@@ -2,9 +2,13 @@ package logrotate
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sync"
 )
+
+// Compile-time check to ensure File staisfies the io.WriteCloser interface.
+var _ io.WriteCloser = (*File)(nil)
 
 // File is an io.WriteCloser that supports appending data to a file and file
 // rotation.
