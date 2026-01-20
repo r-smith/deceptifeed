@@ -1,6 +1,7 @@
 package threatfeed
 
 import (
+	"bytes"
 	"embed"
 	"encoding/csv"
 	"encoding/json"
@@ -300,13 +301,12 @@ func handleDocs(w http.ResponseWriter, r *http.Request) {
 
 // handleCSS serves a CSS stylesheet for styling HTML templates.
 func handleCSS(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/css")
 	data, err := templates.ReadFile("templates/css/style.css")
 	if err != nil {
-		fmt.Println(err)
+		http.NotFound(w, r)
 		return
 	}
-	_, _ = w.Write(data)
+	http.ServeContent(w, r, "style.css", time.Time{}, bytes.NewReader(data))
 }
 
 // handleConfig serves a page that displays the Deceptifeed configuration.
