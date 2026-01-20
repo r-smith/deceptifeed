@@ -15,8 +15,7 @@ import (
 
 // feedEntry represents an individual entry in the threat feed.
 type feedEntry struct {
-	IP           string     `json:"ip"`
-	IPBytes      netip.Addr `json:"-"`
+	IP           netip.Addr `json:"ip"`
 	Added        time.Time  `json:"added"`
 	LastSeen     time.Time  `json:"last_seen"`
 	Observations int        `json:"observations"`
@@ -101,8 +100,7 @@ loop:
 		}
 
 		threats = append(threats, feedEntry{
-			IP:           ip.String(),
-			IPBytes:      ip,
+			IP:           ip,
 			Added:        ioc.added,
 			LastSeen:     ioc.lastSeen,
 			Observations: ioc.observations,
@@ -168,39 +166,30 @@ func parseExcludeList(filepath string) (map[netip.Addr]struct{}, []netip.Prefix,
 // applySort sorts the threat feed based on the specified sort method and
 // direction.
 func (f feedEntries) applySort(method sortMethod, direction sortDirection) {
-	switch method {
-	case byIP:
-		slices.SortFunc(f, func(a, b feedEntry) int {
-			return a.IPBytes.Compare(b.IPBytes)
-		})
-	case byLastSeen:
-		slices.SortFunc(f, func(a, b feedEntry) int {
-			t := a.LastSeen.Compare(b.LastSeen)
-			if t == 0 {
-				return a.IPBytes.Compare(b.IPBytes)
-			}
-			return t
-		})
-	case byAdded:
-		slices.SortFunc(f, func(a, b feedEntry) int {
-			t := a.Added.Compare(b.Added)
-			if t == 0 {
-				return a.IPBytes.Compare(b.IPBytes)
-			}
-			return t
-		})
-	case byObservations:
-		slices.SortFunc(f, func(a, b feedEntry) int {
-			t := cmp.Compare(a.Observations, b.Observations)
-			if t == 0 {
-				return a.IPBytes.Compare(b.IPBytes)
-			}
-			return t
-		})
-	}
-	if direction == descending {
-		slices.Reverse(f)
-	}
+	slices.SortFunc(f, func(a, b feedEntry) int {
+		var t int
+		switch method {
+		case byIP:
+			t = a.IP.Compare(b.IP)
+		case byLastSeen:
+			t = a.LastSeen.Compare(b.LastSeen)
+		case byAdded:
+			t = a.Added.Compare(b.Added)
+		case byObservations:
+			t = cmp.Compare(a.Observations, b.Observations)
+		}
+
+		// If values or equal, sort by IP.
+		if t == 0 && method != byIP {
+			t = a.IP.Compare(b.IP)
+		}
+
+		// Inverse sort if direction is descending.
+		if direction == descending {
+			return t * -1
+		}
+		return t
+	})
 }
 
 // convertToIndicators converts IP addresses from the threat feed into a
@@ -219,11 +208,11 @@ func (f feedEntries) convertToIndicators() []stix.Object {
 	result = append(result, stix.DeceptifeedIdentity())
 
 	for _, entry := range f {
-		pattern := "[ipv4-addr:value = '"
-		if strings.Contains(entry.IP, ":") {
-			pattern = "[ipv6-addr:value = '"
+		addrType := "ipv4-addr"
+		if entry.IP.Is6() {
+			addrType = "ipv6-addr"
 		}
-		pattern = pattern + entry.IP + "']"
+		pattern := fmt.Sprintf("[%s:value = '%s']", addrType, entry.IP)
 
 		// Fixed expiration: 2 months since last seen.
 		validUntil := new(time.Time)
@@ -245,7 +234,7 @@ func (f feedEntries) convertToIndicators() []stix.Object {
 			Modified:       entry.LastSeen.UTC(),
 			ValidFrom:      entry.Added.UTC(),
 			ValidUntil:     validUntil,
-			Name:           "Honeypot interaction: " + entry.IP,
+			Name:           "Honeypot interaction: " + entry.IP.String(),
 			Description:    "This IP was observed interacting with a honeypot server.",
 			KillChains:     []stix.KillChain{{KillChain: "mitre-attack", Phase: "reconnaissance"}},
 			Confidence:     100,
@@ -275,11 +264,11 @@ func (f feedEntries) convertToSightings() []stix.Object {
 	result = append(result, stix.DeceptifeedIdentity())
 
 	for _, entry := range f {
-		pattern := "[ipv4-addr:value = '"
-		if strings.Contains(entry.IP, ":") {
-			pattern = "[ipv6-addr:value = '"
+		addrType := "ipv4-addr"
+		if entry.IP.Is6() {
+			addrType = "ipv6-addr"
 		}
-		pattern = pattern + entry.IP + "']"
+		pattern := fmt.Sprintf("[%s:value = '%s']", addrType, entry.IP)
 
 		count := min(entry.Observations, maxCount)
 
@@ -325,7 +314,7 @@ func (f feedEntries) convertToObservables() []stix.Object {
 
 	for _, entry := range f {
 		t := "ipv4-addr"
-		if strings.Contains(entry.IP, ":") {
+		if entry.IP.Is6() {
 			t = "ipv6-addr"
 		}
 
@@ -335,8 +324,8 @@ func (f feedEntries) convertToObservables() []stix.Object {
 		result = append(result, stix.ObservableIP{
 			Type:         t,
 			SpecVersion:  stix.SpecVersion,
-			ID:           stix.DeterministicID(t, "{\"value\":\""+entry.IP+"\"}"),
-			Value:        entry.IP,
+			ID:           stix.DeterministicID(t, "{\"value\":\""+entry.IP.String()+"\"}"),
+			Value:        entry.IP.String(),
 			CreatedByRef: stix.DeceptifeedID,
 		})
 	}

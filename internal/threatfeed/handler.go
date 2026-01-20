@@ -39,7 +39,7 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	for _, entry := range prepareFeed(opt) {
-		_, err := w.Write([]byte(entry.IP + "\n"))
+		_, err := fmt.Fprintln(w, entry.IP)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
 			return
@@ -87,7 +87,7 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 
 	for _, entry := range prepareFeed(opt) {
 		if err := c.Write([]string{
-			entry.IP,
+			entry.IP.String(),
 			entry.Added.Format(dateFormat),
 			entry.LastSeen.Format(dateFormat),
 			strconv.Itoa(entry.Observations),
