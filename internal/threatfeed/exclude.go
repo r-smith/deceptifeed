@@ -3,12 +3,16 @@ package threatfeed
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/netip"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
+// excludeHeader is the default content written to a new exclude list file.
 const excludeHeader = `# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 #
 # Deceptifeed: Threatfeed exclude list
@@ -31,6 +35,20 @@ const excludeHeader = `# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # 10.0.50.0/24     # Ignore search engine crawler network
 `
 
+var (
+	// excludeMu protects access to the exclude list (excludeIPs/excludeCIDRs).
+	excludeMu sync.RWMutex
+
+	// excludeIPs stores IP addresses to exclude from the threatfeed.
+	excludeIPs = make(map[netip.Addr]struct{})
+
+	// excludeCIDRs stores network ranges to exclude from the threatfeed.
+	excludeCIDRs = []netip.Prefix{}
+
+	// excludeModTime tracks the last modification time of the exclude file.
+	excludeModTime time.Time
+)
+
 // initExcludeList checks for the existence of an exclude list file and creates
 // it with a default header if it's missing.
 func initExcludeList(path string) error {
@@ -45,16 +63,16 @@ func initExcludeList(path string) error {
 	return err
 }
 
-// parseExcludeList reads IP addresses and CIDR ranges from a file. Each line
-// should contain an IP address or CIDR. It returns a map of the unique IPs and
-// a slice of the CIDR ranges found in the file. The file may include comments
-// using "#". The "#" symbol on a line and everything after is ignored.
-func parseExcludeList(filepath string) (map[netip.Addr]struct{}, []netip.Prefix, error) {
-	if len(filepath) == 0 {
+// parseExcludeList reads IP addresses and CIDR ranges from the specified file.
+// It returns a map of IP addresses and a slice of network prefixes to ignore.
+// The file supports single IP addresses and CIDR notation. Comments can appear
+// anywhere on a line using '#' and whitespace is stripped.
+func parseExcludeList(path string) (map[netip.Addr]struct{}, []netip.Prefix, error) {
+	if path == "" {
 		return nil, nil, nil
 	}
 
-	f, err := os.Open(filepath)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -93,4 +111,58 @@ func parseExcludeList(filepath string) (map[netip.Addr]struct{}, []netip.Prefix,
 		return nil, nil, err
 	}
 	return ips, cidr, nil
+}
+
+// reloadExcludeList checks if the exclude list file has been modified since
+// the last load. If newer, it parses the file and updates the in-memory
+// exclude list.
+func reloadExcludeList(path string) {
+	if path == "" {
+		return
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+
+	if !info.ModTime().After(excludeModTime) {
+		return
+	}
+
+	// File has changed. Parse the file and update the in-memory list.
+	ips, cidrs, err := parseExcludeList(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error reloading exclude list:", err)
+		return
+	}
+
+	excludeMu.Lock()
+	excludeIPs = ips
+	excludeCIDRs = cidrs
+	excludeMu.Unlock()
+
+	if !excludeModTime.IsZero() {
+		fmt.Printf("Exclude list updated: %d IPs, %d CIDRs\n", len(ips), len(cidrs))
+	}
+
+	// Update last modified timestamp.
+	excludeModTime = info.ModTime()
+}
+
+// isExcluded returns whether the provided IP address is in the exclude list.
+func isExcluded(ip netip.Addr) bool {
+	excludeMu.RLock()
+	defer excludeMu.RUnlock()
+
+	if _, found := excludeIPs[ip.Unmap()]; found {
+		return true
+	}
+
+	for _, prefix := range excludeCIDRs {
+		if prefix.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

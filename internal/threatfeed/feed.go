@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"fmt"
 	"net/netip"
-	"os"
 	"slices"
 	"time"
 
@@ -68,22 +67,13 @@ func prepareFeed(options ...feedOptions) feedEntries {
 		opt = options[0]
 	}
 
-	excludedIPs, excludedCIDR, err := parseExcludeList(cfg.ThreatFeed.ExcludeListPath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to read threat feed exclude list:", err)
-	}
-
 	// Parse and filter IPs from iocData into the threat feed.
 	asOf := time.Now()
 	mu.Lock()
 	threats := make(feedEntries, 0, len(iocData))
-loop:
+
 	for ip, ioc := range iocData {
 		if ioc.expired(asOf) || !ioc.lastSeen.After(opt.seenAfter) {
-			continue
-		}
-
-		if _, found := excludedIPs[ip]; found {
 			continue
 		}
 
@@ -91,10 +81,8 @@ loop:
 			continue
 		}
 
-		for _, prefix := range excludedCIDR {
-			if prefix.Contains(ip) {
-				continue loop
-			}
+		if isExcluded(ip) {
+			continue
 		}
 
 		threats = append(threats, feedEntry{

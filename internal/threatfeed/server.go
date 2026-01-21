@@ -38,6 +38,9 @@ func Start(c *config.Config) {
 		fmt.Fprintln(os.Stderr, "Warning: Could not initialize exclude list:", err)
 	}
 
+	// Load exclude list into memory.
+	reloadExcludeList(c.ThreatFeed.ExcludeListPath)
+
 	// Load threatfeed CSV file.
 	if err := loadCSV(); err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed data:", err)
@@ -45,12 +48,16 @@ func Start(c *config.Config) {
 	}
 	deleteExpired()
 
-	// Periodically delete expired entries and save the current threat feed to
-	// disk.
+	// Start a background goroutine to perform periodic maintenance:
+	// 1. Reload the exclude list if the file changed.
+	// 2. Remove expired entries from the threatfeed.
+	// 3. Save the current threatfeed to disk.
 	ticker := time.NewTicker(saveInterval)
 	defer ticker.Stop()
 	go func() {
 		for range ticker.C {
+			reloadExcludeList(c.ThreatFeed.ExcludeListPath)
+
 			if dataChanged.CompareAndSwap(true, false) {
 				deleteExpired()
 				if err := saveCSV(); err != nil {
