@@ -33,7 +33,12 @@ var (
 func Start(c *config.Config) {
 	cfg = *c
 
-	// Check for and open an existing threat feed CSV file, if available.
+	// Ensure exclude list exists.
+	if err := initExcludeList(c.ThreatFeed.ExcludeListPath); err != nil {
+		fmt.Fprintln(os.Stderr, "Warning: Could not initialize exclude list:", err)
+	}
+
+	// Load threatfeed CSV file.
 	if err := loadCSV(); err != nil {
 		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed data:", err)
 		return

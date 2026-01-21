@@ -2,10 +2,48 @@ package threatfeed
 
 import (
 	"bufio"
+	"errors"
+	"io/fs"
 	"net/netip"
 	"os"
 	"strings"
 )
+
+const excludeHeader = `# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+#
+# Deceptifeed: Threatfeed exclude list
+#
+# Entries in this file are ignored and filtered out of the threatfeed.
+# Changes are detected automatically while Deceptifeed is running.
+#
+# FORMAT:
+# - Single IP: 192.168.1.100
+# - Network:   172.16.0.0/24 (CIDR notation)
+#
+# COMMENTS:
+# - Use '#' for comments (can be at the start or middle of a line).
+#
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+# Example entries:
+# 192.168.0.15     # Ignore attack surface management platform
+# 10.0.50.0/24     # Ignore search engine crawler network
+`
+
+// initExcludeList checks for the existence of an exclude list file and creates
+// it with a default header if it's missing.
+func initExcludeList(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	_, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return os.WriteFile(path, []byte(excludeHeader), 0644)
+	}
+	return err
+}
 
 // parseExcludeList reads IP addresses and CIDR ranges from a file. Each line
 // should contain an IP address or CIDR. It returns a map of the unique IPs and
