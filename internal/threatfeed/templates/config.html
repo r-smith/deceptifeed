@@ -47,8 +47,10 @@
                 </thead>
                 <tbody>
                     <tr><th>State</th><td>{{if .Enabled}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    <tr><th>Send to Threat Feed</th><td>{{if .SendToThreatFeed}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    <tr><th>Log State</th><td>{{if .LogEnabled}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
+                    {{if ne .Type.String "udp"}}<tr><th>Report Connections</th><td>{{if .ReportConnections}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>{{end}}
+                    <tr><th>Report Interactions</th><td>{{if .ReportInteractions}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
+                    {{if ne .Type.String "udp"}}<tr><th>Log Connections</th><td>{{if .LogConnections}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>{{end}}
+                    <tr><th>Log Interactions</th><td>{{if .LogInteractions}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
                     <tr><th>Log Path</th><td class="blue">{{if .LogPath}}{{.LogPath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
                     {{if eq .Type.String "https"}}<tr><th>Certificate</th><td class="blue">{{if .CertPath}}{{.CertPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
                     {{if or (eq .Type.String "https") (eq .Type.String "ssh")}}<tr><th>Private Key</th><td class="blue">{{if .KeyPath}}{{.KeyPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
