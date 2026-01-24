@@ -84,7 +84,9 @@ type Server struct {
 	UseProxyProtocol   bool              `xml:"useProxyProtocol"`
 	Rules              Rules             `xml:"rules"`
 	SourceIPHeader     string            `xml:"sourceIpHeader"`
+	LogConnections     bool              `xml:"logConnections"`
 	LogInteractions    bool              `xml:"logInteractions"`
+	ReportConnections  bool              `xml:"reportConnections"`
 	ReportInteractions bool              `xml:"reportInteractions"`
 	LogPath            string            `xml:"logPath"`
 	LogFile            *logrotate.File   `xml:"-"`
@@ -234,6 +236,8 @@ func (c *Config) prepare() error {
 
 		// Explicitly disable threatfeed for UDP honeypots.
 		if s.Type == UDP {
+			s.LogConnections = false
+			s.ReportConnections = false
 			s.ReportInteractions = false
 		}
 
@@ -265,7 +269,7 @@ func (c *Config) InitLoggers() error {
 
 		// If no log path is specified or logging is disabled, write to a log
 		// monitor for live monitoring. No log data is written to disk.
-		if logPath == "" || !c.Servers[i].LogInteractions {
+		if logPath == "" || (!c.Servers[i].LogInteractions && !c.Servers[i].LogConnections) {
 			c.Servers[i].Logger = slog.New(slog.NewJSONHandler(c.Monitor, nil))
 			continue
 		}
