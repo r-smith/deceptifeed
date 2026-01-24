@@ -44,46 +44,6 @@ const (
 	DefaultBannerSSH            = "SSH-2.0-OpenSSH_9.9"
 )
 
-// ServerType identifies the protocol used by a honeypot server. It determines
-// how the server listens, responds, and logs activity.
-type ServerType int
-
-const (
-	HTTP ServerType = iota
-	HTTPS
-	SSH
-	TCP
-	UDP
-)
-
-// String returns a string represenation of ServerType.
-func (t ServerType) String() string {
-	return [...]string{"http", "https", "ssh", "tcp", "udp"}[t]
-}
-
-// UnmarshalXMLAttr unmarshals the XML 'type' attribute from 'server' elements
-// into a ServerType.
-//
-// Example XML snippet:
-// <server type="http"><enabled>true</enabled></server>
-func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
-	switch attr.Value {
-	case "http":
-		*t = HTTP
-	case "https":
-		*t = HTTPS
-	case "ssh":
-		*t = SSH
-	case "tcp":
-		*t = TCP
-	case "udp":
-		*t = UDP
-	default:
-		return fmt.Errorf("invalid server type: %s", attr.Value)
-	}
-	return nil
-}
-
 // Config stores the application's settings. It includes honeypot configuration,
 // threatfeed configuration, and loggers.
 type Config struct {
@@ -92,6 +52,19 @@ type Config struct {
 	ThreatFeed ThreatFeed          `xml:"threatFeed"`
 	FilePath   string              `xml:"-"`
 	Monitor    *logmonitor.Monitor `xml:"-"`
+}
+
+// ThreatFeed defines the settings for the threatfeed server.
+type ThreatFeed struct {
+	Enabled           bool   `xml:"enabled"`
+	Port              string `xml:"port"`
+	DatabasePath      string `xml:"databasePath"`
+	ExpiryHours       int    `xml:"threatExpiryHours"`
+	IsPrivateIncluded bool   `xml:"includePrivateIPs"`
+	ExcludeListPath   string `xml:"excludeListPath"`
+	EnableTLS         bool   `xml:"enableTLS"`
+	CertPath          string `xml:"certPath"`
+	KeyPath           string `xml:"keyPath"`
 }
 
 // Server defines the settings for honeypot servers.
@@ -143,17 +116,44 @@ type Prompt struct {
 	Log string `xml:"log,attr"`
 }
 
-// ThreatFeed defines the settings for the threatfeed server.
-type ThreatFeed struct {
-	Enabled           bool   `xml:"enabled"`
-	Port              string `xml:"port"`
-	DatabasePath      string `xml:"databasePath"`
-	ExpiryHours       int    `xml:"threatExpiryHours"`
-	IsPrivateIncluded bool   `xml:"includePrivateIPs"`
-	ExcludeListPath   string `xml:"excludeListPath"`
-	EnableTLS         bool   `xml:"enableTLS"`
-	CertPath          string `xml:"certPath"`
-	KeyPath           string `xml:"keyPath"`
+// ServerType identifies the protocol used by a honeypot server. It determines
+// how the server listens, responds, and logs activity.
+type ServerType int
+
+const (
+	HTTP ServerType = iota
+	HTTPS
+	SSH
+	TCP
+	UDP
+)
+
+// String returns a string represenation of ServerType.
+func (t ServerType) String() string {
+	return [...]string{"http", "https", "ssh", "tcp", "udp"}[t]
+}
+
+// UnmarshalXMLAttr unmarshals the XML 'type' attribute from 'server' elements
+// into a ServerType.
+//
+// Example XML snippet:
+// <server type="http"><enabled>true</enabled></server>
+func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
+	switch attr.Value {
+	case "http":
+		*t = HTTP
+	case "https":
+		*t = HTTPS
+	case "ssh":
+		*t = SSH
+	case "tcp":
+		*t = TCP
+	case "udp":
+		*t = UDP
+	default:
+		return fmt.Errorf("invalid server type: %s", attr.Value)
+	}
+	return nil
 }
 
 // Load reads an XML configuration file, decodes it into a Config struct, and
@@ -181,7 +181,7 @@ func Load(filename string) (*Config, error) {
 		return nil, err
 	}
 
-	// Finalizae honeypot configuration.
+	// Finalize honeypot configuration.
 	if err := config.prepare(); err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func (c *Config) prepare() error {
 
 		// Validate and compile regex rules.
 		if err := s.compileRules(); err != nil {
-			return fmt.Errorf("server on port %s: %w", s.Port, err)
+			return err
 		}
 	}
 	return nil
