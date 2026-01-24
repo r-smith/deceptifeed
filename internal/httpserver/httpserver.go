@@ -210,12 +210,13 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 			)
 		}
 
-		// Log the event and update the threat feed.
+		// Log and report the interaction.
+		if srv.LogInteractions {
 		logData = append(logData, slog.Group("event_details", eventDetails...))
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
 
 		fmt.Printf("[HTTP] %s %s %s %s\n", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
-
+		}
 		if shouldUpdateThreatFeed(srv, r) {
 			threatfeed.Update(evt.SourceIP)
 		}
@@ -302,7 +303,7 @@ func serveErrorPage(w http.ResponseWriter, r *http.Request, srv *config.Server) 
 func shouldUpdateThreatFeed(srv *config.Server, r *http.Request) bool {
 	// Return false if `sendToThreatFeed`` is disabled, or if the request
 	// matches an `exclude` rule.
-	if !srv.SendToThreatFeed || checkRuleMatches(srv.Rules.Exclude, r) {
+	if !srv.ReportInteractions || checkRuleMatches(srv.Rules.Exclude, r) {
 		return false
 	}
 

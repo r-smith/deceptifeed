@@ -69,26 +69,26 @@ type ThreatFeed struct {
 
 // Server defines the settings for honeypot servers.
 type Server struct {
-	Type             ServerType        `xml:"type,attr"`
-	Enabled          bool              `xml:"enabled"`
-	Port             string            `xml:"port"`
-	CertPath         string            `xml:"certPath"`
-	KeyPath          string            `xml:"keyPath"`
-	HomePagePath     string            `xml:"homePagePath"`
-	ErrorPagePath    string            `xml:"errorPagePath"`
-	ErrorCode        int               `xml:"errorCode"`
-	Banner           string            `xml:"banner"`
-	Headers          []string          `xml:"headers>header"`
-	CustomHeaders    map[string]string `xml:"-"`
-	Prompts          []Prompt          `xml:"prompts>prompt"`
-	SendToThreatFeed bool              `xml:"sendToThreatFeed"`
-	UseProxyProtocol bool              `xml:"useProxyProtocol"`
-	Rules            Rules             `xml:"rules"`
-	SourceIPHeader   string            `xml:"sourceIpHeader"`
-	LogPath          string            `xml:"logPath"`
-	LogEnabled       bool              `xml:"logEnabled"`
-	LogFile          *logrotate.File   `xml:"-"`
-	Logger           *slog.Logger      `xml:"-"`
+	Type               ServerType        `xml:"type,attr"`
+	Enabled            bool              `xml:"enabled"`
+	Port               string            `xml:"port"`
+	CertPath           string            `xml:"certPath"`
+	KeyPath            string            `xml:"keyPath"`
+	HomePagePath       string            `xml:"homePagePath"`
+	ErrorPagePath      string            `xml:"errorPagePath"`
+	ErrorCode          int               `xml:"errorCode"`
+	Banner             string            `xml:"banner"`
+	Headers            []string          `xml:"headers>header"`
+	CustomHeaders      map[string]string `xml:"-"`
+	Prompts            []Prompt          `xml:"prompts>prompt"`
+	UseProxyProtocol   bool              `xml:"useProxyProtocol"`
+	Rules              Rules             `xml:"rules"`
+	SourceIPHeader     string            `xml:"sourceIpHeader"`
+	LogInteractions    bool              `xml:"logInteractions"`
+	ReportInteractions bool              `xml:"reportInteractions"`
+	LogPath            string            `xml:"logPath"`
+	LogFile            *logrotate.File   `xml:"-"`
+	Logger             *slog.Logger      `xml:"-"`
 }
 
 // Rules define the criteria for reporting client IPs to the threatfeed.
@@ -207,7 +207,7 @@ func (c *Config) prepare() error {
 
 		// Explicitly disable threatfeed for UDP honeypots.
 		if s.Type == UDP {
-			s.SendToThreatFeed = false
+			s.ReportInteractions = false
 		}
 
 		// Parse headers to a map[string]string (used by http.Header().Set()).
@@ -238,7 +238,7 @@ func (c *Config) InitLoggers() error {
 
 		// If no log path is specified or logging is disabled, write to a log
 		// monitor for live monitoring. No log data is written to disk.
-		if logPath == "" || !c.Servers[i].LogEnabled {
+		if logPath == "" || !c.Servers[i].LogInteractions {
 			c.Servers[i].Logger = slog.New(slog.NewJSONHandler(c.Monitor, nil))
 			continue
 		}

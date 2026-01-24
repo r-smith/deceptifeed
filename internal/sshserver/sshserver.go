@@ -138,6 +138,7 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 	// Password authentication: Log the credentials, update the threat feed,
 	// then reject the attempt.
 	conf.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+		if srv.LogInteractions {
 		d := slog.Group("event_details",
 			slog.String("username", conn.User()),
 			slog.String("password", string(password)),
@@ -147,8 +148,9 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
 		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
+		}
 
-		if srv.SendToThreatFeed {
+		if srv.ReportInteractions {
 			threatfeed.Update(evt.SourceIP)
 		}
 
@@ -161,6 +163,7 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 	// threat feed, then reject the attempt. Note: The logged key is unverified
 	// because the login is rejected before the client proves key ownership.
 	conf.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+		if srv.LogInteractions {
 		d := slog.Group("event_details",
 			slog.String("username", conn.User()),
 			slog.String("ssh_client", string(conn.ClientVersion())),
@@ -174,8 +177,9 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
 		fmt.Printf("[SSH] %s Username: %q (publickey authentication attempt)\n", evt.SourceIP, conn.User())
+		}
 
-		if srv.SendToThreatFeed {
+		if srv.ReportInteractions {
 			threatfeed.Update(evt.SourceIP)
 		}
 

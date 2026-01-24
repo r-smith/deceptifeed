@@ -136,12 +136,12 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 		return
 	}
 
-	// Log the event and update the threat feed.
+	// Log and report the interaction.
+	if srv.LogInteractions {
 	srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
-
 	fmt.Printf("[TCP] %s %q\n", evt.SourceIP, responsesToString(responses))
-
-	if srv.SendToThreatFeed {
+	}
+	if srv.ReportInteractions {
 		threatfeed.Update(evt.SourceIP)
 	}
 }

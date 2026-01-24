@@ -79,8 +79,8 @@ func main() {
 		// Set defaults.
 		for i := range cfg.Servers {
 			cfg.Servers[i].LogPath = cfg.LogPath
-			cfg.Servers[i].LogEnabled = true
-			cfg.Servers[i].SendToThreatFeed = true
+			cfg.Servers[i].LogInteractions = true
+			cfg.Servers[i].ReportInteractions = true
 			if cfg.Servers[i].Type == config.SSH {
 				cfg.Servers[i].Banner = config.DefaultBannerSSH
 			}
