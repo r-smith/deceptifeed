@@ -96,12 +96,22 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 		}
 	}
 
-	// Prepare log and apply callbacks to ssh config.
 	logData := prepareLog(&evt, srv)
-	sshConfig := configureCallbacks(baseConfig, srv, &evt, logData)
+
+	// Log and report the connection.
+	if srv.LogConnections {
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "connection", logData...)
+		fmt.Printf("[SSH] %s connected to port %d\n", evt.SourceIP, evt.ServerPort)
+	}
+	if srv.ReportConnections {
+		threatfeed.Update(evt.SourceIP)
+	}
 
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
+
+	// Apply callbacks to config.
+	sshConfig := configureCallbacks(baseConfig, srv, &evt, logData)
 
 	// Perform the SSH handshake. Because all authentication attempts are
 	// rejected (return an error), NewServerConn never opens a connection. No
@@ -139,15 +149,15 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 	// then reject the attempt.
 	conf.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		if srv.LogInteractions {
-		d := slog.Group("event_details",
-			slog.String("username", conn.User()),
-			slog.String("password", string(password)),
-			slog.String("ssh_client", string(conn.ClientVersion())),
-			slog.String("auth_method", "password"),
-		)
-		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
+			d := slog.Group("event_details",
+				slog.String("username", conn.User()),
+				slog.String("password", string(password)),
+				slog.String("ssh_client", string(conn.ClientVersion())),
+				slog.String("auth_method", "password"),
+			)
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
-		fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
+			fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
 		}
 
 		if srv.ReportInteractions {
@@ -164,19 +174,19 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 	// because the login is rejected before the client proves key ownership.
 	conf.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 		if srv.LogInteractions {
-		d := slog.Group("event_details",
-			slog.String("username", conn.User()),
-			slog.String("ssh_client", string(conn.ClientVersion())),
-			slog.String("auth_method", "publickey"),
-			slog.Group("publickey",
-				slog.String("type", key.Type()),
-				slog.String("fingerprint_sha256", ssh.FingerprintSHA256(key)),
-				slog.Bool("is_verified", false),
-			),
-		)
-		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
+			d := slog.Group("event_details",
+				slog.String("username", conn.User()),
+				slog.String("ssh_client", string(conn.ClientVersion())),
+				slog.String("auth_method", "publickey"),
+				slog.Group("publickey",
+					slog.String("type", key.Type()),
+					slog.String("fingerprint_sha256", ssh.FingerprintSHA256(key)),
+					slog.Bool("is_verified", false),
+				),
+			)
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
-		fmt.Printf("[SSH] %s Username: %q (publickey authentication attempt)\n", evt.SourceIP, conn.User())
+			fmt.Printf("[SSH] %s Username: %q (publickey authentication attempt)\n", evt.SourceIP, conn.User())
 		}
 
 		if srv.ReportInteractions {
