@@ -156,6 +156,33 @@ func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
+// UnmarshalXML is a custom unmarshaler for the Server struct. It provides
+// backwards compatibility for deprecated XML tags.
+func (s *Server) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type alias Server
+
+	var aux struct {
+		*alias
+		OldLog  *bool `xml:"logEnabled"`
+		OldFeed *bool `xml:"sendToThreatFeed"`
+	}
+	aux.alias = (*alias)(s)
+
+	if err := d.DecodeElement(&aux, &start); err != nil {
+		return err
+	}
+
+	// Use the deprecated XML tags if they're provided.
+	if aux.OldLog != nil {
+		s.LogInteractions = *aux.OldLog
+	}
+	if aux.OldFeed != nil {
+		s.ReportInteractions = *aux.OldFeed
+	}
+
+	return nil
+}
+
 // Load reads an XML configuration file, decodes it into a Config struct, and
 // applies sever defaults.
 func Load(filename string) (*Config, error) {
