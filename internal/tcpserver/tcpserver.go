@@ -88,6 +88,15 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 
 	logData := prepareLog(&evt, srv)
 
+	// Log and report the connection.
+	if srv.LogConnections {
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "connection", logData...)
+		fmt.Printf("[TCP] %s connected to port %d\n", evt.SourceIP, evt.ServerPort)
+	}
+	if srv.ReportConnections {
+		threatfeed.Update(evt.SourceIP)
+	}
+
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
@@ -138,8 +147,8 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 
 	// Log and report the interaction.
 	if srv.LogInteractions {
-	srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
-	fmt.Printf("[TCP] %s %q\n", evt.SourceIP, responsesToString(responses))
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
+		fmt.Printf("[TCP] %s %q\n", evt.SourceIP, responsesToString(responses))
 	}
 	if srv.ReportInteractions {
 		threatfeed.Update(evt.SourceIP)
