@@ -73,13 +73,14 @@ func broadcastLogsToClients() {
 
 // handleWebSocket establishes and maintains WebSocket connections.
 func handleWebSocket(ws *websocket.Conn) {
-	// Enforce private IPs.
-	ip, _, err := net.SplitHostPort(ws.Request().RemoteAddr)
+	// Restrict access to private and link-local IP addresses.
+	host, _, err := net.SplitHostPort(ws.Request().RemoteAddr)
 	if err != nil {
 		_ = ws.Close()
 		return
 	}
-	if parsedIP, err := netip.ParseAddr(ip); err != nil || (!parsedIP.IsPrivate() && !parsedIP.IsLoopback()) {
+	addr, err := netip.ParseAddr(host)
+	if err != nil || (!addr.IsPrivate() && !addr.IsLoopback() && !addr.IsLinkLocalUnicast()) {
 		_ = ws.Close()
 		return
 	}
@@ -96,7 +97,7 @@ func handleWebSocket(ws *websocket.Conn) {
 	count := len(wsClients)
 	recent := append([]string(nil), wsRecentMessages...)
 	wsMu.Unlock()
-	fmt.Printf("[THREATFEED] %s established websocket connection (total: %d)\n", ip, count)
+	fmt.Printf("[THREATFEED] %s established websocket connection (total: %d)\n", host, count)
 
 	// Ensure cleanup.
 	defer func() {
@@ -105,7 +106,7 @@ func handleWebSocket(ws *websocket.Conn) {
 		count = len(wsClients)
 		wsMu.Unlock()
 		_ = ws.Close()
-		fmt.Printf("[THREATFEED] %s closed websocket connection (total: %d)\n", ip, count)
+		fmt.Printf("[THREATFEED] %s closed websocket connection (total: %d)\n", host, count)
 	}()
 
 	// Goroutine to send messages to clients. Read from the 'send' channel and
