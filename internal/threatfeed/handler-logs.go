@@ -151,7 +151,7 @@ func handleLogHTTP(w http.ResponseWriter) {
 // displayStats handles the processing and rendering of statistics for a given
 // field. It reads honeypot log data, counts the occurrences of `field` and
 // displays the results.
-func displayStats(w http.ResponseWriter, field fieldCounter) {
+func displayStats(w http.ResponseWriter, fc fieldCounter) {
 	l := logFiles{}
 	reader, err := l.open()
 	if err != nil {
@@ -160,7 +160,7 @@ func displayStats(w http.ResponseWriter, field fieldCounter) {
 	}
 	defer l.close()
 
-	fieldCounts := field.count(reader)
+	fieldCounts := fc.count(reader)
 
 	results := []statsResult{}
 	for k, v := range fieldCounts {
@@ -178,7 +178,7 @@ func displayStats(w http.ResponseWriter, field fieldCounter) {
 		"logs-stats.html",
 		map[string]any{
 			"Data":    results,
-			"Header":  field.fieldName(),
+			"Header":  fc.title(),
 			"NavData": "logs",
 		},
 	)
@@ -190,36 +190,58 @@ type statsResult struct {
 	Count int
 }
 
-// fieldCounter is an interface that defines methods for counting occurrences
-// of specific fields.
+// fieldCounter is the interface that wraps the count and title methods.
+//
+// count returns the unique values and their counts from a JSON log.
+//
+// title returns a friendly name for the log field and is used as a page header
+// when displaying results.
 type fieldCounter interface {
 	count(io.Reader) map[string]int
-	fieldName() string
+	title() string
 }
 
-// sshIPStats is the log structure for extracting SSH IP data.
+// eventTyper is the interface that wraps the eventType method.
+//
+// eventType returns the event_type value from a JSON log entry.
+type eventTyper interface {
+	eventType() string
+}
+
+// fieldCount decodes JSON logs from r, filters by the target event type, and
+// returns a map of extracted values and their occurrence counts.
+func fieldCount[T eventTyper](r io.Reader, target string, extractor func(T) string) map[string]int {
+	counts := make(map[string]int)
+	d := json.NewDecoder(r)
+
+	for d.More() {
+		var entry T
+		if err := d.Decode(&entry); err != nil {
+			continue
+		}
+
+		if entry.eventType() != target {
+			continue
+		}
+
+		counts[extractor(entry)]++
+	}
+	return counts
+}
+
+// sshIPStats extracts counts source IP addresses from SSH logs.
 type sshIPStats struct {
 	EventType string `json:"event_type"`
 	SourceIP  string `json:"source_ip"`
 }
 
-func (sshIPStats) fieldName() string { return "Source IP" }
-
+func (s sshIPStats) eventType() string { return s.EventType }
+func (sshIPStats) title() string       { return "Source IP" }
 func (sshIPStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry sshIPStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "ssh" {
-			continue
-		}
-		fieldCounts[entry.SourceIP]++
-	}
-	return fieldCounts
+	return fieldCount(r, "ssh", func(e sshIPStats) string { return e.SourceIP })
 }
 
-// sshClientStats is the log structure for extracting SSH client data.
+// sshClientStats extracts and counts client versions from SSH logs.
 type sshClientStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -227,23 +249,13 @@ type sshClientStats struct {
 	} `json:"event_details"`
 }
 
-func (sshClientStats) fieldName() string { return "SSH Client" }
-
+func (s sshClientStats) eventType() string { return s.EventType }
+func (sshClientStats) title() string       { return "SSH Client" }
 func (sshClientStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry sshClientStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "ssh" {
-			continue
-		}
-		fieldCounts[entry.Details.Client]++
-	}
-	return fieldCounts
+	return fieldCount(r, "ssh", func(e sshClientStats) string { return e.Details.Client })
 }
 
-// sshUsernameStats is the log structure for extracting SSH username data.
+// sshUsernameStats extracts and counts login usernames from SSH logs.
 type sshUsernameStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -251,23 +263,13 @@ type sshUsernameStats struct {
 	} `json:"event_details"`
 }
 
-func (sshUsernameStats) fieldName() string { return "Username" }
-
+func (s sshUsernameStats) eventType() string { return s.EventType }
+func (sshUsernameStats) title() string       { return "Username" }
 func (sshUsernameStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry sshUsernameStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "ssh" {
-			continue
-		}
-		fieldCounts[entry.Details.Username]++
-	}
-	return fieldCounts
+	return fieldCount(r, "ssh", func(e sshUsernameStats) string { return e.Details.Username })
 }
 
-// sshPasswordStats is the log structure for extracting SSH password data.
+// sshPasswordStats extracts and counts login passwords from SSH logs.
 type sshPasswordStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -275,45 +277,25 @@ type sshPasswordStats struct {
 	} `json:"event_details"`
 }
 
-func (sshPasswordStats) fieldName() string { return "Password" }
-
+func (s sshPasswordStats) eventType() string { return s.EventType }
+func (sshPasswordStats) title() string       { return "Password" }
 func (sshPasswordStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry sshPasswordStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "ssh" {
-			continue
-		}
-		fieldCounts[entry.Details.Password]++
-	}
-	return fieldCounts
+	return fieldCount(r, "ssh", func(e sshPasswordStats) string { return e.Details.Password })
 }
 
-// httpIPStats is the log structure for extracting HTTP IP data.
+// httpIPStats extracts and counts source IP addresses from HTTP logs.
 type httpIPStats struct {
 	EventType string `json:"event_type"`
 	SourceIP  string `json:"source_ip"`
 }
 
-func (httpIPStats) fieldName() string { return "Source IP" }
-
+func (h httpIPStats) eventType() string { return h.EventType }
+func (httpIPStats) title() string       { return "Source IP" }
 func (httpIPStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry httpIPStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
-			continue
-		}
-		fieldCounts[entry.SourceIP]++
-	}
-	return fieldCounts
+	return fieldCount(r, "http", func(e httpIPStats) string { return e.SourceIP })
 }
 
-// httpUserAgentStats is the log structure for extracting HTTP user-agent data.
+// httpUserAgentStats extracts and counts User-Agent strings from HTTP logs.
 type httpUserAgentStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -321,23 +303,13 @@ type httpUserAgentStats struct {
 	} `json:"event_details"`
 }
 
-func (httpUserAgentStats) fieldName() string { return "User-Agent" }
-
+func (h httpUserAgentStats) eventType() string { return h.EventType }
+func (httpUserAgentStats) title() string       { return "User-Agent" }
 func (httpUserAgentStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry httpUserAgentStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
-			continue
-		}
-		fieldCounts[entry.Details.UserAgent]++
-	}
-	return fieldCounts
+	return fieldCount(r, "http", func(e httpUserAgentStats) string { return e.Details.UserAgent })
 }
 
-// httpPathStats is the log structure for extracting HTTP path data.
+// httpPathStats extracts and counts URL paths from HTTP logs.
 type httpPathStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -345,23 +317,13 @@ type httpPathStats struct {
 	} `json:"event_details"`
 }
 
-func (httpPathStats) fieldName() string { return "Path" }
-
+func (h httpPathStats) eventType() string { return h.EventType }
+func (httpPathStats) title() string       { return "Path" }
 func (httpPathStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry httpPathStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
-			continue
-		}
-		fieldCounts[entry.Details.Path]++
-	}
-	return fieldCounts
+	return fieldCount(r, "http", func(e httpPathStats) string { return e.Details.Path })
 }
 
-// httpQueryStats is the log structure for extracting HTTP query string data.
+// httpQueryStats extracts and counts query strings from HTTP logs.
 type httpQueryStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -369,23 +331,13 @@ type httpQueryStats struct {
 	} `json:"event_details"`
 }
 
-func (httpQueryStats) fieldName() string { return "Query String" }
-
+func (h httpQueryStats) eventType() string { return h.EventType }
+func (httpQueryStats) title() string       { return "Query String" }
 func (httpQueryStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry httpQueryStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
-			continue
-		}
-		fieldCounts[entry.Details.Query]++
-	}
-	return fieldCounts
+	return fieldCount(r, "http", func(e httpQueryStats) string { return e.Details.Query })
 }
 
-// httpMethodStats is the log structure for extracting HTTP method data.
+// httpMethodStats extracts and counts HTTP request methods from HTTP logs.
 type httpMethodStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -393,23 +345,13 @@ type httpMethodStats struct {
 	} `json:"event_details"`
 }
 
-func (httpMethodStats) fieldName() string { return "HTTP Method" }
-
+func (h httpMethodStats) eventType() string { return h.EventType }
+func (httpMethodStats) title() string       { return "HTTP Method" }
 func (httpMethodStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry httpMethodStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
-			continue
-		}
-		fieldCounts[entry.Details.Method]++
-	}
-	return fieldCounts
+	return fieldCount(r, "http", func(e httpMethodStats) string { return e.Details.Method })
 }
 
-// httpHostStats is the log structure for extracting HTTP host header data.
+// httpHostStats extracts and counts Host headers from HTTP logs.
 type httpHostStats struct {
 	EventType string `json:"event_type"`
 	Details   struct {
@@ -417,20 +359,10 @@ type httpHostStats struct {
 	} `json:"event_details"`
 }
 
-func (httpHostStats) fieldName() string { return "Host Header" }
-
+func (h httpHostStats) eventType() string { return h.EventType }
+func (httpHostStats) title() string       { return "Host Header" }
 func (httpHostStats) count(r io.Reader) map[string]int {
-	fieldCounts := map[string]int{}
-	d := json.NewDecoder(r)
-	for d.More() {
-		var entry httpHostStats
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
-			continue
-		}
-		fieldCounts[entry.Details.Host]++
-	}
-	return fieldCounts
+	return fieldCount(r, "http", func(e httpHostStats) string { return e.Details.Host })
 }
 
 // logFiles represents open honeypot log files and their associate io.Reader.
