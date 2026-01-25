@@ -3,6 +3,7 @@ package threatfeed
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -155,7 +156,7 @@ func displayStats(w http.ResponseWriter, fc fieldCounter) {
 
 	fieldCounts := fc.count(reader)
 
-	results := []statsResult{}
+	results := make([]statsResult, 0, len(fieldCounts))
 	for k, v := range fieldCounts {
 		results = append(results, statsResult{Field: k, Count: v})
 	}
@@ -360,8 +361,7 @@ func (httpHostStats) count(r io.Reader) map[string]int {
 
 // logFiles represents open honeypot log files and their associate io.Reader.
 type logFiles struct {
-	files   []*os.File
-	readers []io.Reader
+	files []*os.File
 }
 
 // open opens all honeypot log files and returns an io.MultiReader that
@@ -370,18 +370,15 @@ func (l *logFiles) open() (io.Reader, error) {
 	paths := []string{}
 	seenPaths := make(map[string]bool)
 
-	// Helper function to ensure only unique paths are added to the slice.
-	add := func(p string) {
+	// Determine unique log paths.
+	for _, s := range cfg.Servers {
+		p := s.LogPath
 		if seenPaths[p] {
-			return
+			continue
 		}
-		// New path. Add both the path and the path with ".1" to the slice.
+		// Add p.1 and p.
 		paths = append(paths, p+".1", p)
 		seenPaths[p] = true
-	}
-
-	for _, s := range cfg.Servers {
-		add(s.LogPath)
 	}
 
 	for _, path := range paths {
@@ -390,16 +387,22 @@ func (l *logFiles) open() (io.Reader, error) {
 			if os.IsNotExist(err) {
 				continue
 			}
+			l.close()
 			return nil, err
 		}
 		l.files = append(l.files, f)
 	}
 
-	for _, f := range l.files {
-		l.readers = append(l.readers, f)
+	if len(l.files) == 0 {
+		return nil, errors.New("no log files found")
 	}
 
-	return io.MultiReader(l.readers...), nil
+	readers := make([]io.Reader, 0, len(l.files))
+	for _, f := range l.files {
+		readers = append(readers, f)
+	}
+
+	return io.MultiReader(readers...), nil
 }
 
 // close closes all honeypot log files.
