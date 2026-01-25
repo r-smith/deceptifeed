@@ -6,19 +6,20 @@ import (
 	"net/netip"
 )
 
-// enforcePrivateIP is a middleware that restricts access to the HTTP server
-// based on the client's IP address. It allows only requests from private IP
-// addresses. Any other requests are denied with a 403 Forbidden error.
+// enforcePrivateIP restricts access to private, loopback, and link-local IP
+// addresses. Note: This restriction can be bypassed if the threatfeed is
+// behind a proxy.
 func enforcePrivateIP(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			http.Error(w, "", http.StatusForbidden)
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
 
-		if parsedIP, err := netip.ParseAddr(ip); err != nil || (!parsedIP.IsPrivate() && !parsedIP.IsLoopback()) {
-			http.Error(w, "", http.StatusForbidden)
+		addr, err := netip.ParseAddr(host)
+		if err != nil || (!addr.IsPrivate() && !addr.IsLoopback() && !addr.IsLinkLocalUnicast()) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
 
@@ -27,7 +28,7 @@ func enforcePrivateIP(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // disableCache is a middleware that sets HTTP response headers to prevent
-// clients from caching the threat feed.
+// clients from caching the threatfeed.
 func disableCache(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store, must-revalidate")
