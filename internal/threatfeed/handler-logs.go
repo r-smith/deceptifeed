@@ -89,20 +89,7 @@ func handleLogSSH(w http.ResponseWriter) {
 	}
 
 	const maxResults = 25_000
-	d := json.NewDecoder(reader)
-	data := make([]Log, 0, maxResults+1)
-	for d.More() {
-		var entry Log
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "ssh" {
-			continue
-		}
-		data = append(data, entry)
-		if len(data) > maxResults {
-			data = data[1:]
-		}
-	}
-	slices.Reverse(data)
+	data := fetchEntries(reader, "ssh", func(e Log) string { return e.EventType }, maxResults)
 
 	_ = parsedTemplates.ExecuteTemplate(w, "logs-ssh.html", map[string]any{"Data": data, "NavData": "logs"})
 }
@@ -130,22 +117,28 @@ func handleLogHTTP(w http.ResponseWriter) {
 	}
 
 	const maxResults = 25_000
-	d := json.NewDecoder(reader)
-	data := make([]Log, 0, maxResults+1)
+	data := fetchEntries(reader, "http", func(e Log) string { return e.EventType }, maxResults)
+
+	_ = parsedTemplates.ExecuteTemplate(w, "logs-http.html", map[string]any{"Data": data, "NavData": "logs"})
+}
+
+// fetchEntries decodes the last N entries of a specific log type from r.
+func fetchEntries[T any](r io.Reader, target string, filter func(T) string, limit int) []T {
+	d := json.NewDecoder(r)
+	data := make([]T, 0, limit+1)
+
 	for d.More() {
-		var entry Log
-		err := d.Decode(&entry)
-		if err != nil || entry.EventType != "http" {
+		var entry T
+		if err := d.Decode(&entry); err != nil || filter(entry) != target {
 			continue
 		}
 		data = append(data, entry)
-		if len(data) > maxResults {
+		if len(data) > limit {
 			data = data[1:]
 		}
 	}
 	slices.Reverse(data)
-
-	_ = parsedTemplates.ExecuteTemplate(w, "logs-http.html", map[string]any{"Data": data, "NavData": "logs"})
+	return data
 }
 
 // displayStats handles the processing and rendering of statistics for a given
