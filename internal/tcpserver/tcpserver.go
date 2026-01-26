@@ -19,10 +19,6 @@ import (
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
-// serverTimeout defines the duration after which connected clients are
-// automatically disconnected, set to 30 seconds.
-const serverTimeout = 30 * time.Second
-
 // Start initializes and starts a generic TCP honeypot server. It presents
 // custom prompts to connected clients and logs their responses. Interactions
 // with the TCP server are sent to the threat feed.
@@ -98,8 +94,8 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 		threatfeed.Update(evt.SourceIP)
 	}
 
-	// Set a connection deadline.
-	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
+	// Apply SessionTimeout as an absolute deadline for the connection.
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(srv.SessionTimeout) * time.Second))
 
 	// Add artificial latency: 92% chance of 43-108ms, 8% chance of 60-160ms.
 	delay := time.Duration(rand.IntN(65)+43) * time.Millisecond
