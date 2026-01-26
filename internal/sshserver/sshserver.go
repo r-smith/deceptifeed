@@ -19,10 +19,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// serverTimeout defines the duration after which connected clients are
-// automatically disconnected, set to 30 seconds.
-const serverTimeout = 30 * time.Second
-
 // Start launches an SSH honeypot server that logs credentials and reports
 // activity to the threat feed. All authentication attempts are rejected. It is
 // not possible to "login" to the server.
@@ -107,8 +103,8 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 		threatfeed.Update(evt.SourceIP)
 	}
 
-	// Set a connection deadline.
-	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
+	// Apply SessionTimeout as an absolute deadline for the connection.
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(srv.SessionTimeout) * time.Second))
 
 	// Apply callbacks to config.
 	sshConfig := configureCallbacks(baseConfig, srv, &evt, logData)
