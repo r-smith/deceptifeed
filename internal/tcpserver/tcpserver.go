@@ -94,6 +94,15 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 		threatfeed.Update(evt.SourceIP)
 	}
 
+	// Forcibly drop the connection using a TCP RST when SessionTimeout is 0.
+	if srv.SessionTimeout == 0 {
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			_ = tcpConn.SetLinger(0)
+		}
+		conn.Close()
+		return
+	}
+
 	// Apply SessionTimeout as an absolute deadline for the connection.
 	_ = conn.SetDeadline(time.Now().Add(time.Duration(srv.SessionTimeout) * time.Second))
 
