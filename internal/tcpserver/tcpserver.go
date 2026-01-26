@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"os"
 	"sort"
@@ -100,6 +101,13 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Set a connection deadline.
 	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
 
+	// Add artificial latency: 92% chance of 43-108ms, 8% chance of 60-160ms.
+	delay := time.Duration(rand.IntN(65)+43) * time.Millisecond
+	if rand.Float32() < 0.08 {
+		delay = time.Duration(rand.IntN(100)+60) * time.Millisecond
+	}
+	time.Sleep(delay)
+
 	// Display configured banner to client.
 	if srv.Banner != "" {
 		_, _ = conn.Write([]byte(srv.Banner))
@@ -124,6 +132,9 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 			key = fmt.Sprintf("data%02d", i+1)
 		}
 		responses[key] = scanner.Text()
+
+		// Add artificial latency between prompts (6-18ms).
+		time.Sleep(time.Duration(rand.IntN(12)+6) * time.Millisecond)
 	}
 
 	// If no prompts are configured, wait for client input and record the
