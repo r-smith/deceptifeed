@@ -72,23 +72,23 @@ type Server struct {
 	Type               ServerType        `xml:"type,attr"`
 	Enabled            bool              `xml:"enabled"`
 	Port               string            `xml:"port"`
+	LogPath            string            `xml:"logPath"`
+	LogConnections     bool              `xml:"logConnections"`
+	LogInteractions    bool              `xml:"logInteractions"`
+	ReportConnections  bool              `xml:"reportConnections"`
+	ReportInteractions bool              `xml:"reportInteractions"`
+	UseProxyProtocol   bool              `xml:"useProxyProtocol"`
+	SourceIPHeader     string            `xml:"sourceIpHeader"`
 	CertPath           string            `xml:"certPath"`
 	KeyPath            string            `xml:"keyPath"`
 	HomePagePath       string            `xml:"homePagePath"`
 	ErrorPagePath      string            `xml:"errorPagePath"`
 	ErrorCode          int               `xml:"errorCode"`
-	Banner             string            `xml:"banner"`
 	Headers            []string          `xml:"headers>header"`
 	CustomHeaders      map[string]string `xml:"-"`
 	Prompts            []Prompt          `xml:"prompts>prompt"`
-	UseProxyProtocol   bool              `xml:"useProxyProtocol"`
 	Rules              Rules             `xml:"rules"`
-	SourceIPHeader     string            `xml:"sourceIpHeader"`
-	LogConnections     bool              `xml:"logConnections"`
-	LogInteractions    bool              `xml:"logInteractions"`
-	ReportConnections  bool              `xml:"reportConnections"`
-	ReportInteractions bool              `xml:"reportInteractions"`
-	LogPath            string            `xml:"logPath"`
+	Banner             string            `xml:"banner"`
 	LogFile            *logrotate.File   `xml:"-"`
 	Logger             *slog.Logger      `xml:"-"`
 }
