@@ -97,12 +97,13 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(srv, response))
 	s := &http.Server{
-		Addr:         ":" + srv.Port,
-		Handler:      mux,
-		ErrorLog:     log.New(io.Discard, "", log.LstdFlags),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  0,
+		Addr:              ":" + srv.Port,
+		Handler:           mux,
+		ErrorLog:          log.New(io.Discard, "", log.LstdFlags),
+		ReadTimeout:       time.Duration(srv.SessionTimeout) * time.Second,
+		WriteTimeout:      time.Duration(srv.SessionTimeout) * time.Second * 2,
+		ReadHeaderTimeout: 0, // Falls back to ReadTimeout
+		IdleTimeout:       0, // Falls back to ReadTimeout
 	}
 
 	// Start the HTTP server.
@@ -117,12 +118,13 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(srv, response))
 	s := &http.Server{
-		Addr:         ":" + srv.Port,
-		Handler:      mux,
-		ErrorLog:     log.New(io.Discard, "", log.LstdFlags),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  0,
+		Addr:              ":" + srv.Port,
+		Handler:           mux,
+		ErrorLog:          log.New(io.Discard, "", log.LstdFlags),
+		ReadTimeout:       time.Duration(srv.SessionTimeout) * time.Second,
+		WriteTimeout:      time.Duration(srv.SessionTimeout) * time.Second * 2,
+		ReadHeaderTimeout: 0, // Falls back to ReadTimeout
+		IdleTimeout:       0, // Falls back to ReadTimeout
 	}
 
 	// If the cert and key aren't found, generate a self-signed certificate.
@@ -212,10 +214,10 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 
 		// Log and report the interaction.
 		if srv.LogInteractions {
-		logData = append(logData, slog.Group("event_details", eventDetails...))
-		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
+			logData = append(logData, slog.Group("event_details", eventDetails...))
+			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
 
-		fmt.Printf("[HTTP] %s %s %s %s\n", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
+			fmt.Printf("[HTTP] %s %s %s %s\n", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
 		}
 		if shouldUpdateThreatFeed(srv, r) {
 			threatfeed.Update(evt.SourceIP)
