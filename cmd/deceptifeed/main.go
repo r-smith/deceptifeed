@@ -78,11 +78,18 @@ func main() {
 		cfg.Servers = append(cfg.Servers, http, https, ssh)
 		// Set defaults.
 		for i := range cfg.Servers {
-			cfg.Servers[i].LogPath = cfg.LogPath
-			cfg.Servers[i].LogInteractions = true
-			cfg.Servers[i].ReportInteractions = true
-			if cfg.Servers[i].Type == config.SSH {
-				cfg.Servers[i].Banner = config.DefaultBannerSSH
+			s := &cfg.Servers[i]
+			s.LogPath = cfg.LogPath
+			s.LogInteractions = true
+			s.ReportInteractions = true
+			switch s.Type {
+			case config.HTTP:
+				s.SessionTimeout = config.DefaultSessionTimeoutHTTP
+			case config.SSH:
+				s.Banner = config.DefaultBannerSSH
+				s.SessionTimeout = config.DefaultSessionTimeout
+			default:
+				s.SessionTimeout = config.DefaultSessionTimeout
 			}
 		}
 	}

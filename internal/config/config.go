@@ -42,6 +42,8 @@ const (
 	DefaultKeyPathHTTPS         = "deceptifeed-https.key"
 	DefaultKeyPathSSH           = "deceptifeed-ssh.key"
 	DefaultBannerSSH            = "SSH-2.0-OpenSSH_9.9"
+	DefaultSessionTimeout       = 30
+	DefaultSessionTimeoutHTTP   = 5
 )
 
 // Config stores the application's settings. It includes honeypot configuration,
@@ -77,6 +79,7 @@ type Server struct {
 	LogInteractions    bool              `xml:"logInteractions"`
 	ReportConnections  bool              `xml:"reportConnections"`
 	ReportInteractions bool              `xml:"reportInteractions"`
+	SessionTimeout     int               `xml:"sessionTimeout"`
 	UseProxyProtocol   bool              `xml:"useProxyProtocol"`
 	SourceIPHeader     string            `xml:"sourceIpHeader"`
 	CertPath           string            `xml:"certPath"`
@@ -165,6 +168,7 @@ func (s *Server) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 
 	var aux struct {
 		*alias
+		Timeout *int  `xml:"sessionTimeout"`
 		OldLog  *bool `xml:"logEnabled"`
 		OldFeed *bool `xml:"sendToThreatFeed"`
 	}
@@ -172,6 +176,13 @@ func (s *Server) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 
 	if err := d.DecodeElement(&aux, &start); err != nil {
 		return err
+	}
+
+	// Capture the timeout value. Use -1 to identify when no value is provided.
+	if aux.Timeout != nil {
+		s.SessionTimeout = *aux.Timeout
+	} else {
+		s.SessionTimeout = -1 // Indicates "not set".
 	}
 
 	// Use the deprecated XML tags if they're provided.
@@ -239,6 +250,20 @@ func (c *Config) prepare() error {
 			s.LogConnections = false
 			s.ReportConnections = false
 			s.ReportInteractions = false
+		}
+
+		// Apply default SessionTimeout if unset or out of range. Unset values
+		// are set to -1 by UnmarshalXML. The valid range is 0-60 for TCP and
+		// 1-60 for all other honeypot types.
+		if s.SessionTimeout < 0 || s.SessionTimeout > 60 || (s.SessionTimeout == 0 && s.Type != TCP) {
+			if s.SessionTimeout != -1 {
+				fmt.Fprintf(os.Stderr, "Invalid <sessionTimeout> for %s honeypot, using default. [Provided: %d]\n", s.Type, s.SessionTimeout)
+			}
+			if s.Type == HTTP || s.Type == HTTPS {
+				s.SessionTimeout = DefaultSessionTimeoutHTTP
+			} else {
+				s.SessionTimeout = DefaultSessionTimeout
+			}
 		}
 
 		// Parse headers to a map[string]string (used by http.Header().Set()).
