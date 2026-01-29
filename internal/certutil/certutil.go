@@ -1,6 +1,7 @@
 package certutil
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -86,6 +87,25 @@ func GenerateSelfSigned(certPath string, keyPath string) (tls.Certificate, error
 	return cert, nil
 }
 
+// GenerateEd25519Key creates a private key. If a path is provided, the key is
+// saved to disk.
+func GenerateEd25519Key(path string) (ed25519.PrivateKey, error) {
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate key: %w", err)
+	}
+
+	// Attempt to save to disk. Return the valid in-memory key and a SaveError
+	// if writing fails.
+	if path != "" {
+		if err := writePrivateKey(key, path); err != nil {
+			return key, &SaveError{Err: err}
+		}
+	}
+
+	return key, nil
+}
+
 // writeCertAndKey saves a PEM-encoded certificate and private key to disk.
 func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath string) error {
 	// Create the parent directories if they don't exist.
@@ -119,6 +139,34 @@ func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath s
 	}
 
 	return nil
+}
+
+// writePrivateKey encodes and saves a private key to the specified path in PEM
+// format.
+func writePrivateKey(key any, path string) error {
+	// Create the parent directories if they don't exist.
+	if err := ensureDir(path); err != nil {
+		return err
+	}
+
+	// Setup PEM block.
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return err
+	}
+	keyPEM := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: keyBytes,
+	}
+
+	// Write PEM-encoded key to disk.
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return pem.Encode(file, keyPEM)
 }
 
 // ensureDir creates any necessary parent directories for the given path if

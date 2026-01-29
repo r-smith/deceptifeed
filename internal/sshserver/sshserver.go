@@ -2,9 +2,7 @@ package sshserver
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -12,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
 	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/proxyproto"
@@ -27,7 +26,7 @@ func Start(srv *config.Server) {
 	sshConfig := &ssh.ServerConfig{}
 
 	// Load or generate a private key and add it to the SSH configuration.
-	privateKey, err := loadOrGeneratePrivateKey(srv.KeyPath)
+	privateKey, err := loadOrCreateKey(srv.KeyPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", srv.Port, err)
 		return
@@ -196,62 +195,56 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 	return &conf
 }
 
-// loadOrGeneratePrivateKey attempts to load a private key from the specified
-// path. If the key does not exist, it generates a new private key, saves it to
-// the specified path, and returns the generated key.
-func loadOrGeneratePrivateKey(path string) (ssh.Signer, error) {
-	if _, err := os.Stat(path); err == nil {
-		// Load the specified file and return the parsed private key.
-		privateKey, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read private key '%s': %w", path, err)
+// loadOrCreateKey attempts to load an SSH private key from the given path.
+// If the path is empty or the file doesn't exist, it generates a new Ed25519
+// key, saves it (if a path is provided), and returns an ssh.Signer.
+func loadOrCreateKey(path string) (ssh.Signer, error) {
+	if path != "" {
+		signer, err := loadKey(path)
+		if err == nil {
+			return signer, nil
 		}
-		signer, err := ssh.ParsePrivateKey(privateKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key '%s': %w", path, err)
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
 		}
-		return signer, nil
-	} else if os.IsNotExist(err) {
-		// Generate and return a new private key.
-		_, privateKey, err := ed25519.GenerateKey(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	// Generate a new key because no existing key was found.
+	return createKey(path)
 		}
 
-		// Save the private key to disk.
-		if path != "" {
-			// Silently ignore any potential errors and continue.
-			_ = writePrivateKey(path, privateKey)
-		}
-
-		// Convert the key to ssh.Signer.
-		signer, err := ssh.NewSignerFromKey(privateKey)
+// loadKey reads a private key from the filesystem and parses it into an
+// ssh.Signer.
+func loadKey(path string) (ssh.Signer, error) {
+	data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert key to SSH signer: %w", err)
-		}
-		return signer, nil
-	} else {
 		return nil, err
 	}
+	return ssh.ParsePrivateKey(data)
 }
 
-// writePrivateKey saves a private key in PEM format to the specified path.
-func writePrivateKey(path string, privateKey any) error {
-	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+// createKey generates a new Ed25519 key and converts it to an ssh.Signer. If a
+// path is given, it attempts to save the key to disk.
+func createKey(path string) (ssh.Signer, error) {
+	label := "in-memory"
+	if path != "" {
+		label = "new"
+	}
+	fmt.Printf("[SSH] Generating %s Ed25519 private key...\n", label)
+
+	priv, err := certutil.GenerateEd25519Key(path)
 	if err != nil {
-		return err
+		var saveError *certutil.SaveError
+		if errors.As(err, &saveError) {
+			fmt.Fprintf(os.Stderr, "[SSH] SSH key generated, but failed saving to disk: %v\n", err)
+			return ssh.NewSignerFromKey(priv)
+		}
+		return nil, err
 	}
 
-	privPem := &pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: privBytes,
+	if path != "" {
+		fmt.Printf("[SSH] Private key saved to '%s'\n", path)
 	}
 
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	return pem.Encode(file, privPem)
+	return ssh.NewSignerFromKey(priv)
 }
