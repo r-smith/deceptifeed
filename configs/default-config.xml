@@ -1,33 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- Deceptifeed Configuration -->
+<!-- Deceptifeed configuration -->
 <config>
 
   <!-- The default log path for honeypot servers -->
   <defaultLogPath>/opt/deceptifeed/logs/honeypot.log</defaultLogPath>
 
-  <!-- Threat Feed Configuration -->
+  <!-- Threatfeed configuration -->
   <threatFeed>
     <enabled>true</enabled>
     <port>9000</port>
     <databasePath>/opt/deceptifeed/logs/threatfeed.csv</databasePath>
+    <excludeListPath>/opt/deceptifeed/etc/exclude.conf</excludeListPath>
     <threatExpiryHours>336</threatExpiryHours>
     <includePrivateIPs>false</includePrivateIPs>
-    <excludeListPath></excludeListPath>
     <enableTLS>false</enableTLS>
     <certPath>/opt/deceptifeed/certs/threatfeed-cert.pem</certPath>
     <keyPath>/opt/deceptifeed/certs/threatfeed-key.pem</keyPath>
   </threatFeed>
 
-  <!-- Honeypot Server Configuration -->
+  <!-- Honeypot server configuration -->
   <honeypotServers>
 
     <!-- SSH honeypot server on port 2222 -->
     <server type="ssh">
       <enabled>true</enabled>
       <port>2222</port>
-      <logEnabled>true</logEnabled>
-      <sendToThreatFeed>true</sendToThreatFeed>
+      <logConnections>false</logConnections>
+      <logInteractions>true</logInteractions>
+      <reportConnections>false</reportConnections>
+      <reportInteractions>true</reportInteractions>
+      <sessionTimeout>30</sessionTimeout>
       <useProxyProtocol>false</useProxyProtocol>
       <keyPath>/opt/deceptifeed/certs/ssh-key.pem</keyPath>
       <banner>SSH-2.0-OpenSSH_9.6</banner>
@@ -37,11 +40,14 @@
     <server type="http">
       <enabled>true</enabled>
       <port>8080</port>
-      <logEnabled>true</logEnabled>
-      <sendToThreatFeed>true</sendToThreatFeed>
+      <logConnections>false</logConnections>
+      <logInteractions>true</logInteractions>
+      <reportConnections>false</reportConnections>
+      <reportInteractions>true</reportInteractions>
+      <sessionTimeout>5</sessionTimeout>
       <sourceIpHeader></sourceIpHeader>
       <rules>
-        <!-- Update the threat feed if any of the following rules match: -->
+        <!-- Report interactions to the threatfeed only if any of the following rules match: -->
         <include target="path" negate="true">(?i)^(/|/index\.html|/favicon\.ico|/robots\.txt|/sitemap\.xml|/\.well-known/\w+\.txt)$</include>
         <include target="query">(?i)(action|conf|dns|file|form|http|id=|json|login|php|q=|url|user|\.\.)</include>
         <include target="authorization">.*</include>
@@ -55,13 +61,16 @@
     <server type="https">
       <enabled>true</enabled>
       <port>8443</port>
-      <logEnabled>true</logEnabled>
-      <sendToThreatFeed>true</sendToThreatFeed>
+      <logConnections>false</logConnections>
+      <logInteractions>true</logInteractions>
+      <reportConnections>false</reportConnections>
+      <reportInteractions>true</reportInteractions>
+      <sessionTimeout>5</sessionTimeout>
       <sourceIpHeader></sourceIpHeader>
       <certPath>/opt/deceptifeed/certs/https-cert.pem</certPath>
       <keyPath>/opt/deceptifeed/certs/https-key.pem</keyPath>
       <rules>
-        <!-- Update the threat feed if any of the following rules match: -->
+        <!-- Report interactions to the threatfeed only if any of the following rules match: -->
         <include target="path" negate="true">(?i)^(/|/index\.html|/favicon\.ico|/robots\.txt|/sitemap\.xml|/\.well-known/\w+\.txt)$</include>
         <include target="query">(?i)(action|conf|dns|file|form|http|id=|json|login|php|q=|url|user|\.\.)</include>
         <include target="authorization">.*</include>
@@ -76,8 +85,11 @@
     <server type="tcp">
       <enabled>false</enabled>
       <port>2323</port>
-      <logEnabled>true</logEnabled>
-      <sendToThreatFeed>true</sendToThreatFeed>
+      <logConnections>false</logConnections>
+      <logInteractions>true</logInteractions>
+      <reportConnections>false</reportConnections>
+      <reportInteractions>true</reportInteractions>
+      <sessionTimeout>30</sessionTimeout>
       <useProxyProtocol>false</useProxyProtocol>
       <banner>\nUser Access Verification\n\n</banner>
       <prompts>
@@ -91,7 +103,7 @@
     <server type="udp">
       <enabled>false</enabled>
       <port>5060</port>
-      <logEnabled>true</logEnabled>
+      <logInteractions>true</logInteractions>
     </server>
   </honeypotServers>
 
