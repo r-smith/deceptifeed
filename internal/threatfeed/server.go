@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 	"golang.org/x/net/websocket"
 )
 
@@ -43,7 +45,7 @@ func Start(c *config.Config) {
 
 	// Load threatfeed CSV file.
 	if err := loadCSV(); err != nil {
-		fmt.Fprintln(os.Stderr, "The Threat Feed server has stopped: Failed to open Threat Feed data:", err)
+		console.Error(console.Feed, "Failed to load threatfeed database '%s': %v", cfg.ThreatFeed.DatabasePath, err)
 		return
 	}
 	deleteExpired()
@@ -61,7 +63,7 @@ func Start(c *config.Config) {
 			if dataChanged.CompareAndSwap(true, false) {
 				deleteExpired()
 				if err := saveCSV(); err != nil {
-					fmt.Fprintln(os.Stderr, "Error saving Threat Feed data:", err)
+					console.Error(console.Feed, "Failed to save threatfeed database '%s': %v", cfg.ThreatFeed.DatabasePath, err)
 				}
 			}
 		}
@@ -107,11 +109,16 @@ func Start(c *config.Config) {
 		IdleTimeout:  0,
 	}
 
-	// Start the threat feed (HTTP) server if TLS is not enabled.
+	// If TLS is disabled, start the threatfeed over HTTP.
 	if !c.ThreatFeed.EnableTLS {
-		fmt.Printf("Starting threat feed (HTTP) on port: %s\n", c.ThreatFeed.Port)
-		if err := srv.ListenAndServe(); err != nil {
-			fmt.Fprintln(os.Stderr, "The threat feed server has stopped:", err)
+		l, err := net.Listen("tcp", srv.Addr)
+		if err != nil {
+			console.Error(console.Feed, "Failed to start threatfeed on port %s: %v", c.ThreatFeed.Port, err)
+			return
+		}
+		console.Info(console.Feed, "Threatfeed is active and listening on port %s (http://%s:%s)", c.ThreatFeed.Port, config.GetHostIP(), c.ThreatFeed.Port)
+		if err := srv.Serve(l); err != nil {
+			console.Error(console.Feed, "Threatfeed stopped on port %s: %v", c.ThreatFeed.Port, err)
 		}
 		return
 	}
@@ -130,9 +137,16 @@ func Start(c *config.Config) {
 		}
 	}
 
-	// Start the threat feed (HTTPS) server.
-	fmt.Printf("Starting threat feed (HTTPS) on port: %s\n", c.ThreatFeed.Port)
-	if err := srv.ListenAndServeTLS(c.ThreatFeed.CertPath, c.ThreatFeed.KeyPath); err != nil {
-		fmt.Fprintln(os.Stderr, "The threat feed server has stopped:", err)
+	// Start the threatfeed over HTTPS.
+	l, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		console.Error(console.Feed, "Failed to start threatfeed on port %s: %v", c.ThreatFeed.Port, err)
+		return
+	}
+
+	console.Info(console.Feed, "Threatfeed is active and listening on port %s (https://%s:%s)", c.ThreatFeed.Port, config.GetHostIP(), c.ThreatFeed.Port)
+	if err := srv.ServeTLS(l, "", ""); err != nil {
+		console.Error(console.Feed, "Threatfeed stopped on port %s: %v", c.ThreatFeed.Port, err)
+		return
 	}
 }

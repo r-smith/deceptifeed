@@ -7,13 +7,13 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
@@ -21,15 +21,15 @@ import (
 
 // Start initializes and starts a generic TCP honeypot server. It presents
 // custom prompts to connected clients and logs their responses. Interactions
-// with the TCP server are sent to the threat feed.
+// with the TCP server are sent to the threatfeed.
 func Start(srv *config.Server) {
-	fmt.Printf("Starting TCP server on port: %s\n", srv.Port)
 	listener, err := net.Listen("tcp", ":"+srv.Port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The TCP server on port %s has stopped: %v\n", srv.Port, err)
+		console.Error(console.TCP, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
 	}
 	defer listener.Close()
+	console.Info(console.TCP, "Honeypot is active and listening on port %s", srv.Port)
 
 	// Replace occurrences of "\n" with "\r\n". The configuration file uses
 	// "\n", but CRLF is expected for TCP protocols.
@@ -86,7 +86,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Log and report the connection.
 	if srv.LogConnections {
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "connection", logData...)
-		fmt.Printf("[TCP] %s connected to port %d\n", evt.SourceIP, evt.ServerPort)
+		console.Debug(console.TCP, "%s connected to port %d", evt.SourceIP, evt.ServerPort)
 	}
 	if srv.ReportConnections {
 		threatfeed.Update(evt.SourceIP)
@@ -162,7 +162,7 @@ func handleConnection(conn net.Conn, srv *config.Server) {
 	// Log and report the interaction.
 	if srv.LogInteractions {
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "tcp", append(logData, slog.Any("event_details", responses))...)
-		fmt.Printf("[TCP] %s %q\n", evt.SourceIP, responsesToString(responses))
+		console.Debug(console.TCP, "%s → %q", evt.SourceIP, responsesToString(responses))
 	}
 	if srv.ReportInteractions {
 		threatfeed.Update(evt.SourceIP)

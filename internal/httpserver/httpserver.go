@@ -20,6 +20,7 @@ import (
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
@@ -75,7 +76,7 @@ func determineConfig(srv *config.Server) *responseConfig {
 }
 
 // Start initializes and starts an HTTP or HTTPS honeypot server. It logs all
-// request details and updates the threat feed as needed. If a filesystem path
+// request details and updates the threatfeed as needed. If a filesystem path
 // is specified in the configuration, the honeypot serves static content from
 // the path.
 func Start(srv *config.Server) {
@@ -106,10 +107,17 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 		IdleTimeout:       0, // Falls back to ReadTimeout
 	}
 
-	// Start the HTTP server.
-	fmt.Printf("Starting HTTP server on port: %s\n", srv.Port)
-	if err := s.ListenAndServe(); err != nil {
-		fmt.Fprintf(os.Stderr, "The HTTP server on port %s has stopped: %v\n", srv.Port, err)
+	// Start the HTTP listener and serve.
+	l, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		console.Error(console.HTTP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		return
+	}
+
+	console.Info(console.HTTP, "Honeypot is active and listening on port %s", srv.Port)
+	if err := s.Serve(l); err != nil {
+		console.Error(console.HTTP, "Honeypot stopped on port %s: %v", srv.Port, err)
+		return
 	}
 }
 
@@ -141,15 +149,22 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 		}
 	}
 
-	// Start the HTTPS server.
-	fmt.Printf("Starting HTTPS server on port: %s\n", srv.Port)
-	if err := s.ListenAndServeTLS(srv.CertPath, srv.KeyPath); err != nil {
-		fmt.Fprintf(os.Stderr, "The HTTPS server on port %s has stopped: %v\n", srv.Port, err)
+	// Start the HTTPS listener and serve.
+	l, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		console.Error(console.HTTP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		return
+	}
+
+	console.Info(console.HTTP, "Honeypot is active and listening on port %s", srv.Port)
+	if err := s.ServeTLS(l, "", ""); err != nil {
+		console.Error(console.HTTP, "Honeypot stopped on port %s: %v", srv.Port, err)
+		return
 	}
 }
 
 // handleConnection processes incoming HTTP and HTTPS client requests. It logs
-// the details of each request, updates the threat feed, and serves responses
+// the details of each request, updates the threatfeed, and serves responses
 // based on the honeypot configuration.
 func handleConnection(srv *config.Server, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +232,7 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 			logData = append(logData, slog.Group("event_details", eventDetails...))
 			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "http", logData...)
 
-			fmt.Printf("[HTTP] %s %s %s %s\n", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
+			console.Debug(console.HTTP, "%s → %s %s %s", evt.SourceIP, r.Method, r.URL.Path, r.URL.RawQuery)
 		}
 		if shouldUpdateThreatFeed(srv, r) {
 			threatfeed.Update(evt.SourceIP)
@@ -300,10 +315,10 @@ func serveErrorPage(w http.ResponseWriter, r *http.Request, srv *config.Server) 
 	http.ServeFile(w, r, srv.ErrorPagePath)
 }
 
-// shouldUpdateThreatFeed determines if the threat feed should be updated based
+// shouldUpdateThreatFeed determines if the threatfeed should be updated based
 // on the server's configured rules.
 func shouldUpdateThreatFeed(srv *config.Server, r *http.Request) bool {
-	// Return false if `sendToThreatFeed`` is disabled, or if the request
+	// Return false if `reportInteractions` is disabled, or if the request
 	// matches an `exclude` rule.
 	if !srv.ReportInteractions || checkRuleMatches(srv.Rules.Exclude, r) {
 		return false

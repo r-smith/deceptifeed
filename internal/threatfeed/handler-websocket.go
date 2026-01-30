@@ -1,12 +1,12 @@
 package threatfeed
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
 	"sync"
 
+	"github.com/r-smith/deceptifeed/internal/console"
 	"golang.org/x/net/websocket"
 )
 
@@ -97,7 +97,7 @@ func handleWebSocket(ws *websocket.Conn) {
 	count := len(wsClients)
 	recent := append([]string(nil), wsRecentMessages...)
 	wsMu.Unlock()
-	fmt.Printf("[THREATFEED] %s established websocket connection (total: %d)\n", host, count)
+	console.Debug(console.Feed, "%s connected to websocket live feed (connections: %d)", host, count)
 
 	// Ensure cleanup.
 	defer func() {
@@ -106,7 +106,7 @@ func handleWebSocket(ws *websocket.Conn) {
 		count = len(wsClients)
 		wsMu.Unlock()
 		_ = ws.Close()
-		fmt.Printf("[THREATFEED] %s closed websocket connection (total: %d)\n", host, count)
+		console.Debug(console.Feed, "%s disconnected from websocket live feed (connections: %d)", host, count)
 	}()
 
 	// Goroutine to send messages to clients. Read from the 'send' channel and

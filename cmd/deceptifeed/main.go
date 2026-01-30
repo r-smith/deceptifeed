@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"slices"
@@ -14,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/httpserver"
 	"github.com/r-smith/deceptifeed/internal/sshserver"
 	"github.com/r-smith/deceptifeed/internal/tcpserver"
@@ -33,16 +33,16 @@ func main() {
 	flag.BoolVar(&http.Enabled, "enable-http", config.DefaultEnableHTTP, "Enable HTTP server")
 	flag.BoolVar(&https.Enabled, "enable-https", config.DefaultEnableHTTPS, "Enable HTTPS server")
 	flag.BoolVar(&ssh.Enabled, "enable-ssh", config.DefaultEnableSSH, "Enable SSH server")
-	flag.BoolVar(&cfg.ThreatFeed.Enabled, "enable-threatfeed", config.DefaultEnableThreatFeed, "Enable threat feed server")
+	flag.BoolVar(&cfg.ThreatFeed.Enabled, "enable-threatfeed", config.DefaultEnableThreatFeed, "Enable threatfeed server")
 	flag.StringVar(&cfg.LogPath, "log", config.DefaultLogPath, "Path to log file")
-	flag.StringVar(&cfg.ThreatFeed.DatabasePath, "threat-database", config.DefaultThreatDatabasePath, "Path to threat feed database file")
-	flag.IntVar(&cfg.ThreatFeed.ExpiryHours, "threat-expiry-hours", config.DefaultThreatExpiryHours, "Remove inactive IPs from threat feed after specified hours")
-	flag.BoolVar(&cfg.ThreatFeed.IsPrivateIncluded, "threat-include-private", config.DefaultThreatIncludePrivate, "Include private IPs in threat feed")
+	flag.StringVar(&cfg.ThreatFeed.DatabasePath, "threat-database", config.DefaultThreatDatabasePath, "Path to threatfeed database file")
+	flag.IntVar(&cfg.ThreatFeed.ExpiryHours, "threat-expiry-hours", config.DefaultThreatExpiryHours, "Remove inactive IPs from threatfeed after specified hours")
+	flag.BoolVar(&cfg.ThreatFeed.IsPrivateIncluded, "threat-include-private", config.DefaultThreatIncludePrivate, "Include private IPs in threatfeed")
 	flag.StringVar(&http.HomePagePath, "html", config.DefaultHomePagePath, "Path to optional HTML file to serve")
 	flag.StringVar(&http.Port, "port-http", config.DefaultPortHTTP, "Port number to listen on for HTTP server")
 	flag.StringVar(&https.Port, "port-https", config.DefaultPortHTTPS, "Port number to listen on for HTTPS server")
 	flag.StringVar(&ssh.Port, "port-ssh", config.DefaultPortSSH, "Port number to listen on for SSH server")
-	flag.StringVar(&cfg.ThreatFeed.Port, "port-threatfeed", config.DefaultPortThreatFeed, "Port number to listen on for threat feed server")
+	flag.StringVar(&cfg.ThreatFeed.Port, "port-threatfeed", config.DefaultPortThreatFeed, "Port number to listen on for threatfeed server")
 	flag.StringVar(&https.CertPath, "https-cert", config.DefaultCertPathHTTPS, "Path to optional TLS public certificate")
 	flag.StringVar(&https.KeyPath, "https-key", config.DefaultKeyPathHTTPS, "Path to optional TLS private key")
 	flag.StringVar(&ssh.KeyPath, "ssh-key", config.DefaultKeyPathSSH, "Path to optional SSH private key")
@@ -55,12 +55,17 @@ func main() {
 		return
 	}
 
-	// If the `-config` flag is not provided, use "config.xml" from the current
-	// directory if the file exists.
+	version := ""
+	if config.Version != "undefined" {
+		version = " v" + config.Version
+	}
+	console.Info(console.Main, "Initializing Deceptifeed%s", version)
+
+	// If the `-config` flag is not provided, try using "config.xml" from the
+	// current directory.
 	if *configPath == "" {
 		if _, err := os.Stat("config.xml"); err == nil {
 			*configPath = "config.xml"
-			fmt.Printf("Using configuration file: '%v'\n", *configPath)
 		}
 	}
 
@@ -68,9 +73,11 @@ func main() {
 	// load it. Otherwise, configure the app using the command line flags and
 	// default settings.
 	if *configPath != "" {
+		console.Info(console.Main, "Reading configuration file '%v'", *configPath)
 		cfgFromFile, err := config.Load(*configPath)
 		if err != nil {
-			log.Fatalln("Failed to load configuration file:", err)
+			console.Error(console.Main, "Failed to load '%v': %v", *configPath, err)
+			return
 		}
 		cfg = *cfgFromFile
 	} else {
@@ -111,7 +118,8 @@ func main() {
 	// Initialize loggers.
 	err := cfg.InitLoggers()
 	if err != nil {
-		log.Fatalln("Failed to initialize logging:", err)
+		console.Error(console.Main, "Failed to initialize logging: %v", err)
+		return
 	}
 	defer cfg.CloseLogFiles()
 
@@ -132,7 +140,7 @@ func main() {
 func run(ctx context.Context, cfg *config.Config) {
 	var wg sync.WaitGroup
 
-	// Start the threat feed.
+	// Start the threatfeed.
 	if cfg.ThreatFeed.Enabled {
 		wg.Add(1)
 		go func() {
@@ -174,8 +182,8 @@ func run(ctx context.Context, cfg *config.Config) {
 	// Block until all servers stop naturally or interrupt signal is received.
 	select {
 	case <-done:
-		fmt.Println("All servers stopped.")
+		console.Info(console.Main, "All servers stopped")
 	case <-ctx.Done():
-		fmt.Println("\nShutting down...")
+		console.Info(console.Main, "Shutting down...")
 	}
 }

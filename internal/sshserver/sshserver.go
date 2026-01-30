@@ -12,6 +12,7 @@ import (
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/eventdata"
 	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
@@ -19,16 +20,15 @@ import (
 )
 
 // Start launches an SSH honeypot server that logs credentials and reports
-// activity to the threat feed. All authentication attempts are rejected. It is
+// activity to the threatfeed. All authentication attempts are rejected. It is
 // not possible to "login" to the server.
 func Start(srv *config.Server) {
-	fmt.Printf("Starting SSH server on port: %s\n", srv.Port)
 	sshConfig := &ssh.ServerConfig{}
 
 	// Load or generate a private key and add it to the SSH configuration.
 	privateKey, err := loadOrCreateKey(srv.KeyPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", srv.Port, err)
+		console.Error(console.SSH, "Failed to start honeypot on port %s: ssh key failure: %v", srv.Port, err)
 		return
 	}
 	sshConfig.AddHostKey(privateKey)
@@ -43,10 +43,11 @@ func Start(srv *config.Server) {
 	// Start the SSH server.
 	listener, err := net.Listen("tcp", ":"+srv.Port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The SSH server on port %s has stopped: %v\n", srv.Port, err)
+		console.Error(console.SSH, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
 	}
 	defer listener.Close()
+	console.Info(console.SSH, "Honeypot is active and listening on port %s", srv.Port)
 
 	// Listen for and accept incoming connections.
 	for {
@@ -94,7 +95,7 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 	// Log and report the connection.
 	if srv.LogConnections {
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "connection", logData...)
-		fmt.Printf("[SSH] %s connected to port %d\n", evt.SourceIP, evt.ServerPort)
+		console.Debug(console.SSH, "%s connected to port %d", evt.SourceIP, evt.ServerPort)
 	}
 	if srv.ReportConnections {
 		threatfeed.Update(evt.SourceIP)
@@ -134,11 +135,11 @@ func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 }
 
 // configureCallbacks attaches authentication callbacks to a base SSH config.
-// The callbacks log authentication attempts and update the threat feed.
+// The callbacks log authentication attempts and update the threatfeed.
 func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventdata.Connection, logData []slog.Attr) *ssh.ServerConfig {
 	conf := *base
 
-	// Password authentication: Log the credentials, update the threat feed,
+	// Password authentication: Log the credentials, update the threatfeed,
 	// then reject the attempt.
 	conf.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		if srv.LogInteractions {
@@ -150,7 +151,7 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 			)
 			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
-			fmt.Printf("[SSH] %s Username: %q Password: %q\n", evt.SourceIP, conn.User(), string(password))
+			console.Debug(console.SSH, "%s → Username: %q Password: %q", evt.SourceIP, conn.User(), string(password))
 		}
 
 		if srv.ReportInteractions {
@@ -163,7 +164,7 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 	}
 
 	// Publickey authentication: Log the key hash and username, update the
-	// threat feed, then reject the attempt. Note: The logged key is unverified
+	// threatfeed, then reject the attempt. Note: The logged key is unverified
 	// because the login is rejected before the client proves key ownership.
 	conf.PublicKeyCallback = func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 		if srv.LogInteractions {
@@ -179,7 +180,7 @@ func configureCallbacks(base *ssh.ServerConfig, srv *config.Server, evt *eventda
 			)
 			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "ssh", append(logData, d)...)
 
-			fmt.Printf("[SSH] %s Username: %q (publickey authentication attempt)\n", evt.SourceIP, conn.User())
+			console.Debug(console.SSH, "%s → Username: %q (publickey authentication)", evt.SourceIP, conn.User())
 		}
 
 		if srv.ReportInteractions {
@@ -209,13 +210,13 @@ func loadOrCreateKey(path string) (ssh.Signer, error) {
 
 	// Generate a new key because no existing key was found.
 	return createKey(path)
-		}
+}
 
 // loadKey reads a private key from the filesystem and parses it into an
 // ssh.Signer.
 func loadKey(path string) (ssh.Signer, error) {
 	data, err := os.ReadFile(path)
-		if err != nil {
+	if err != nil {
 		return nil, err
 	}
 	return ssh.ParsePrivateKey(data)
@@ -224,24 +225,20 @@ func loadKey(path string) (ssh.Signer, error) {
 // createKey generates a new Ed25519 key and converts it to an ssh.Signer. If a
 // path is given, it attempts to save the key to disk.
 func createKey(path string) (ssh.Signer, error) {
-	label := "in-memory"
-	if path != "" {
-		label = "new"
-	}
-	fmt.Printf("[SSH] Generating %s Ed25519 private key...\n", label)
+	console.Info(console.SSH, "Generating Ed25519 private key...")
 
 	priv, err := certutil.GenerateEd25519Key(path)
 	if err != nil {
 		var saveError *certutil.SaveError
 		if errors.As(err, &saveError) {
-			fmt.Fprintf(os.Stderr, "[SSH] SSH key generated, but failed saving to disk: %v\n", err)
+			console.Warning(console.SSH, "Failed to save SSH key to disk; generated key will not persist after restart: %v", err)
 			return ssh.NewSignerFromKey(priv)
 		}
 		return nil, err
 	}
 
 	if path != "" {
-		fmt.Printf("[SSH] Private key saved to '%s'\n", path)
+		console.Info(console.SSH, "Private key saved to '%s'", path)
 	}
 
 	return ssh.NewSignerFromKey(priv)

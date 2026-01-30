@@ -3,13 +3,14 @@ package threatfeed
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io/fs"
 	"net/netip"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/r-smith/deceptifeed/internal/console"
 )
 
 // excludeHeader is the default content written to a new exclude list file.
@@ -105,7 +106,7 @@ func parseExcludeList(path string) (map[netip.Addr]struct{}, []netip.Prefix, err
 			if prefix.IsSingleIP() {
 				ips[prefix.Addr().Unmap()] = struct{}{}
 			} else {
-			cidr = append(cidr, prefix)
+				cidr = append(cidr, prefix)
 			}
 			continue
 		}
@@ -143,7 +144,7 @@ func reloadExcludeList(path string) {
 	// File has changed. Parse the file and update the in-memory list.
 	ips, cidrs, err := parseExcludeList(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error reloading exclude list:", err)
+		console.Error(console.Feed, "Error reloading exclude list: %v", err)
 		return
 	}
 
@@ -153,7 +154,7 @@ func reloadExcludeList(path string) {
 	excludeMu.Unlock()
 
 	if !excludeModTime.IsZero() {
-		fmt.Printf("Exclude list updated: %d IPs, %d CIDRs\n", len(ips), len(cidrs))
+		console.Info(console.Feed, "Exclude list refreshed (exclusions: %d IPs, %d CIDRs)", len(ips), len(cidrs))
 	}
 
 	// Update last modified timestamp.

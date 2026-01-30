@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/logmonitor"
 	"github.com/r-smith/deceptifeed/internal/logrotate"
 )
@@ -257,7 +258,7 @@ func (c *Config) prepare() error {
 		// 1-60 for all other honeypot types.
 		if s.SessionTimeout < 0 || s.SessionTimeout > 60 || (s.SessionTimeout == 0 && s.Type != TCP) {
 			if s.SessionTimeout != -1 {
-				fmt.Fprintf(os.Stderr, "Invalid <sessionTimeout> for %s honeypot, using default. [Provided: %d]\n", s.Type, s.SessionTimeout)
+				console.Warning(console.Cfg, "Invalid <sessionTimeout> for %s honeypot, using default (provided: %d)", s.Type, s.SessionTimeout)
 			}
 			if s.Type == HTTP || s.Type == HTTPS {
 				s.SessionTimeout = DefaultSessionTimeoutHTTP

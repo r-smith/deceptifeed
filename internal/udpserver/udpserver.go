@@ -2,14 +2,13 @@ package udpserver
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/netip"
-	"os"
 	"strings"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 )
 
 // Start launches a passive UDP honeypot that listens on the specified port. It
@@ -20,20 +19,20 @@ import (
 // are considered unreliable. For this reason, the UDP server does not
 // integrate with the threatfeed.
 func Start(srv *config.Server) {
-	fmt.Printf("Starting UDP server on port: %s\n", srv.Port)
 	addr, err := net.ResolveUDPAddr("udp", ":"+srv.Port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", srv.Port, err)
+		console.Error(console.UDP, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
 	}
 
 	// Start the UDP server.
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "The UDP server on port %s has stopped: %v\n", srv.Port, err)
+		console.Error(console.UDP, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
 	}
 	defer conn.Close()
+	console.Info(console.UDP, "Honeypot is active and listening on port %s", srv.Port)
 
 	// Store the server's local IP and port.
 	_, srvPort, _ := net.SplitHostPort(conn.LocalAddr().String())
@@ -71,7 +70,7 @@ func Start(srv *config.Server) {
 			)
 
 			// Print to the console.
-			fmt.Printf("[UDP] %s Data: %q\n", ip, strings.TrimSpace(data))
+			console.Debug(console.UDP, "%s → %q", ip, strings.TrimSpace(data))
 		}(capturedData, srcIP)
 	}
 }

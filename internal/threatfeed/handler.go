@@ -9,12 +9,12 @@ import (
 	"html/template"
 	"net/http"
 	"net/netip"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/config"
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/stix"
 	"github.com/r-smith/deceptifeed/internal/taxii"
 )
@@ -24,12 +24,12 @@ import (
 //go:embed templates
 var templates embed.FS
 
-// parsedTemplates pre-parses and caches all HTML templates when the threat
-// feed server starts. This eliminates the need for HTTP handlers to re-parse
+// parsedTemplates pre-parses and caches all HTML templates when the threatfeed
+// server starts. This eliminates the need for HTTP handlers to re-parse
 // templates on each request.
 var parsedTemplates = template.Must(template.ParseFS(templates, "templates/*.html"))
 
-// handlePlain handles HTTP requests to serve the threat feed in plain text. It
+// handlePlain handles HTTP requests to serve the threatfeed in plain text. It
 // returns a list of IP addresses that interacted with the honeypot servers.
 func handlePlain(w http.ResponseWriter, r *http.Request) {
 	opt, err := parseParams(r)
@@ -42,13 +42,13 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 	for _, entry := range prepareFeed(opt) {
 		_, err := fmt.Fprintln(w, entry.IP)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to serve threat feed:", err)
+			console.Debug(console.Feed, "Failed to serve plain-text threatfeed: %v", err)
 			return
 		}
 	}
 }
 
-// handleJSON handles HTTP requests to serve the full threat feed in JSON
+// handleJSON handles HTTP requests to serve the full threatfeed in JSON
 // format. It returns a JSON array containing all IoC data (IP addresses and
 // their associated data).
 func handleJSON(w http.ResponseWriter, r *http.Request) {
@@ -62,12 +62,12 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
 	if err := e.Encode(map[string]any{"threat_feed": prepareFeed(opt)}); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to JSON:", err)
+		console.Error(console.Feed, "Failed to serve JSON threatfeed: %v", err)
 		return
 	}
 }
 
-// handleCSV handles HTTP requests to serve the full threat feed in CSV format.
+// handleCSV handles HTTP requests to serve the full threatfeed in CSV format.
 // It returns a CSV file containing all IoC data (IP addresses and their
 // associated data).
 func handleCSV(w http.ResponseWriter, r *http.Request) {
@@ -78,11 +78,11 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"threat-feed-"+time.Now().Format("20060102-150405")+".csv\"")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"threatfeed-"+time.Now().Format("20060102-150405")+".csv\"")
 
 	c := csv.NewWriter(w)
 	if err := c.Write(csvHeader); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+		console.Error(console.Feed, "Failed to write CSV header: %v", err)
 		return
 	}
 
@@ -93,21 +93,21 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 			entry.LastSeen.Format(dateFormat),
 			strconv.Itoa(entry.Observations),
 		}); err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+			console.Error(console.Feed, "Failed to serve CSV threatfeed: %v", err)
 			return
 		}
 	}
 
 	c.Flush()
 	if err := c.Error(); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to CSV:", err)
+		console.Error(console.Feed, "Failed to flush CSV threatfeed: %v", err)
 	}
 }
 
-// handleSTIX handles HTTP requests to serve the full threat feed in STIX 2.1
+// handleSTIX handles HTTP requests to serve the full threatfeed in STIX 2.1
 // format. The response includes all IoC data (IP addresses and their
 // associated data). The response is structured as a STIX Bundle containing
-// `Indicators` (STIX Domain Objects) for each IP address in the threat feed.
+// `Indicators` (STIX Domain Objects) for each IP address in the threatfeed.
 func handleSTIX(w http.ResponseWriter, r *http.Request) {
 	opt, err := parseParams(r)
 	if err != nil {
@@ -124,7 +124,7 @@ func handleSTIX(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", stix.ContentType)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to encode threat feed to STIX:", err)
+		console.Error(console.Feed, "Failed to serve STIX threatfeed: %v", err)
 	}
 }
 
@@ -199,7 +199,7 @@ func handleTAXIICollections(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleTAXIIObjects returns the threat feed as STIX objects. The objects are
+// handleTAXIIObjects returns the threatfeed as STIX objects. The objects are
 // structured according to the requested TAXII collection and wrapped in a
 // TAXII Envelope. Request URL format: `{api-root}/collections/{id}/objects/`.
 func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
@@ -286,15 +286,15 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleHome serves as the default landing page for the threat feed. It
-// delivers a static HTML document with information on accessing the threat
-// feed.
+// handleHome serves as the default landing page for the threatfeed. It
+// delivers a static HTML document with information on accessing the
+// threatfeed.
 func handleHome(w http.ResponseWriter, r *http.Request) {
 	_ = parsedTemplates.ExecuteTemplate(w, "home.html", "home")
 }
 
-// handleDocs serves a static page with documentation for accessing the threat
-// feed.
+// handleDocs serves a static page with documentation for accessing the
+// threatfeed.
 func handleDocs(w http.ResponseWriter, r *http.Request) {
 	_ = parsedTemplates.ExecuteTemplate(w, "docs.html", "docs")
 }
@@ -320,7 +320,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 	_ = parsedTemplates.ExecuteTemplate(w, "config.html", d)
 }
 
-// handleHTML returns the threat feed as a web page for viewing in a browser.
+// handleHTML returns the threatfeed as a web page for viewing in a browser.
 func handleHTML(w http.ResponseWriter, r *http.Request) {
 	opt, err := parseParams(r)
 	if err != nil {
@@ -388,14 +388,14 @@ func paginate(items []stix.Object, limit int, page int) ([]stix.Object, bool) {
 }
 
 // parseParams extracts HTTP query parameters and maps them to options for
-// controlling the threat feed output.
+// controlling the threatfeed output.
 func parseParams(r *http.Request) (feedOptions, error) {
 	opt := feedOptions{}
 
 	// Handle TAXII parameters.
 	if strings.HasPrefix(r.URL.Path, taxii.APIRoot) {
 		// While TAXII requires sorting by creation date, we sort by `LastSeen`
-		// instead. This is because the threat feed is dynamic and IPs may be
+		// instead. This is because the threatfeed is dynamic and IPs may be
 		// updated. This ensures clients don't miss updates if they are only
 		// looking for new entries.
 		opt.sortMethod = byLastSeen
