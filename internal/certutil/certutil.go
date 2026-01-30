@@ -8,7 +8,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -28,6 +30,36 @@ func (e *SaveError) Error() string {
 
 func (e *SaveError) Unwrap() error {
 	return e.Err
+}
+
+// LoadResult indicates whether the key or public/private key pair was newly
+// created or loaded from disk.
+type LoadResult int
+
+const (
+	// Generated indicates a new key or public/private key pair was generated.
+	Generated LoadResult = iota
+	// Loaded indicates an existing key or public/private key pair was loaded.
+	Loaded
+)
+
+// GetCertificate attempts to retrieve a TLS certificate and private key. If
+// both files are missing or both paths are empty, it generates a new self-
+// signed certificate. Otherwise, it attempts to load from the provided paths.
+func GetCertificate(certPath string, keyPath string) (tls.Certificate, LoadResult, error) {
+	_, certErr := os.Stat(certPath)
+	_, keyErr := os.Stat(keyPath)
+
+	certMissing := certPath == "" || errors.Is(certErr, fs.ErrNotExist)
+	keyMissing := keyPath == "" || errors.Is(keyErr, fs.ErrNotExist)
+
+	if certMissing && keyMissing {
+		cert, err := GenerateSelfSigned(certPath, keyPath)
+		return cert, Generated, err
+	}
+
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	return cert, Loaded, err
 }
 
 // GenerateSelfSigned creates a self-signed certificate and private key. If

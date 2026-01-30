@@ -4,9 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"log/slog"
 	"net"
@@ -135,19 +133,29 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 		IdleTimeout:       0, // Falls back to ReadTimeout
 	}
 
-	// If the cert and key aren't found, generate a self-signed certificate.
-	if _, err := os.Stat(srv.CertPath); errors.Is(err, fs.ErrNotExist) {
-		if _, err := os.Stat(srv.KeyPath); errors.Is(err, fs.ErrNotExist) {
-			cert, err := certutil.GenerateSelfSigned(srv.CertPath, srv.KeyPath)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "Failed to generate HTTPS certificate:", err)
-				return
-			}
+	// Load the provided certificate and key. Generate a self-signed cert
+	// if the files are missing or paths are empty.
+	cert, status, err := certutil.GetCertificate(srv.CertPath, srv.KeyPath)
 
-			// Add cert to server config.
-			s.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
-		}
+	if status == certutil.Generated {
+		console.Info(console.HTTP, "Generated self-signed TLS certificate")
 	}
+
+	// Handle cert initialization errors. Print a warning for save errors,
+	// while all other errors stop the honeypot.
+	if err != nil {
+		var saveError *certutil.SaveError
+		if errors.As(err, &saveError) {
+			console.Warning(console.HTTP, "Failed to save certificate to disk; generated cert will not persist: %v", err)
+		} else {
+			console.Error(console.HTTP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+			return
+		}
+	} else if status == certutil.Generated && srv.CertPath != "" && srv.KeyPath != "" {
+		console.Info(console.HTTP, "Certificate saved to '%s'", srv.CertPath)
+		console.Info(console.HTTP, "Private key saved to '%s'", srv.KeyPath)
+	}
+	s.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// Start the HTTPS listener and serve.
 	l, err := net.Listen("tcp", s.Addr)

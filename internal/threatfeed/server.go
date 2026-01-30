@@ -3,11 +3,8 @@ package threatfeed
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
@@ -37,7 +34,7 @@ func Start(c *config.Config) {
 
 	// Ensure exclude list exists.
 	if err := initExcludeList(c.ThreatFeed.ExcludeListPath); err != nil {
-		fmt.Fprintln(os.Stderr, "Warning: Could not initialize exclude list:", err)
+		console.Error(console.Feed, "Failed to initialize exclude list: %v", err)
 	}
 
 	// Load exclude list into memory.
@@ -123,19 +120,29 @@ func Start(c *config.Config) {
 		return
 	}
 
-	// Generate a self-signed cert if the provided key and cert aren't found.
-	if _, err := os.Stat(c.ThreatFeed.CertPath); errors.Is(err, fs.ErrNotExist) {
-		if _, err := os.Stat(c.ThreatFeed.KeyPath); errors.Is(err, fs.ErrNotExist) {
-			cert, err := certutil.GenerateSelfSigned(c.ThreatFeed.CertPath, c.ThreatFeed.KeyPath)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "Failed to generate threat feed TLS certificate:", err)
-				return
-			}
+	// Load the provided certificate and key. Generate a self-signed cert
+	// if the files are missing or paths are empty.
+	cert, status, err := certutil.GetCertificate(c.ThreatFeed.CertPath, c.ThreatFeed.KeyPath)
 
-			// Add cert to server config.
-			srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
-		}
+	if status == certutil.Generated {
+		console.Info(console.Feed, "Generated self-signed TLS certificate")
 	}
+
+	// Handle cert initialization errors. Print a warning for save errors,
+	// while all other errors stop the honeypot.
+	if err != nil {
+		var saveError *certutil.SaveError
+		if errors.As(err, &saveError) {
+			console.Warning(console.Feed, "Failed to save certificate to disk; generated cert will not persist: %v", err)
+		} else {
+			console.Error(console.Feed, "Failed to start threatfeed on port %s: Cert initialization failed: %v", c.ThreatFeed.Port, err)
+			return
+		}
+	} else if status == certutil.Generated && c.ThreatFeed.CertPath != "" && c.ThreatFeed.KeyPath != "" {
+		console.Info(console.Feed, "Certificate saved to '%s'", c.ThreatFeed.CertPath)
+		console.Info(console.Feed, "Private key saved to '%s'", c.ThreatFeed.KeyPath)
+	}
+			srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// Start the threatfeed over HTTPS.
 	l, err := net.Listen("tcp", srv.Addr)
