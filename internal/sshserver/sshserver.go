@@ -77,11 +77,9 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 	// Handle Proxy Protocol.
 	if srv.UseProxyProtocol {
 		evt.ProxyIP = evt.SourceIP
-		newConn, extractedIP, err := proxyproto.ReadHeader(conn)
 
-		if newConn != nil {
-			conn = newConn
-		}
+		c, extractedIP, err := proxyproto.ReadHeader(conn)
+		conn = c
 
 		if err != nil {
 			evt.ProxyError = err.Error()
