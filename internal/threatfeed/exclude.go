@@ -91,19 +91,29 @@ func parseExcludeList(path string) (map[netip.Addr]struct{}, []netip.Prefix, err
 			line = line[:i]
 		}
 		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+		if line == "" {
 			continue
 		}
 
 		// Try to parse as CIDR.
 		if prefix, err := netip.ParsePrefix(line); err == nil {
+			// Ensure canonical form (eg: 192.168.1.7/24 -> 192.168.1.0/24).
+			prefix = prefix.Masked()
+
+			// If it's a single IP expressed as CIDR, store as a single IP.
+			// Otherwise, store as CIDR.
+			if prefix.IsSingleIP() {
+				ips[prefix.Addr().Unmap()] = struct{}{}
+			} else {
 			cidr = append(cidr, prefix)
+			}
 			continue
 		}
 
 		// Try to parse as single IP.
 		if addr, err := netip.ParseAddr(line); err == nil {
 			ips[addr.Unmap()] = struct{}{}
+			continue
 		}
 	}
 
