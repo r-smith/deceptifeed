@@ -24,15 +24,47 @@ var v2Signature = []byte{
 	0x55, 0x49, 0x54, 0x0A,
 }
 
-// serverTimeout defines the duration after which connected clients are
-// automatically disconnected, set to 2 seconds.
-const serverTimeout = 2 * time.Second
+// readHeaderTimeout defines the time limit for receiving and parsing a Proxy
+// Protocol header before the connection is closed.
+const readHeaderTimeout = 2 * time.Second
+
+// Listener wraps a net.Listener to automatically parse Proxy Protocol headers
+// from incoming connections.
+type Listener struct {
+	net.Listener
+}
+
+// Ensure Listener satisfies the net.Listener interface.
+var _ net.Listener = (*Listener)(nil)
+
+// Accept waits for and returns the next connection to the listener. Proxy
+// Protocol headers are automatically parsed from incoming connections.
+func (l *Listener) Accept() (net.Conn, error) {
+	rawConn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	wrappedConn := &Conn{
+		Conn: rawConn,
+		r:    bufio.NewReaderSize(rawConn, 512),
+	}
+
+	// Parse the Proxy Protocol header (with a set deadline).
+	_ = rawConn.SetDeadline(time.Now().Add(readHeaderTimeout))
+	wrappedConn.readHeader()
+	_ = rawConn.SetDeadline(time.Time{})
+
+	return wrappedConn, nil
+}
 
 // Conn wraps a net.Conn and a bufio.Reader to ensure data read by Proxy
 // Protocol handling remains accessible.
 type Conn struct {
 	net.Conn
-	r *bufio.Reader
+	r           *bufio.Reader
+	extractedIP netip.Addr
+	proxyErr    error
 }
 
 // Ensure Conn satisfies the net.Conn interface.
@@ -44,52 +76,69 @@ func (c *Conn) Read(b []byte) (int, error) {
 	return c.r.Read(b)
 }
 
-// ReadHeader reads and parses a Proxy Protocol v1 or v2 header from conn. It
-// extracts and returns the client IP address from the header. It sets a
-// 2-second deadline on conn. If parsing fails, it returns an error. Callers
-// should reset the deadline after this function returns to extend the timeout.
-func ReadHeader(conn net.Conn) (net.Conn, netip.Addr, error) {
-	_ = conn.SetDeadline(time.Now().Add(serverTimeout))
+// RemoteAddr returns the original client's network address. If Proxy Protocol
+// parsing fails, it returns the underlying connection's remote address.
+func (c *Conn) RemoteAddr() net.Addr {
+	if !c.extractedIP.IsValid() {
+		return c.Conn.RemoteAddr()
+	}
 
-	reader := bufio.NewReader(conn)
-	c := &Conn{Conn: conn, r: reader}
+	// Return the extracted client IP with the original connection's port and
+	// zone.
+	if addr, ok := c.Conn.RemoteAddr().(*net.TCPAddr); ok {
+		return &net.TCPAddr{
+			IP:   net.IP(c.extractedIP.AsSlice()),
+			Port: addr.Port,
+			Zone: addr.Zone,
+		}
+	}
 
-	peek, err := reader.Peek(12)
+	return c.Conn.RemoteAddr()
+}
+
+// ProxyData returns the source IP address extracted from the Proxy Protocol
+// header and any error encountered during parsing.
+func (c *Conn) ProxyData() (netip.Addr, error) {
+	return c.extractedIP, c.proxyErr
+}
+
+// readHeader reads and parses a Proxy Protocol version 1 or 2 header from the
+// connection. The extracted client IP and any parsing errors are stored within
+// the Conn.
+func (c *Conn) readHeader() {
+	peek, err := c.r.Peek(12)
 	if err != nil {
-		return c, netip.Addr{}, errors.New("failed to read proxy header data")
+		c.proxyErr = errors.New("failed to read proxy header data")
+		return
 	}
 
 	var clientIP netip.Addr
 
 	// Determine the Proxy Protocol version and parse accordingly.
 	if bytes.Equal(peek, v2Signature) {
-		// Proxy Protocol version 2.
-		clientIP, err = parseVersion2(reader)
-		if err != nil {
-			return c, netip.Addr{}, fmt.Errorf("proxy protocol v2: %w", err)
-		}
+		clientIP, err = parseVersion2(c.r)
 	} else if bytes.HasPrefix(peek, v1Signature) {
-		// Proxy Protocol version 1.
-		clientIP, err = parseVersion1(reader)
-		if err != nil {
-			return c, netip.Addr{}, fmt.Errorf("proxy protocol v1: %w", err)
-		}
+		clientIP, err = parseVersion1(c.r)
 	} else {
-		// Not a Proxy Protocol header.
-		return c, netip.Addr{}, errors.New("invalid or missing proxy protocol header")
+		c.proxyErr = errors.New("invalid or missing proxy protocol header")
+		return
 	}
 
-	// Ensure the header data was provided by a private IP address.
-	if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+	if err != nil {
+		c.proxyErr = err
+		return
+	}
+
+	// Restrict Proxy Protocol usage to private IP addresses.
+	if addr, ok := c.Conn.RemoteAddr().(*net.TCPAddr); ok {
 		remoteIP := addr.AddrPort().Addr().Unmap()
 		if !remoteIP.IsPrivate() && !remoteIP.IsLoopback() {
-			return c, netip.Addr{}, errors.New("proxy connection must originate from a private IP address")
+			c.proxyErr = errors.New("proxy connection must originate from a private IP address")
+			return
 		}
-	} else {
-		return c, netip.Addr{}, errors.New("could not resolve proxy IP address")
 	}
 
-	return c, clientIP, nil
+	c.extractedIP = clientIP
 }
 
 // parseVersion1 reads and parses a Proxy Protocol version 1 text header and
@@ -238,9 +287,9 @@ func parseVersion2(r *bufio.Reader) (netip.Addr, error) {
 
 	// Extract and validate the source IP.
 	ip, ok := netip.AddrFromSlice(addrBuf[:ipOffset])
-		if !ok || !ip.IsValid() {
+	if !ok || !ip.IsValid() {
 		return netip.Addr{}, errors.New("invalid proxy v2 source address")
-		}
+	}
 
-		return ip.Unmap(), nil
+	return ip.Unmap(), nil
 }
