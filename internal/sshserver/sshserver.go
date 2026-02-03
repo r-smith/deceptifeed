@@ -46,6 +46,10 @@ func Start(srv *config.Server) {
 		console.Error(console.SSH, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
 	}
+
+	if srv.UseProxyProtocol {
+		listener = &proxyproto.Listener{Listener: listener}
+	}
 	defer listener.Close()
 	console.Info(console.SSH, "Honeypot is active and listening on port %s", srv.Port)
 
@@ -75,18 +79,18 @@ func handleConnection(conn net.Conn, baseConfig *ssh.ServerConfig, srv *config.S
 		evt.SourceIP = addr.AddrPort().Addr().Unmap()
 	}
 
-	// Handle Proxy Protocol.
-	if srv.UseProxyProtocol {
-		evt.ProxyIP = evt.SourceIP
+	// If the connection is Proxy Protocol wrapped, extract the metadata.
+	if pconn, ok := conn.(*proxyproto.Conn); ok {
+		// Record the proxy's IP.
+		if rawAddr, ok := pconn.Conn.RemoteAddr().(*net.TCPAddr); ok {
+			evt.ProxyIP = rawAddr.AddrPort().Addr().Unmap()
+		}
 
-		c, extractedIP, err := proxyproto.ReadHeader(conn)
-		conn = c
-
-		if err != nil {
-			evt.ProxyError = err.Error()
-		} else {
+		// Record the parsing results.
+		if extractedIP, err := pconn.ProxyData(); err == nil && extractedIP.IsValid() {
 			evt.ProxyParsed = true
-			evt.SourceIP = extractedIP
+		} else if err != nil {
+			evt.ProxyError = err.Error()
 		}
 	}
 
