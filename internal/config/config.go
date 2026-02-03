@@ -326,11 +326,6 @@ func (c *Config) InitLoggers() error {
 						case slog.LevelKey:
 							// Remove the default 'level' field.
 							return slog.Attr{}
-						case "source_ip_error":
-							// Remove 'source_ip_error' field if it's empty.
-							if a.Value.String() == "" {
-								return slog.Attr{}
-							}
 						}
 						return a
 					},
