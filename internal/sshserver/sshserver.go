@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
@@ -27,7 +28,7 @@ func Start(srv *config.Server) {
 	// Load or generate a private key and add it to the SSH configuration.
 	privateKey, err := loadOrCreateKey(srv.KeyPath)
 	if err != nil {
-		console.Error(console.SSH, "Failed to start honeypot on port %s: ssh key failure: %v", srv.Port, err)
+		console.Error(console.SSH, "Failed to start honeypot on port %d: ssh key failure: %v", srv.Port, err)
 		return
 	}
 	sshConfig.AddHostKey(privateKey)
@@ -40,9 +41,10 @@ func Start(srv *config.Server) {
 	}
 
 	// Start the SSH server.
-	listener, err := net.Listen("tcp", ":"+srv.Port)
+	addr := net.JoinHostPort("", strconv.Itoa(int(srv.Port)))
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		console.Error(console.SSH, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		console.Error(console.SSH, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 
@@ -50,7 +52,7 @@ func Start(srv *config.Server) {
 		listener = &proxyproto.Listener{Listener: listener}
 	}
 	defer listener.Close()
-	console.Info(console.SSH, "Honeypot is active and listening on port %s", srv.Port)
+	console.Info(console.SSH, "Honeypot is active and listening on port %d", srv.Port)
 
 	// Listen for and accept incoming connections.
 	for {

@@ -29,10 +29,10 @@ const (
 	DefaultEnableHTTPS          = true
 	DefaultEnableSSH            = true
 	DefaultEnableThreatFeed     = true
-	DefaultPortHTTP             = "8080"
-	DefaultPortHTTPS            = "8443"
-	DefaultPortSSH              = "2222"
-	DefaultPortThreatFeed       = "9000"
+	DefaultPortHTTP             = 8080
+	DefaultPortHTTPS            = 8443
+	DefaultPortSSH              = 2222
+	DefaultPortThreatFeed       = 9000
 	DefaultThreatExpiryHours    = 336
 	DefaultThreatDatabasePath   = "deceptifeed-database.csv"
 	DefaultThreatIncludePrivate = true
@@ -60,7 +60,7 @@ type Config struct {
 // ThreatFeed defines the settings for the threatfeed server.
 type ThreatFeed struct {
 	Enabled           bool   `xml:"enabled"`
-	Port              string `xml:"port"`
+	Port              uint16 `xml:"port"`
 	DatabasePath      string `xml:"databasePath"`
 	ExpiryHours       int    `xml:"threatExpiryHours"`
 	IsPrivateIncluded bool   `xml:"includePrivateIPs"`
@@ -74,7 +74,7 @@ type ThreatFeed struct {
 type Server struct {
 	Type               ServerType        `xml:"type,attr"`
 	Enabled            bool              `xml:"enabled"`
-	Port               string            `xml:"port"`
+	Port               uint16            `xml:"port"`
 	LogPath            string            `xml:"logPath"`
 	LogConnections     bool              `xml:"logConnections"`
 	LogInteractions    bool              `xml:"logInteractions"`
@@ -258,7 +258,7 @@ func (c *Config) prepare() error {
 		// 1-60 for all other honeypot types.
 		if s.SessionTimeout < 0 || s.SessionTimeout > 60 || (s.SessionTimeout == 0 && s.Type != TCP) {
 			if s.SessionTimeout != -1 {
-				console.Warning(console.Cfg, "Invalid <sessionTimeout> for %s honeypot, using default (provided: %d)", s.Type, s.SessionTimeout)
+				console.Warning(console.Cfg, "Config error → honeypot %s/%d → invalid sessionTimeout '%d', using default", s.Type, s.Port, s.SessionTimeout)
 			}
 			if s.Type == HTTP || s.Type == HTTPS {
 				s.SessionTimeout = DefaultSessionTimeoutHTTP

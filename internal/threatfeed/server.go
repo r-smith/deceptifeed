@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/certutil"
@@ -99,7 +100,7 @@ func Start(c *config.Config) {
 	mux.HandleFunc("GET /logs/{logtype}/{subtype}", enforcePrivateIP(handleLogs))
 
 	srv := &http.Server{
-		Addr:         ":" + c.ThreatFeed.Port,
+		Addr:         net.JoinHostPort("", strconv.Itoa(int(c.ThreatFeed.Port))),
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -110,12 +111,12 @@ func Start(c *config.Config) {
 	if !c.ThreatFeed.EnableTLS {
 		l, err := net.Listen("tcp", srv.Addr)
 		if err != nil {
-			console.Error(console.Feed, "Failed to start threatfeed on port %s: %v", c.ThreatFeed.Port, err)
+			console.Error(console.Feed, "Failed to start threatfeed on port %d: %v", c.ThreatFeed.Port, err)
 			return
 		}
-		console.Info(console.Feed, "Threatfeed is active and listening on port %s (http://%s:%s)", c.ThreatFeed.Port, config.GetHostIP(), c.ThreatFeed.Port)
+		console.Info(console.Feed, "Threatfeed is active and listening on port %d (http://%s:%d)", c.ThreatFeed.Port, config.GetHostIP(), c.ThreatFeed.Port)
 		if err := srv.Serve(l); err != nil {
-			console.Error(console.Feed, "Threatfeed stopped on port %s: %v", c.ThreatFeed.Port, err)
+			console.Error(console.Feed, "Threatfeed stopped on port %d: %v", c.ThreatFeed.Port, err)
 		}
 		return
 	}
@@ -135,25 +136,25 @@ func Start(c *config.Config) {
 		if errors.As(err, &saveError) {
 			console.Warning(console.Feed, "Failed to save certificate to disk; generated cert will not persist: %v", err)
 		} else {
-			console.Error(console.Feed, "Failed to start threatfeed on port %s: Cert initialization failed: %v", c.ThreatFeed.Port, err)
+			console.Error(console.Feed, "Failed to start threatfeed on port %d: Cert initialization failed: %v", c.ThreatFeed.Port, err)
 			return
 		}
 	} else if status == certutil.Generated && c.ThreatFeed.CertPath != "" && c.ThreatFeed.KeyPath != "" {
 		console.Info(console.Feed, "Certificate saved to '%s'", c.ThreatFeed.CertPath)
 		console.Info(console.Feed, "Private key saved to '%s'", c.ThreatFeed.KeyPath)
 	}
-			srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	srv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// Start the threatfeed over HTTPS.
 	l, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
-		console.Error(console.Feed, "Failed to start threatfeed on port %s: %v", c.ThreatFeed.Port, err)
+		console.Error(console.Feed, "Failed to start threatfeed on port %d: %v", c.ThreatFeed.Port, err)
 		return
 	}
 
-	console.Info(console.Feed, "Threatfeed is active and listening on port %s (https://%s:%s)", c.ThreatFeed.Port, config.GetHostIP(), c.ThreatFeed.Port)
+	console.Info(console.Feed, "Threatfeed is active and listening on port %d (https://%s:%d)", c.ThreatFeed.Port, config.GetHostIP(), c.ThreatFeed.Port)
 	if err := srv.ServeTLS(l, "", ""); err != nil {
-		console.Error(console.Feed, "Threatfeed stopped on port %s: %v", c.ThreatFeed.Port, err)
+		console.Error(console.Feed, "Threatfeed stopped on port %d: %v", c.ThreatFeed.Port, err)
 		return
 	}
 }

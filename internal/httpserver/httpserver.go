@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,7 +96,7 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(srv, response))
 	s := &http.Server{
-		Addr:              ":" + srv.Port,
+		Addr:              net.JoinHostPort("", strconv.Itoa(int(srv.Port))),
 		Handler:           mux,
 		ErrorLog:          log.New(io.Discard, "", log.LstdFlags),
 		ReadTimeout:       time.Duration(srv.SessionTimeout) * time.Second,
@@ -107,13 +108,13 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 	// Start the HTTP listener and serve.
 	l, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		console.Error(console.HTTP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		console.Error(console.HTTP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 
-	console.Info(console.HTTP, "Honeypot is active and listening on port %s", srv.Port)
+	console.Info(console.HTTP, "Honeypot is active and listening on port %d", srv.Port)
 	if err := s.Serve(l); err != nil {
-		console.Error(console.HTTP, "Honeypot stopped on port %s: %v", srv.Port, err)
+		console.Error(console.HTTP, "Honeypot stopped on port %d: %v", srv.Port, err)
 		return
 	}
 }
@@ -123,7 +124,7 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnection(srv, response))
 	s := &http.Server{
-		Addr:              ":" + srv.Port,
+		Addr:              net.JoinHostPort("", strconv.Itoa(int(srv.Port))),
 		Handler:           mux,
 		ErrorLog:          log.New(io.Discard, "", log.LstdFlags),
 		ReadTimeout:       time.Duration(srv.SessionTimeout) * time.Second,
@@ -147,7 +148,7 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 		if errors.As(err, &saveError) {
 			console.Warning(console.HTTP, "Failed to save certificate to disk; generated cert will not persist: %v", err)
 		} else {
-			console.Error(console.HTTP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+			console.Error(console.HTTP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 			return
 		}
 	} else if status == certutil.Generated && srv.CertPath != "" && srv.KeyPath != "" {
@@ -159,13 +160,13 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 	// Start the HTTPS listener and serve.
 	l, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		console.Error(console.HTTP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		console.Error(console.HTTP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 
-	console.Info(console.HTTP, "Honeypot is active and listening on port %s", srv.Port)
+	console.Info(console.HTTP, "Honeypot is active and listening on port %d", srv.Port)
 	if err := s.ServeTLS(l, "", ""); err != nil {
-		console.Error(console.HTTP, "Honeypot stopped on port %s: %v", srv.Port, err)
+		console.Error(console.HTTP, "Honeypot stopped on port %d: %v", srv.Port, err)
 		return
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"slices"
-	"strconv"
 	"sync"
 	"syscall"
 
@@ -27,6 +26,7 @@ func main() {
 	http := config.Server{Type: config.HTTP}
 	https := config.Server{Type: config.HTTPS}
 	ssh := config.Server{Type: config.SSH}
+	var httpPort, httpsPort, sshPort, threatPort uint
 
 	// Parse command line flags.
 	configPath := flag.String("config", "", "Path to optional XML configuration file")
@@ -39,10 +39,10 @@ func main() {
 	flag.IntVar(&cfg.ThreatFeed.ExpiryHours, "threat-expiry-hours", config.DefaultThreatExpiryHours, "Remove inactive IPs from threatfeed after specified hours")
 	flag.BoolVar(&cfg.ThreatFeed.IsPrivateIncluded, "threat-include-private", config.DefaultThreatIncludePrivate, "Include private IPs in threatfeed")
 	flag.StringVar(&http.HomePagePath, "html", config.DefaultHomePagePath, "Path to optional HTML file to serve")
-	flag.StringVar(&http.Port, "port-http", config.DefaultPortHTTP, "Port number to listen on for HTTP server")
-	flag.StringVar(&https.Port, "port-https", config.DefaultPortHTTPS, "Port number to listen on for HTTPS server")
-	flag.StringVar(&ssh.Port, "port-ssh", config.DefaultPortSSH, "Port number to listen on for SSH server")
-	flag.StringVar(&cfg.ThreatFeed.Port, "port-threatfeed", config.DefaultPortThreatFeed, "Port number to listen on for threatfeed server")
+	flag.UintVar(&httpPort, "port-http", config.DefaultPortHTTP, "Port number to listen on for HTTP server")
+	flag.UintVar(&httpsPort, "port-https", config.DefaultPortHTTPS, "Port number to listen on for HTTPS server")
+	flag.UintVar(&sshPort, "port-ssh", config.DefaultPortSSH, "Port number to listen on for SSH server")
+	flag.UintVar(&threatPort, "port-threatfeed", config.DefaultPortThreatFeed, "Port number to listen on for threatfeed server")
 	flag.StringVar(&https.CertPath, "https-cert", config.DefaultCertPathHTTPS, "Path to optional TLS public certificate")
 	flag.StringVar(&https.KeyPath, "https-key", config.DefaultKeyPathHTTPS, "Path to optional TLS private key")
 	flag.StringVar(&ssh.KeyPath, "ssh-key", config.DefaultKeyPathSSH, "Path to optional SSH private key")
@@ -54,6 +54,12 @@ func main() {
 		fmt.Println(config.Version)
 		return
 	}
+
+	// Assign 'port' flags to config structs.
+	http.Port = uint16(httpPort)
+	https.Port = uint16(httpsPort)
+	ssh.Port = uint16(sshPort)
+	cfg.ThreatFeed.Port = uint16(threatPort)
 
 	version := ""
 	if config.Version != "undefined" {
@@ -101,18 +107,9 @@ func main() {
 		}
 	}
 
-	// Sort the servers by port number. This is for cosmetic reasons to format
-	// the output when querying / viewing the active configuration.
+	// Sort servers by port number for consistent order when viewing config.
 	slices.SortFunc(cfg.Servers, func(a, b config.Server) int {
-		p1, err := strconv.Atoi(a.Port)
-		if err != nil {
-			return 0
-		}
-		p2, err := strconv.Atoi(b.Port)
-		if err != nil {
-			return 0
-		}
-		return cmp.Compare(p1, p2)
+		return cmp.Compare(a.Port, b.Port)
 	})
 
 	// Initialize loggers.
@@ -151,7 +148,7 @@ func run(ctx context.Context, cfg *config.Config) {
 
 	// Start the honeypots.
 	for _, server := range cfg.Servers {
-		if !server.Enabled || server.Port == "" {
+		if !server.Enabled {
 			continue
 		}
 

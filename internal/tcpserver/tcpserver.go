@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,9 +23,10 @@ import (
 // custom prompts to connected clients and logs their responses. Interactions
 // with the TCP server are sent to the threatfeed.
 func Start(srv *config.Server) {
-	listener, err := net.Listen("tcp", ":"+srv.Port)
+	addr := net.JoinHostPort("", strconv.Itoa(int(srv.Port)))
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		console.Error(console.TCP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		console.Error(console.TCP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 
@@ -32,7 +34,7 @@ func Start(srv *config.Server) {
 		listener = &proxyproto.Listener{Listener: listener}
 	}
 	defer listener.Close()
-	console.Info(console.TCP, "Honeypot is active and listening on port %s", srv.Port)
+	console.Info(console.TCP, "Honeypot is active and listening on port %d", srv.Port)
 
 	// Replace occurrences of "\n" with "\r\n". The configuration file uses
 	// "\n", but CRLF is expected for TCP protocols.

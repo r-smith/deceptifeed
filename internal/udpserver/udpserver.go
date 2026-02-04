@@ -19,27 +19,20 @@ import (
 // are considered unreliable. For this reason, the UDP server does not
 // integrate with the threatfeed.
 func Start(srv *config.Server) {
-	localAddr, err := net.ResolveUDPAddr("udp", ":"+srv.Port)
-	if err != nil {
-		console.Error(console.UDP, "Failed to start honeypot on port %s: %v", srv.Port, err)
-		return
-	}
-
 	// Start the UDP server.
-	conn, err := net.ListenUDP("udp", localAddr)
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: int(srv.Port), IP: nil})
 	if err != nil {
-		console.Error(console.UDP, "Failed to start honeypot on port %s: %v", srv.Port, err)
+		console.Error(console.UDP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 	defer conn.Close()
-	console.Info(console.UDP, "Honeypot is active and listening on port %s", srv.Port)
+	console.Info(console.UDP, "Honeypot is active and listening on port %d", srv.Port)
 
-	// Store the server's local IP and port.
-	srvPort := localAddr.Port
+	// Store the server's local IP for logging.
 	srvIP := config.GetHostIP()
 
 	// Reusable buffer to store incoming data.
-	buf := make([]byte, 1024)
+	buf := make([]byte, 2048)
 
 	// Listen for and capture incoming UDP packets.
 	for {
@@ -54,12 +47,12 @@ func Start(srv *config.Server) {
 
 		// Log the received data. Because the source IP may be spoofed, an
 		// "[unverified]" tag is added.
-		go func(data string, ip netip.Addr) {
+		go func(data string, ip netip.Addr, port uint16) {
 			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "udp",
 				slog.String("source_ip", ip.String()+" [unverified]"),
 				slog.Bool("source_ip_verified", false),
 				slog.String("server_ip", srvIP),
-				slog.Int("server_port", srvPort),
+				slog.Int("server_port", int(port)),
 				slog.String("server_name", config.Hostname),
 				slog.Group("event_details",
 					slog.String("data", data),
@@ -68,6 +61,6 @@ func Start(srv *config.Server) {
 
 			// Print to the console.
 			console.Debug(console.UDP, "%s → %q", ip, strings.TrimSpace(data))
-		}(capturedData, srcIP)
+		}(capturedData, srcIP, srv.Port)
 	}
 }
