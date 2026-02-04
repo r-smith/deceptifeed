@@ -53,11 +53,11 @@ func Start(srv *config.Server) {
 		srcIP := udpAddr.AddrPort().Addr().Unmap()
 
 		// Log the received data. Because the source IP may be spoofed, an
-		// "[unreliable]" tag is added.
+		// "[unverified]" tag is added.
 		go func(data string, ip netip.Addr) {
 			srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "udp",
-				slog.String("source_ip", ip.String()+" [unreliable]"),
-				slog.String("source_reliability", "unreliable"),
+				slog.String("source_ip", ip.String()+" [unverified]"),
+				slog.Bool("source_ip_verified", false),
 				slog.String("server_ip", srvIP),
 				slog.Int("server_port", srvPort),
 				slog.String("server_name", config.Hostname),
