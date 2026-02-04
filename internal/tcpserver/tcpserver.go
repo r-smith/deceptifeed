@@ -8,7 +8,6 @@ import (
 	"math/rand/v2"
 	"net"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -181,14 +180,14 @@ func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	)
 	if srv.UseProxyProtocol {
 		d = append(d,
-			slog.Bool("source_ip_parsed", evt.ProxyParsed),
-			slog.String("source_ip_error", evt.ProxyError),
 			slog.Any("proxy_ip", evt.ProxyIP),
+			slog.Bool("proxy_parsed", evt.ProxyParsed),
+			slog.String("proxy_error", evt.ProxyError),
 		)
 	}
 	d = append(d,
 		slog.Any("server_ip", evt.ServerIP),
-		slog.String("server_port", strconv.FormatUint(uint64(evt.ServerPort), 10)),
+		slog.Uint64("server_port", uint64(evt.ServerPort)),
 		slog.String("server_name", config.Hostname),
 	)
 	return d

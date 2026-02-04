@@ -19,14 +19,14 @@ import (
 // are considered unreliable. For this reason, the UDP server does not
 // integrate with the threatfeed.
 func Start(srv *config.Server) {
-	addr, err := net.ResolveUDPAddr("udp", ":"+srv.Port)
+	localAddr, err := net.ResolveUDPAddr("udp", ":"+srv.Port)
 	if err != nil {
 		console.Error(console.UDP, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
 	}
 
 	// Start the UDP server.
-	conn, err := net.ListenUDP("udp", addr)
+	conn, err := net.ListenUDP("udp", localAddr)
 	if err != nil {
 		console.Error(console.UDP, "Failed to start honeypot on port %s: %v", srv.Port, err)
 		return
@@ -35,7 +35,7 @@ func Start(srv *config.Server) {
 	console.Info(console.UDP, "Honeypot is active and listening on port %s", srv.Port)
 
 	// Store the server's local IP and port.
-	_, srvPort, _ := net.SplitHostPort(conn.LocalAddr().String())
+	srvPort := localAddr.Port
 	srvIP := config.GetHostIP()
 
 	// Reusable buffer to store incoming data.
@@ -43,17 +43,14 @@ func Start(srv *config.Server) {
 
 	// Listen for and capture incoming UDP packets.
 	for {
-		n, remoteAddr, err := conn.ReadFrom(buf)
+		n, udpAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			continue
 		}
 
 		// UDP packet received. Capture the data and source IP address.
 		capturedData := string(buf[:n])
-		var srcIP netip.Addr
-		if addr, ok := remoteAddr.(*net.UDPAddr); ok {
-			srcIP = addr.AddrPort().Addr().Unmap()
-		}
+		srcIP := udpAddr.AddrPort().Addr().Unmap()
 
 		// Log the received data. Because the source IP may be spoofed, an
 		// "[unreliable]" tag is added.
@@ -62,7 +59,7 @@ func Start(srv *config.Server) {
 				slog.String("source_ip", ip.String()+" [unreliable]"),
 				slog.String("source_reliability", "unreliable"),
 				slog.String("server_ip", srvIP),
-				slog.String("server_port", srvPort),
+				slog.Int("server_port", srvPort),
 				slog.String("server_name", config.Hostname),
 				slog.Group("event_details",
 					slog.String("data", data),
