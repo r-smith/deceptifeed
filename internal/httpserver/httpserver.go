@@ -94,7 +94,7 @@ func Start(srv *config.Server) {
 // listenHTTP initializes and starts an HTTP (plaintext) honeypot server.
 func listenHTTP(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(srv, response))
+	mux.HandleFunc("/", handleRequest(srv, response))
 	s := &http.Server{
 		Addr:              net.JoinHostPort("", strconv.Itoa(int(srv.Port))),
 		Handler:           mux,
@@ -103,6 +103,11 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 		WriteTimeout:      time.Duration(srv.SessionTimeout) * time.Second * 2,
 		ReadHeaderTimeout: 0, // Falls back to ReadTimeout
 		IdleTimeout:       0, // Falls back to ReadTimeout
+		ConnState: func(c net.Conn, state http.ConnState) {
+			if state == http.StateNew && (srv.LogConnections || srv.ReportConnections) {
+				handleConnection(c, srv)
+			}
+		},
 	}
 
 	// Start the HTTP listener and serve.
@@ -122,7 +127,7 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 // listenHTTPS initializes and starts an HTTPS (encrypted) honeypot server.
 func listenHTTPS(srv *config.Server, response *responseConfig) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleConnection(srv, response))
+	mux.HandleFunc("/", handleRequest(srv, response))
 	s := &http.Server{
 		Addr:              net.JoinHostPort("", strconv.Itoa(int(srv.Port))),
 		Handler:           mux,
@@ -131,6 +136,11 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 		WriteTimeout:      time.Duration(srv.SessionTimeout) * time.Second * 2,
 		ReadHeaderTimeout: 0, // Falls back to ReadTimeout
 		IdleTimeout:       0, // Falls back to ReadTimeout
+		ConnState: func(c net.Conn, state http.ConnState) {
+			if state == http.StateNew && (srv.LogConnections || srv.ReportConnections) {
+				handleConnection(c, srv)
+			}
+		},
 	}
 
 	// Load the provided certificate and key. Generate a self-signed cert
@@ -171,10 +181,10 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 	}
 }
 
-// handleConnection processes incoming HTTP and HTTPS client requests. It logs
-// the details of each request, updates the threatfeed, and serves responses
-// based on the honeypot configuration.
-func handleConnection(srv *config.Server, response *responseConfig) http.HandlerFunc {
+// handleRequest processes incoming HTTP and HTTPS client requests. It logs the
+// details of each request, updates the threatfeed, and serves responses based
+// on the honeypot configuration.
+func handleRequest(srv *config.Server, response *responseConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Record connection details.
 		evt := eventdata.Connection{}
@@ -274,6 +284,29 @@ func handleConnection(srv *config.Server, response *responseConfig) http.Handler
 			// Serve files from a directory.
 			response.fsHandler.ServeHTTP(w, r)
 		}
+	}
+}
+
+// handleConnection logs and reports client connections to the server.
+func handleConnection(c net.Conn, srv *config.Server) {
+	evt := eventdata.Connection{}
+
+	// Extract connection endpoints.
+	if addr, ok := c.LocalAddr().(*net.TCPAddr); ok {
+		evt.ServerIP = addr.AddrPort().Addr().Unmap()
+		evt.ServerPort = addr.AddrPort().Port()
+	}
+	if addr, ok := c.RemoteAddr().(*net.TCPAddr); ok {
+		evt.SourceIP = addr.AddrPort().Addr().Unmap()
+	}
+
+	// Log and report the connection.
+	if srv.LogConnections {
+		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "connection", prepareLog(&evt, srv)...)
+		console.Debug(console.HTTP, "%s connected to port %d", evt.SourceIP, evt.ServerPort)
+	}
+	if srv.ReportConnections {
+		threatfeed.Update(evt.SourceIP)
 	}
 }
 
