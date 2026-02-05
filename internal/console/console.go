@@ -40,6 +40,25 @@ func Debug(c Component, msg string, args ...any) {
 	print(os.Stdout, "DEBUG", c, msg, args...)
 }
 
+// Errors logs one or more errors with a custom prefix. If the error contains
+// multiple joined errors, each is unwrapped and logged as a separate entry.
+func Errors(c Component, prefix string, err error) {
+	if err == nil {
+		return
+	}
+
+	// Unwrap joined errors.
+	if u, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range u.Unwrap() {
+			Error(c, "%s%v", prefix, e)
+		}
+		return
+	}
+
+	// If couldn't unwrap, log the single error.
+	Error(c, "%s%v", prefix, err)
+}
+
 func print(w io.Writer, level string, c Component, msg string, args ...any) {
 	userMsg := fmt.Sprintf(msg, args...)
 	fmt.Fprintf(w, "%-5s | %-4s | %s\n", level, c, userMsg)
