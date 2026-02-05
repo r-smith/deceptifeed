@@ -20,6 +20,7 @@ import (
 	"github.com/r-smith/deceptifeed/internal/config"
 	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/eventdata"
+	"github.com/r-smith/deceptifeed/internal/proxyproto"
 	"github.com/r-smith/deceptifeed/internal/threatfeed"
 )
 
@@ -103,6 +104,9 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 		WriteTimeout:      time.Duration(srv.SessionTimeout) * time.Second * 2,
 		ReadHeaderTimeout: 0, // Falls back to ReadTimeout
 		IdleTimeout:       0, // Falls back to ReadTimeout
+		ConnContext: func(ctx context.Context, c net.Conn) context.Context {
+			return context.WithValue(ctx, "conn", c)
+		},
 		ConnState: func(c net.Conn, state http.ConnState) {
 			if state == http.StateNew && (srv.LogConnections || srv.ReportConnections) {
 				handleConnection(c, srv)
@@ -110,14 +114,20 @@ func listenHTTP(srv *config.Server, response *responseConfig) {
 		},
 	}
 
-	// Start the HTTP listener and serve.
+	// Start the HTTP listener.
 	l, err := net.Listen("tcp", s.Addr)
 	if err != nil {
 		console.Error(console.HTTP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 
+	// Wrap the listener if Proxy Protocol is enabled.
+	if srv.UseProxyProtocol {
+		l = &proxyproto.Listener{Listener: l}
+	}
 	console.Info(console.HTTP, "Honeypot is active and listening on port %d", srv.Port)
+
+	// Start serving.
 	if err := s.Serve(l); err != nil {
 		console.Error(console.HTTP, "Honeypot stopped on port %d: %v", srv.Port, err)
 		return
@@ -136,6 +146,9 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 		WriteTimeout:      time.Duration(srv.SessionTimeout) * time.Second * 2,
 		ReadHeaderTimeout: 0, // Falls back to ReadTimeout
 		IdleTimeout:       0, // Falls back to ReadTimeout
+		ConnContext: func(ctx context.Context, c net.Conn) context.Context {
+			return context.WithValue(ctx, "conn", c)
+		},
 		ConnState: func(c net.Conn, state http.ConnState) {
 			if state == http.StateNew && (srv.LogConnections || srv.ReportConnections) {
 				handleConnection(c, srv)
@@ -167,14 +180,20 @@ func listenHTTPS(srv *config.Server, response *responseConfig) {
 	}
 	s.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 
-	// Start the HTTPS listener and serve.
+	// Start the HTTPS listener.
 	l, err := net.Listen("tcp", s.Addr)
 	if err != nil {
 		console.Error(console.HTTP, "Failed to start honeypot on port %d: %v", srv.Port, err)
 		return
 	}
 
+	// Wrap the listener if Proxy Protocol is enabled.
+	if srv.UseProxyProtocol {
+		l = &proxyproto.Listener{Listener: l}
+	}
 	console.Info(console.HTTP, "Honeypot is active and listening on port %d", srv.Port)
+
+	// Start serving.
 	if err := s.ServeTLS(l, "", ""); err != nil {
 		console.Error(console.HTTP, "Honeypot stopped on port %d: %v", srv.Port, err)
 		return
@@ -191,6 +210,13 @@ func handleRequest(srv *config.Server, response *responseConfig) http.HandlerFun
 		evt.ServerIP, evt.ServerPort = getLocalAddr(r)
 		if addr, err := netip.ParseAddrPort(r.RemoteAddr); err == nil {
 			evt.SourceIP = addr.Addr().Unmap()
+		}
+
+		// If the connection is Proxy Protocol wrapped, extract the metadata.
+		if srv.UseProxyProtocol {
+			if c, ok := r.Context().Value("conn").(net.Conn); ok {
+				evt.ProxyIP, evt.ProxyParsed, evt.ProxyError = extractProxyData(c)
+			}
 		}
 
 		// If configured to use a proxy header, extract the client IP and
@@ -300,6 +326,11 @@ func handleConnection(c net.Conn, srv *config.Server) {
 		evt.SourceIP = addr.AddrPort().Addr().Unmap()
 	}
 
+	// If the connection is Proxy Protocol wrapped, extract the metadata.
+	if srv.UseProxyProtocol {
+		evt.ProxyIP, evt.ProxyParsed, evt.ProxyError = extractProxyData(c)
+	}
+
 	// Log and report the connection.
 	if srv.LogConnections {
 		srv.Logger.LogAttrs(context.Background(), slog.LevelInfo, "connection", prepareLog(&evt, srv)...)
@@ -308,6 +339,34 @@ func handleConnection(c net.Conn, srv *config.Server) {
 	if srv.ReportConnections {
 		threatfeed.Update(evt.SourceIP)
 	}
+}
+
+// extractProxyData retrieves Proxy Protocol info from a connection.
+func extractProxyData(c net.Conn) (proxyIP netip.Addr, parsed bool, proxyErr string) {
+	// Unwrap TLS layer to find the proxyproto.Conn.
+	ic := c
+	for {
+		if tc, ok := ic.(*tls.Conn); ok {
+			ic = tc.NetConn()
+			continue
+		}
+		break
+	}
+
+	if pc, ok := ic.(*proxyproto.Conn); ok {
+		// Record the proxy's IP.
+		if rawAddr, ok := pc.Conn.RemoteAddr().(*net.TCPAddr); ok {
+			proxyIP = rawAddr.AddrPort().Addr().Unmap()
+		}
+
+		// Record the parsing results.
+		if extractedIP, err := pc.ProxyData(); err == nil && extractedIP.IsValid() {
+			parsed = true
+		} else if err != nil {
+			proxyErr = err.Error()
+		}
+	}
+	return
 }
 
 // preparelog builds structured log fields from network connection metadata.
