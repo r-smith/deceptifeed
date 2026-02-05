@@ -375,7 +375,7 @@ func prepareLog(evt *eventdata.Connection, srv *config.Server) []slog.Attr {
 	d = append(d,
 		slog.Any("source_ip", evt.SourceIP),
 	)
-	if srv.UseProxyProtocol {
+	if srv.UseProxyProtocol || srv.SourceIPHeader != "" {
 		d = append(d,
 			slog.Any("proxy_ip", evt.ProxyIP),
 			slog.Bool("proxy_parsed", evt.ProxyParsed),
