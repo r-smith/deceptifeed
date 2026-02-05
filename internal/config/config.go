@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/logmonitor"
 	"github.com/r-smith/deceptifeed/internal/logrotate"
 )
@@ -206,35 +206,56 @@ func Load(filename string) (*Config, error) {
 	}
 	defer file.Close()
 
-	var config Config
+	var cfg Config
 
 	// Resolve the absolute path.
-	absPath, err := filepath.Abs(filename)
-	if err != nil {
-		config.FilePath = filename
-	} else {
-		config.FilePath = absPath
+	cfg.FilePath = filename
+	if abs, err := filepath.Abs(filename); err == nil {
+		cfg.FilePath = abs
 	}
 
 	// Decode the XML.
 	decoder := xml.NewDecoder(file)
-	if err := decoder.Decode(&config); err != nil {
+	if err := decoder.Decode(&cfg); err != nil {
 		return nil, err
 	}
 
 	// Finalize honeypot configuration.
-	if err := config.prepare(); err != nil {
+	if err := cfg.prepare(); err != nil {
 		return nil, err
 	}
 
-	return &config, nil
+	return &cfg, nil
 }
 
 // prepare finalizes the configuration for each honeypot server. It applies
 // defaults, ensures a log path is defined, and ensures rules are compiled.
 func (c *Config) prepare() error {
+	var errs []error
+	seenPorts := make(map[uint16]string)
+
+	// Validate threatfeed port.
+	if c.ThreatFeed.Port == 0 {
+		errs = append(errs, fmt.Errorf("invalid <port> number for <threatFeed>; assign a port number between 1 and 65535"))
+	} else {
+		seenPorts[c.ThreatFeed.Port] = "threatfeed"
+	}
+
 	for i := range c.Servers {
 		s := &c.Servers[i]
+
+		// Validate port (skip remaining checks when invalid).
+		if s.Port == 0 {
+			errs = append(errs, fmt.Errorf("invalid <port> number for honeypot #%d (%s); assign a port number between 1 and 65535", i+1, s.Type))
+			continue
+		}
+
+		// Duplicate port check.
+		if svc, exists := seenPorts[s.Port]; exists {
+			errs = append(errs, fmt.Errorf("<port> %d is used by both %s and honeypot #%d (%s)", s.Port, svc, i+1, s.Type))
+		} else {
+			seenPorts[s.Port] = fmt.Sprintf("honeypot #%d (%s)", i+1, s.Type)
+		}
 
 		// Use the global log path if the server log path is not specified.
 		if s.LogPath == "" {
@@ -257,9 +278,6 @@ func (c *Config) prepare() error {
 		// are set to -1 by UnmarshalXML. The valid range is 0-60 for TCP and
 		// 1-60 for all other honeypot types.
 		if s.SessionTimeout < 0 || s.SessionTimeout > 60 || (s.SessionTimeout == 0 && s.Type != TCP) {
-			if s.SessionTimeout != -1 {
-				console.Warning(console.Cfg, "Config error → honeypot %s/%d → invalid sessionTimeout '%d', using default", s.Type, s.Port, s.SessionTimeout)
-			}
 			if s.Type == HTTP || s.Type == HTTPS {
 				s.SessionTimeout = DefaultSessionTimeoutHTTP
 			} else {
@@ -272,10 +290,16 @@ func (c *Config) prepare() error {
 
 		// Validate and compile regex rules.
 		if err := s.compileRules(); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("invalid <rules> defined for honeypot #%d (%s/%d): %w", i+1, s.Type, s.Port, err))
+		}
+
+		// Ensure only one proxy method is used.
+		if (s.Type == HTTP || s.Type == HTTPS) && (s.UseProxyProtocol && s.SourceIPHeader != "") {
+			errs = append(errs, fmt.Errorf("conflicting proxy settings defined for honeypot #%d (%s/%d); choose either <useProxyProtocol> or <sourceIpHeader>", i+1, s.Type, s.Port))
 		}
 	}
-	return nil
+
+	return errors.Join(errs...)
 }
 
 // InitLoggers creates structured loggers for each server. It opens log files

@@ -82,7 +82,8 @@ func main() {
 		console.Info(console.Main, "Reading configuration file '%v'", *configPath)
 		cfgFromFile, err := config.Load(*configPath)
 		if err != nil {
-			console.Error(console.Main, "Failed to load '%v': %v", *configPath, err)
+			console.Errors(console.Cfg, "Config error → ", err)
+			console.Info(console.Main, "Shutting down...")
 			return
 		}
 		cfg = *cfgFromFile
