@@ -168,6 +168,14 @@
 
                         break;
                     }
+                    case 'connection': {
+                        const connLabel = document.createElement('span');
+                        connLabel.textContent = `Connected to port ${d.server_port}`;
+                        connLabel.className = 'magenta';
+                        eventDetails.appendChild(connLabel);
+                        
+                        break;
+                    }
                     default: {
                         const protoLabel = document.createElement('span');
                         protoLabel.textContent = `[${d.event_type.toUpperCase()}:${d.server_port}] `;
