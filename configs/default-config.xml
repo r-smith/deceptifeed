@@ -45,6 +45,7 @@
       <reportConnections>false</reportConnections>
       <reportInteractions>true</reportInteractions>
       <sessionTimeout>5</sessionTimeout>
+      <useProxyProtocol>false</useProxyProtocol>
       <sourceIpHeader></sourceIpHeader>
       <rules>
         <!-- Report interactions to the threatfeed only if any of the following rules match: -->
@@ -66,6 +67,7 @@
       <reportConnections>false</reportConnections>
       <reportInteractions>true</reportInteractions>
       <sessionTimeout>5</sessionTimeout>
+      <useProxyProtocol>false</useProxyProtocol>
       <sourceIpHeader></sourceIpHeader>
       <certPath>/opt/deceptifeed/certs/https-cert.pem</certPath>
       <keyPath>/opt/deceptifeed/certs/https-key.pem</keyPath>
