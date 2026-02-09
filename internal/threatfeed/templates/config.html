@@ -52,15 +52,16 @@
                     {{if ne .Type.String "udp"}}<tr><th>Log Connections</th><td>{{if .LogConnections}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>{{end}}
                     <tr><th>Log Interactions</th><td>{{if .LogInteractions}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
                     <tr><th>Log Path</th><td class="blue">{{if .LogPath}}{{.LogPath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
+                    {{if ne .Type.String "udp"}}<tr><th>Session Timeout</th><td><span class="yellow">{{.SessionTimeout}} second{{if ne .SessionTimeout 1}}s{{end}}</span></td></tr>{{end}}
+                    {{if ne .Type.String "udp"}}<tr><th>Proxy Protocol</th><td>{{if .UseProxyProtocol}}<span class="green">Enabled{{else}}<span class="gray">Disabled{{end}}</span></td></tr>{{end}}
+                    {{if .SourceIPHeader}}<tr><th>Source IP Header</th><td class="yellow">{{.SourceIPHeader}}</td></tr>{{end}}
                     {{if eq .Type.String "https"}}<tr><th>Certificate</th><td class="blue">{{if .CertPath}}{{.CertPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
                     {{if or (eq .Type.String "https") (eq .Type.String "ssh")}}<tr><th>Private Key</th><td class="blue">{{if .KeyPath}}{{.KeyPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
-                    {{if or (eq .Type.String "tcp") (eq .Type.String "ssh")}}<tr><th>Proxy Protocol</th><td>{{if .UseProxyProtocol}}<span class="green">Enabled{{else}}<span class="gray">Disabled{{end}}</span></td></tr>{{end}}
                     {{if .HomePagePath}}<tr><th>Home Page</th><td class="blue">{{.HomePagePath}}</td></tr>{{end}}
                     {{if .ErrorPagePath}}<tr><th>Error Page</th><td class="blue">{{.ErrorPagePath}}</td></tr>{{end}}
                     {{if .Banner}}<tr><th>Banner</th><td class="magenta">{{.Banner}}</td></tr>{{end}}
                     {{if .Headers}}<tr><th>Headers</th><td class="magenta">{{range .Headers}}{{.}}<br />{{end}}</td></tr>{{end}}
                     {{if .Prompts}}<tr><th>Prompts</th><td class="magenta">{{range .Prompts}}{{if .Text}}{{.Text}}<br />{{end}}{{end}}</td></tr>{{end}}
-                    {{if .SourceIPHeader}}<tr><th>Source IP Header</th><td class="magenta">{{.SourceIPHeader}}</td></tr>{{end}}
                     {{if .Rules.Include}}{{range .Rules.Include}}<tr><th>Include Rule</th><td><span class="gray">Target:</span> <span class="white">{{.Target}}</span><br /><span class="gray">Negate:</span> <span class="white">{{.Negate}}</span><br /><span class="gray">Regex:</span> <span class="yellow">{{.Pattern}}</span></td></tr>{{end}}{{end}}
                     {{if .Rules.Exclude}}{{range .Rules.Exclude}}<tr><th>Exclude Rule</th><td><span class="gray">Target:</span> <span class="white">{{.Target}}</span><br /><span class="gray">Negate:</span> <span class="white">{{.Negate}}</span><br /><span class="gray">Regex:</span> <span class="yellow">{{.Pattern}}</span></td></tr>{{end}}{{end}}
                 </tbody>
