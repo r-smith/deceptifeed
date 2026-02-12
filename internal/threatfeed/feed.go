@@ -10,24 +10,20 @@ import (
 	"github.com/r-smith/deceptifeed/internal/stix"
 )
 
-// feedEntry represents an individual entry in the threat feed.
-type feedEntry struct {
+// threatRecord represents a threat entry formatted for client delivery.
+type threatRecord struct {
 	IP           netip.Addr `json:"ip"`
 	Added        time.Time  `json:"added"`
 	LastSeen     time.Time  `json:"last_seen"`
 	Observations int        `json:"observations"`
 }
 
-// feedEntries is a slice of feedEntry structs. It represents the threat feed
-// served to clients. When clients request the feed, this structure is built
-// from the `iocData` map. The data is then formatted and served to clients in
-// the requested format.
-type feedEntries []feedEntry
+// threatRecords represents the actual threatfeed ready to serve to clients.
+type threatRecords []threatRecord
 
-// sortMethod represents the method used for sorting the threat feed.
+// sortMethod represents the method used for sorting the threatfeed.
 type sortMethod int
 
-// Constants representing the possible values for sortMethod.
 const (
 	byIP sortMethod = iota
 	byAdded
@@ -35,45 +31,35 @@ const (
 	byObservations
 )
 
-// sortDirection represents the direction of sorting (ascending or descending).
-type sortDirection int
-
-// Constants representing the possible values for sortDirection.
-const (
-	ascending sortDirection = iota
-	descending
-)
-
-// feedOptions define configurable options for serving the threat feed.
+// feedOptions define configurable options for serving the threatfeed.
 type feedOptions struct {
-	sortMethod    sortMethod
-	sortDirection sortDirection
-	seenAfter     time.Time
-	limit         int
-	page          int
+	sortBy     sortMethod
+	descending bool
+	after      time.Time
+	limit      int
+	page       int
 }
 
-// prepareFeed filters, processes, and sorts IP addresses from the threat feed.
-// The resulting slice of `net.IP` represents the current threat feed to be
-// served to clients.
-func prepareFeed(options ...feedOptions) feedEntries {
+// snapshot filters and converts the threatfeed database into a slice to serve
+// to clients.
+func (d *threatDB) snapshot(options ...feedOptions) threatRecords {
 	// Set default feed options.
 	opt := feedOptions{
-		sortMethod:    byIP,
-		sortDirection: ascending,
+		sortBy:     byIP,
+		descending: false,
 	}
 	// Override default options if provided.
 	if len(options) > 0 {
 		opt = options[0]
 	}
 
-	// Parse and filter IPs from iocData into the threat feed.
+	// Copy entries from threatfeed database into a slice of threatRecords.
 	asOf := time.Now()
-	db.Lock()
-	threats := make(feedEntries, 0, len(db.entries))
+	d.Lock()
+	threats := make(threatRecords, 0, len(d.entries))
 
-	for ip, t := range db.entries {
-		if t.expired(asOf) || !t.lastSeen.After(opt.seenAfter) {
+	for ip, t := range d.entries {
+		if t.expired(asOf) || !t.lastSeen.After(opt.after) {
 			continue
 		}
 
@@ -85,24 +71,23 @@ func prepareFeed(options ...feedOptions) feedEntries {
 			continue
 		}
 
-		threats = append(threats, feedEntry{
+		threats = append(threats, threatRecord{
 			IP:           ip,
 			Added:        t.added,
 			LastSeen:     t.lastSeen,
 			Observations: t.observations,
 		})
 	}
-	db.Unlock()
+	d.Unlock()
 
-	threats.applySort(opt.sortMethod, opt.sortDirection)
+	threats.sort(opt.sortBy, opt.descending)
 
 	return threats
 }
 
-// applySort sorts the threat feed based on the specified sort method and
-// direction.
-func (f feedEntries) applySort(method sortMethod, direction sortDirection) {
-	slices.SortFunc(f, func(a, b feedEntry) int {
+// sort sorts threat records based on the specified sort criteria.
+func (t threatRecords) sort(method sortMethod, descending bool) {
+	slices.SortFunc(t, func(a, b threatRecord) int {
 		var t int
 		switch method {
 		case byIP:
@@ -115,35 +100,34 @@ func (f feedEntries) applySort(method sortMethod, direction sortDirection) {
 			t = cmp.Compare(a.Observations, b.Observations)
 		}
 
-		// If values or equal, sort by IP.
+		// If values are equal, sort by IP.
 		if t == 0 && method != byIP {
 			t = a.IP.Compare(b.IP)
 		}
 
 		// Inverse sort if direction is descending.
-		if direction == descending {
+		if descending {
 			return t * -1
 		}
 		return t
 	})
 }
 
-// convertToIndicators converts IP addresses from the threat feed into a
-// collection of STIX Indicator objects.
-func (f feedEntries) convertToIndicators() []stix.Object {
-	if len(f) == 0 {
+// convertToIndicators converts the threatfeed into a collection of STIX
+// STIX Indicator objects.
+func (t threatRecords) convertToIndicators() []stix.Object {
+	if len(t) == 0 {
 		return []stix.Object{}
 	}
 
 	const indicator = "indicator"
-	result := make([]stix.Object, 0, len(f)+1)
+	result := make([]stix.Object, 0, len(t)+1)
 
 	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All objects in the collection will reference this identity as the
-	// creator.
+	// All objects in the collection reference this identity as the creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
-	for _, entry := range f {
+	for _, entry := range t {
 		addrType := "ipv4-addr"
 		if entry.IP.Is6() {
 			addrType = "ipv6-addr"
@@ -182,24 +166,23 @@ func (f feedEntries) convertToIndicators() []stix.Object {
 	return result
 }
 
-// convertToSightings converts IP addresses from the threat feed into a
-// collection of STIX Sighting objects.
-func (f feedEntries) convertToSightings() []stix.Object {
-	if len(f) == 0 {
+// convertToSightings converts the threatfeed into a collection of STIX
+// Sighting objects.
+func (t threatRecords) convertToSightings() []stix.Object {
+	if len(t) == 0 {
 		return []stix.Object{}
 	}
 
 	const indicator = "indicator"
 	const sighting = "sighting"
 	const maxCount = 999_999_999 // Maximum count according to STIX 2.1 specification.
-	result := make([]stix.Object, 0, len(f)+1)
+	result := make([]stix.Object, 0, len(t)+1)
 
 	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All objects in the collection will reference this identity as the
-	// creator.
+	// All objects in the collection reference this identity as the creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
-	for _, entry := range f {
+	for _, entry := range t {
 		addrType := "ipv4-addr"
 		if entry.IP.Is6() {
 			addrType = "ipv6-addr"
@@ -234,28 +217,27 @@ func (f feedEntries) convertToSightings() []stix.Object {
 	return result
 }
 
-// convertToObservables converts IP addresses from the threat feed into a
-// collection of STIX Cyber-observable Objects.
-func (f feedEntries) convertToObservables() []stix.Object {
-	if len(f) == 0 {
+// convertToObservables converts the threatfeed into a collection of STIX
+// Cyber-observable Objects.
+func (t threatRecords) convertToObservables() []stix.Object {
+	if len(t) == 0 {
 		return []stix.Object{}
 	}
 
-	result := make([]stix.Object, 0, len(f)+1)
+	result := make([]stix.Object, 0, len(t)+1)
 
 	// Add the Deceptifeed `Identity` as the first object in the collection.
-	// All objects in the collection will reference this identity as the
-	// creator.
+	// All objects in the collection reference this identity as the creator.
 	result = append(result, stix.DeceptifeedIdentity())
 
-	for _, entry := range f {
+	for _, entry := range t {
 		t := "ipv4-addr"
 		if entry.IP.Is6() {
 			t = "ipv6-addr"
 		}
 
 		// Generate a deterministic identifier for each IP address in the
-		// threat feed using the IP value represented as a JSON string. For
+		// threatfeed using the IP value represented as a JSON string. For
 		// example: {"value":"127.0.0.1"}
 		result = append(result, stix.ObservableIP{
 			Type:         t,

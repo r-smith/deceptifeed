@@ -37,7 +37,7 @@ func handlePlain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	for _, entry := range prepareFeed(opt) {
+	for _, entry := range db.snapshot(opt) {
 		_, err := fmt.Fprintln(w, entry.IP)
 		if err != nil {
 			console.Debug(console.Feed, "Failed to serve plain-text threatfeed: %v", err)
@@ -59,7 +59,7 @@ func handleJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
-	if err := e.Encode(map[string]any{"threat_feed": prepareFeed(opt)}); err != nil {
+	if err := e.Encode(map[string]any{"threat_feed": db.snapshot(opt)}); err != nil {
 		console.Error(console.Feed, "Failed to serve JSON threatfeed: %v", err)
 		return
 	}
@@ -84,7 +84,7 @@ func handleCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, entry := range prepareFeed(opt) {
+	for _, entry := range db.snapshot(opt) {
 		if err := c.Write([]string{
 			entry.IP.String(),
 			entry.Added.Format(dateFormat),
@@ -117,7 +117,7 @@ func handleSTIX(w http.ResponseWriter, r *http.Request) {
 	result := stix.Bundle{
 		Type:    bundle,
 		ID:      stix.NewID(bundle),
-		Objects: prepareFeed(opt).convertToIndicators(),
+		Objects: db.snapshot(opt).convertToIndicators(),
 	}
 
 	w.Header().Set("Content-Type", stix.ContentType)
@@ -216,11 +216,11 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 	result := taxii.Envelope{}
 	switch r.PathValue("id") {
 	case taxii.IndicatorsID, taxii.IndicatorsAlias:
-		result.Objects = prepareFeed(opt).convertToIndicators()
+		result.Objects = db.snapshot(opt).convertToIndicators()
 	case taxii.ObservablesID, taxii.ObservablesAlias:
-		result.Objects = prepareFeed(opt).convertToObservables()
+		result.Objects = db.snapshot(opt).convertToObservables()
 	case taxii.SightingsID, taxii.SightingsAlias:
-		result.Objects = prepareFeed(opt).convertToSightings()
+		result.Objects = db.snapshot(opt).convertToSightings()
 	default:
 		handleNotFound(w, r)
 		return
@@ -327,19 +327,16 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 	}
 	// Set default sort if no query parameters are provided.
 	if len(r.URL.Query()) == 0 {
-		opt.sortMethod = byLastSeen
-		opt.sortDirection = descending
+		opt.sortBy = byLastSeen
+		opt.descending = true
 	}
 
-	var d string
-	switch opt.sortDirection {
-	case ascending:
-		d = "asc"
-	case descending:
+	d := "asc"
+	if opt.descending {
 		d = "desc"
 	}
 	var m string
-	switch opt.sortMethod {
+	switch opt.sortBy {
 	case byIP:
 		m = "ip"
 	case byAdded:
@@ -353,7 +350,7 @@ func handleHTML(w http.ResponseWriter, r *http.Request) {
 	_ = parsedTemplates.ExecuteTemplate(
 		w,
 		"webfeed.html",
-		map[string]any{"Data": prepareFeed(opt), "SortDirection": d, "SortMethod": m, "NavData": "webfeed"},
+		map[string]any{"Data": db.snapshot(opt), "SortDirection": d, "SortMethod": m, "NavData": "webfeed"},
 	)
 }
 
@@ -396,11 +393,11 @@ func parseParams(r *http.Request) (feedOptions, error) {
 		// instead. This is because the threatfeed is dynamic and IPs may be
 		// updated. This ensures clients don't miss updates if they are only
 		// looking for new entries.
-		opt.sortMethod = byLastSeen
+		opt.sortBy = byLastSeen
 
 		var err error
 		if len(r.URL.Query().Get("added_after")) > 0 {
-			opt.seenAfter, err = time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
+			opt.after, err = time.Parse(time.RFC3339, r.URL.Query().Get("added_after"))
 			if err != nil {
 				return feedOptions{}, fmt.Errorf("invalid 'added_after' value")
 			}
@@ -422,13 +419,13 @@ func parseParams(r *http.Request) (feedOptions, error) {
 
 	switch r.URL.Query().Get("sort") {
 	case "ip":
-		opt.sortMethod = byIP
+		opt.sortBy = byIP
 	case "last_seen":
-		opt.sortMethod = byLastSeen
+		opt.sortBy = byLastSeen
 	case "added":
-		opt.sortMethod = byAdded
+		opt.sortBy = byAdded
 	case "observations":
-		opt.sortMethod = byObservations
+		opt.sortBy = byObservations
 	case "":
 		// No sort option specified.
 	default:
@@ -437,9 +434,9 @@ func parseParams(r *http.Request) (feedOptions, error) {
 
 	switch r.URL.Query().Get("direction") {
 	case "asc":
-		opt.sortDirection = ascending
+		opt.descending = false
 	case "desc":
-		opt.sortDirection = descending
+		opt.descending = true
 	case "":
 		// No direction option specified.
 	default:
@@ -451,7 +448,7 @@ func parseParams(r *http.Request) (feedOptions, error) {
 		if err != nil {
 			return feedOptions{}, fmt.Errorf("invalid 'last_seen_hours' value")
 		}
-		opt.seenAfter = time.Now().Add(-time.Hour * time.Duration(hours))
+		opt.after = time.Now().Add(-time.Hour * time.Duration(hours))
 	}
 
 	return opt, nil

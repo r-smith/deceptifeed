@@ -167,9 +167,9 @@ func (d *threatDB) loadCSV() error {
 func (d *threatDB) saveCSV() error {
 	// Copy db to a temporary slice, to minimize lock time.
 	d.Lock()
-	tempDB := make([]feedEntry, 0, len(d.entries))
+	tempDB := make([]threatRecord, 0, len(d.entries))
 	for ip, t := range d.entries {
-		tempDB = append(tempDB, feedEntry{
+		tempDB = append(tempDB, threatRecord{
 			IP:           ip,
 			Added:        t.added,
 			LastSeen:     t.lastSeen,
