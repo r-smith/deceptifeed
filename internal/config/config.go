@@ -209,10 +209,11 @@ func Load(filename string) (*Config, error) {
 	var cfg Config
 
 	// Resolve the absolute path.
-	cfg.FilePath = filename
-	if abs, err := filepath.Abs(filename); err == nil {
-		cfg.FilePath = abs
+	abs, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
 	}
+	cfg.FilePath = abs
 
 	// Decode the XML.
 	decoder := xml.NewDecoder(file)
@@ -367,12 +368,70 @@ func (c *Config) InitLoggers() error {
 	return nil
 }
 
-// CloseLogFiles closes all open log file handles for the servers. This
-// function should be called when the application is shutting down.
-func (c *Config) CloseLogFiles() {
+// CloseLogs closes all open log file handles. This function should be called
+// when the application is shutting down.
+func (c *Config) CloseLogs() {
 	for i := range c.Servers {
 		if c.Servers[i].LogFile != nil {
 			_ = c.Servers[i].LogFile.Close()
 		}
 	}
+}
+
+// ResolvePaths updates all config paths with the cleaned and absolute
+// representation of the path. Disabled components and empty paths are skipped.
+func (c *Config) ResolvePaths() error {
+	// Update the config struct with the cleaned and absolute paths.
+	for _, p := range c.ActivePaths() {
+		if *p == "" {
+			continue
+		}
+
+		abs, err := filepath.Abs(*p)
+		if err != nil {
+			return fmt.Errorf("couldn't resolve '%v': %w", *p, err)
+		}
+
+		*p = abs
+	}
+
+	return nil
+}
+
+// ActivePaths returns a slice of pointers to all configuration paths for
+// components that are currently enabled.
+func (c *Config) ActivePaths() []*string {
+	// Start with global log path.
+	paths := []*string{&c.LogPath}
+
+	// Collect threatfeed paths.
+	if c.ThreatFeed.Enabled {
+		paths = append(paths,
+			&c.ThreatFeed.DatabasePath,
+			&c.ThreatFeed.ExcludeListPath,
+		)
+		if c.ThreatFeed.EnableTLS {
+			paths = append(paths,
+				&c.ThreatFeed.CertPath,
+				&c.ThreatFeed.KeyPath,
+			)
+		}
+	}
+
+	// Collect honeypot paths.
+	for i := range c.Servers {
+		s := &c.Servers[i]
+		if !s.Enabled {
+			continue
+		}
+		paths = append(paths,
+			&s.LogPath,
+			&s.CertPath,
+			&s.KeyPath,
+			&s.HomePagePath,
+			&s.ErrorPagePath,
+		)
+	}
+
+	return paths
 }

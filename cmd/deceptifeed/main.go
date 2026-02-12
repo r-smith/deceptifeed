@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"sync"
 	"syscall"
@@ -108,18 +109,29 @@ func main() {
 		}
 	}
 
+	// Update config paths with the cleaned and absolute path representations.
+	if err := cfg.ResolvePaths(); err != nil {
+		console.Error(console.Main, "Failed to resolve paths: %v", err)
+		return
+	}
+
+	// Ensure directories exist and create directory structure if missing.
+	if err := ensureDirs(&cfg); err != nil {
+		console.Error(console.Main, "Directory setup failed: %v", err)
+		return
+	}
+
+	// Initialize loggers.
+	if err := cfg.InitLoggers(); err != nil {
+		console.Error(console.Main, "Failed to initialize logging: %v", err)
+		return
+	}
+	defer cfg.CloseLogs()
+
 	// Sort servers by port number for consistent order when viewing config.
 	slices.SortFunc(cfg.Servers, func(a, b config.Server) int {
 		return cmp.Compare(a.Port, b.Port)
 	})
-
-	// Initialize loggers.
-	err := cfg.InitLoggers()
-	if err != nil {
-		console.Error(console.Main, "Failed to initialize logging: %v", err)
-		return
-	}
-	defer cfg.CloseLogFiles()
 
 	// Resolve the system's hostname for identification in logs.
 	config.InitHostname()
@@ -184,4 +196,27 @@ func run(ctx context.Context, cfg *config.Config) {
 	case <-ctx.Done():
 		console.Info(console.Main, "Shutting down...")
 	}
+}
+
+// ensureDirs ensures the filesystem is ready by creating parent directories
+// for file paths defined in the configuration. It skips empty paths and
+// returns an error if a directory can't be created.
+func ensureDirs(cfg *config.Config) error {
+	for _, p := range cfg.ActivePaths() {
+		if *p == "" {
+			continue
+		}
+		dir := filepath.Dir(*p)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("couldn't create '%v': %w", dir, err)
+		}
+		info, err := os.Stat(dir)
+		if err != nil {
+			return fmt.Errorf("couldn't access '%v': %w", dir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("path '%v' is not a directory", dir)
+		}
+	}
+	return nil
 }
