@@ -42,11 +42,11 @@ func Start(c *config.Config) {
 	reloadExcludeList(c.ThreatFeed.ExcludeListPath)
 
 	// Load threatfeed CSV file.
-	if err := loadCSV(); err != nil {
+	if err := db.loadCSV(); err != nil {
 		console.Error(console.Feed, "Failed to load threatfeed database '%s': %v", cfg.ThreatFeed.DatabasePath, err)
 		return
 	}
-	deleteExpired()
+	db.deleteExpired()
 
 	// Start a background goroutine to perform periodic maintenance:
 	// 1. Reload the exclude list if the file changed.
@@ -58,9 +58,9 @@ func Start(c *config.Config) {
 		for range ticker.C {
 			reloadExcludeList(c.ThreatFeed.ExcludeListPath)
 
-			if dataChanged.CompareAndSwap(true, false) {
-				deleteExpired()
-				if err := saveCSV(); err != nil {
+			if db.hasChanged.CompareAndSwap(true, false) {
+				db.deleteExpired()
+				if err := db.saveCSV(); err != nil {
 					console.Error(console.Feed, "Failed to save threatfeed database '%s': %v", cfg.ThreatFeed.DatabasePath, err)
 				}
 			}

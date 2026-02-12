@@ -15,58 +15,57 @@ import (
 	"time"
 )
 
-// IOC represents an Indicator of Compromise (IOC) entry that stores
-// information about IP addresses that interact with the honeypot servers.
-type IOC struct {
-	// added records the time when an IP address is added to the threat feed.
-	added time.Time
-
-	// lastSeen records the last time an IP was observed interacting with a
-	// honeypot server.
-	lastSeen time.Time
-
-	// observations tracks the total number of interactions an IP has had with
-	// the honeypot servers.
-	observations int
-}
-
 const (
-	// dateFormat specifies the timestamp format used for threat feed entries.
+	// dateFormat specifies the timestamp format used for threatfeed entries.
 	dateFormat = time.RFC3339Nano
 
-	// maxObservations is the maximum number of interactions the threat feed
+	// maxObservations is the maximum number of interactions the threatfeed
 	// will record for each IP.
 	maxObservations = 999_999_999
 )
 
 var (
-	// iocData stores Indicator of Compromise (IOC) entries, keyed by IP
-	// address. This map represents the internal structure of the threat feed.
-	// It is populated with existing threat data when the server starts. The
-	// map is then updated by `Update` whenever a potential attacker interacts
-	// with a honeypot server. The threat feed served to clients is generated
-	// based on the data in this map.
-	iocData = make(map[netip.Addr]*IOC)
+	// db is the global instance of the threatfeed database used to track IP
+	// address activity. It serves as the central repository for all recorded
+	// honeypot interactions and is the source for serving the feed to clients.
+	db = &threatDB{
+		entries: make(map[netip.Addr]*threat),
+	}
 
-	// mu is to ensure thread-safe access to iocData.
-	mu sync.Mutex
-
-	// dataChanged indicates whether the IoC map has been modified since the
-	// last time it was saved to disk.
-	dataChanged atomic.Bool
-
-	// csvHeader defines the header row for saved threat feed data.
+	// csvHeader defines the header row for saved threatfeed data.
 	csvHeader = []string{"ip", "added", "last_seen", "observations"}
 )
 
-// Update updates the threat feed with the provided source IP address. This
-// function should be called by honeypot servers whenever a client interacts
-// with the honeypot. If the source IP address is already in the threat feed,
-// its last-seen timestamp is updated, and its observation count is
-// incremented. Otherwise, the IP address is added as a new entry.
+// threat stores the interaction history for a unique IP address in the
+// threatfeed.
+type threat struct {
+	// added is the timestamp when the IP was first stored in the threatfeed.
+	added time.Time
+
+	// lastSeen is the timestamp of the most recent activity for this IP.
+	lastSeen time.Time
+
+	// observations is the total number of times this IP has been detected.
+	observations int
+}
+
+// threatDB provides a thread-safe container for managing records in the
+// threatfeed database.
+type threatDB struct {
+	sync.Mutex
+
+	// entries stores all tracked IP addresses and their interaction history.
+	entries map[netip.Addr]*threat
+
+	// hasChanged indicates if the in-memory data has been modified since the
+	// last save to disk.
+	hasChanged atomic.Bool
+}
+
+// Update records a honeypot interaction for the given IP address in the
+// threatfeed database.
 func Update(ip netip.Addr) {
-	// Check if the given IP string is a private address. The threat feed may
-	// be configured to include or exclude private IPs.
+	// Filter out invalid, loopback, and private IPs (if configured).
 	ip = ip.Unmap()
 	if !ip.IsValid() || ip.IsLoopback() || (!cfg.ThreatFeed.IsPrivateIncluded && ip.IsPrivate()) {
 		return
@@ -74,66 +73,32 @@ func Update(ip netip.Addr) {
 
 	now := time.Now()
 
-	mu.Lock()
-	defer mu.Unlock()
+	db.Lock()
+	defer db.Unlock()
 
-	if ioc, exists := iocData[ip]; exists {
+	if t, ok := db.entries[ip]; ok {
 		// Update existing entry.
-		ioc.lastSeen = now
-		if ioc.observations < maxObservations {
-			ioc.observations++
+		t.lastSeen = now
+		if t.observations < maxObservations {
+			t.observations++
 		}
 	} else {
 		// Create a new entry.
-		iocData[ip] = &IOC{
+		db.entries[ip] = &threat{
 			added:        now,
 			lastSeen:     now,
 			observations: 1,
 		}
 	}
 
-	dataChanged.Store(true)
+	db.hasChanged.Store(true)
 }
 
-// deleteExpired deletes expired threatfeed entries from the IoC map.
-func deleteExpired() {
-	if cfg.ThreatFeed.ExpiryHours <= 0 {
-		return
-	}
-
-	cutoff := time.Now().Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours))
-	isModified := false
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	for ip, ioc := range iocData {
-		if ioc.lastSeen.Before(cutoff) {
-			delete(iocData, ip)
-			isModified = true
-		}
-	}
-
-	if isModified {
-		dataChanged.Store(true)
-	}
-}
-
-// expired evaluates the age of an IoC. It returns true if the duration between
-// its lastSeen time and the proided time exceeds the configured expiry hours.
-func (ioc *IOC) expired(at time.Time) bool {
-	if cfg.ThreatFeed.ExpiryHours <= 0 {
-		return false
-	}
-	return ioc.lastSeen.Before(at.Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours)))
-}
-
-// loadCSV loads existing threat feed data from a CSV file. If found, it
-// populates iocData which represents the active threat feed. This function is
-// called once during the initialization of the threat feed server.
-func loadCSV() error {
-	mu.Lock()
-	defer mu.Unlock()
+// loadCSV populates the in-memory threatfeed with existing records from a CSV
+// file. It restores the threatfeed state during startup.
+func (d *threatDB) loadCSV() error {
+	d.Lock()
+	defer d.Unlock()
 
 	f, err := os.Open(cfg.ThreatFeed.DatabasePath)
 	if err != nil {
@@ -191,35 +156,35 @@ func loadCSV() error {
 			count = 1
 		}
 
-		iocData[ip] = &IOC{added: added, lastSeen: lastSeen, observations: count}
+		d.entries[ip] = &threat{added: added, lastSeen: lastSeen, observations: count}
 	}
 	return nil
 }
 
-// saveCSV performs an atomic save of the threatfeed to a CSV file. This file
-// ensures the threatfeed persists across restarts. It is separate from the
-// live in-memory feed.
-func saveCSV() error {
-	// Copy iocData to a temporary slice, to minimize lock time.
-	mu.Lock()
-	tempData := make([]feedEntry, 0, len(iocData))
-	for ip, ioc := range iocData {
-		tempData = append(tempData, feedEntry{
+// saveCSV writes the threatfeed to a CSV file for persistence. This allows the
+// threatfeed to be restored after a restart. It is independent of the live
+// in-memory feed.
+func (d *threatDB) saveCSV() error {
+	// Copy db to a temporary slice, to minimize lock time.
+	d.Lock()
+	tempDB := make([]feedEntry, 0, len(d.entries))
+	for ip, t := range d.entries {
+		tempDB = append(tempDB, feedEntry{
 			IP:           ip,
-			Added:        ioc.added,
-			LastSeen:     ioc.lastSeen,
-			Observations: ioc.observations,
+			Added:        t.added,
+			LastSeen:     t.lastSeen,
+			Observations: t.observations,
 		})
 	}
-	mu.Unlock()
+	d.Unlock()
 
 	// Prepare a temp file.
-	tempPath := cfg.ThreatFeed.DatabasePath + ".tmp"
-	f, err := os.OpenFile(tempPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	tmpFile := cfg.ThreatFeed.DatabasePath + ".tmp"
+	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tempPath)
+	defer os.Remove(tmpFile)
 	defer f.Close()
 
 	// 64KB buffered writer.
@@ -230,12 +195,12 @@ func saveCSV() error {
 		return err
 	}
 	// Write the entries.
-	for _, ioc := range tempData {
+	for _, t := range tempDB {
 		_, err := fmt.Fprintf(w, "%s,%s,%s,%d\n",
-			ioc.IP,
-			ioc.Added.Format(dateFormat),
-			ioc.LastSeen.Format(dateFormat),
-			ioc.Observations,
+			t.IP,
+			t.Added.Format(dateFormat),
+			t.LastSeen.Format(dateFormat),
+			t.Observations,
 		)
 		if err != nil {
 			return err
@@ -254,5 +219,38 @@ func saveCSV() error {
 	}
 
 	// Replace (or create) the database file with the temp file.
-	return os.Rename(tempPath, cfg.ThreatFeed.DatabasePath)
+	return os.Rename(tmpFile, cfg.ThreatFeed.DatabasePath)
+}
+
+// deleteExpired deletes expired threatfeed entries from the database.
+func (d *threatDB) deleteExpired() {
+	if cfg.ThreatFeed.ExpiryHours <= 0 {
+		return
+	}
+
+	cutoff := time.Now().Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours))
+	isModified := false
+
+	d.Lock()
+	defer d.Unlock()
+
+	for ip, t := range d.entries {
+		if t.lastSeen.Before(cutoff) {
+			delete(d.entries, ip)
+			isModified = true
+		}
+	}
+
+	if isModified {
+		d.hasChanged.Store(true)
+	}
+}
+
+// expired determines if a threat has exceeded the configured age limit based
+// on its lastSeen timestamp.
+func (t *threat) expired(at time.Time) bool {
+	if cfg.ThreatFeed.ExpiryHours <= 0 {
+		return false
+	}
+	return t.lastSeen.Before(at.Add(-time.Hour * time.Duration(cfg.ThreatFeed.ExpiryHours)))
 }

@@ -69,11 +69,11 @@ func prepareFeed(options ...feedOptions) feedEntries {
 
 	// Parse and filter IPs from iocData into the threat feed.
 	asOf := time.Now()
-	mu.Lock()
-	threats := make(feedEntries, 0, len(iocData))
+	db.Lock()
+	threats := make(feedEntries, 0, len(db.entries))
 
-	for ip, ioc := range iocData {
-		if ioc.expired(asOf) || !ioc.lastSeen.After(opt.seenAfter) {
+	for ip, t := range db.entries {
+		if t.expired(asOf) || !t.lastSeen.After(opt.seenAfter) {
 			continue
 		}
 
@@ -87,12 +87,12 @@ func prepareFeed(options ...feedOptions) feedEntries {
 
 		threats = append(threats, feedEntry{
 			IP:           ip,
-			Added:        ioc.added,
-			LastSeen:     ioc.lastSeen,
-			Observations: ioc.observations,
+			Added:        t.added,
+			LastSeen:     t.lastSeen,
+			Observations: t.observations,
 		})
 	}
-	mu.Unlock()
+	db.Unlock()
 
 	threats.applySort(opt.sortMethod, opt.sortDirection)
 

@@ -19,14 +19,12 @@ import (
 	"github.com/r-smith/deceptifeed/internal/taxii"
 )
 
-// templates embeds .html and template files in the `./templates/` folder.
+// templates embeds all web-related content in the ./templates directory.
 //
 //go:embed templates
 var templates embed.FS
 
-// parsedTemplates pre-parses and caches all HTML templates when the threatfeed
-// server starts. This eliminates the need for HTTP handlers to re-parse
-// templates on each request.
+// parsedTemplates is the global cache for pre-compiled HTML templates.
 var parsedTemplates = template.Must(template.ParseFS(templates, "templates/*.html"))
 
 // handlePlain handles HTTP requests to serve the threatfeed in plain text. It
@@ -261,8 +259,8 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 				timestamp = v.LastSeen
 			case stix.ObservableIP:
 				if addr, err := netip.ParseAddr(v.Value); err == nil {
-					if ioc, found := iocData[addr.Unmap()]; found {
-						timestamp = ioc.lastSeen
+					if t, ok := db.entries[addr.Unmap()]; ok {
+						timestamp = t.lastSeen
 					}
 				}
 			case stix.Identity:
