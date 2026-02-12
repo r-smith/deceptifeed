@@ -13,7 +13,6 @@ import (
 	"io/fs"
 	"math/big"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -140,14 +139,6 @@ func GenerateEd25519Key(path string) (ed25519.PrivateKey, error) {
 
 // writeCertAndKey saves a PEM-encoded certificate and private key to disk.
 func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath string) error {
-	// Create the parent directories if they don't exist.
-	if err := ensureDir(certPath); err != nil {
-		return err
-	}
-	if err := ensureDir(keyPath); err != nil {
-		return err
-	}
-
 	// Write the certificate.
 	certFile, err := os.OpenFile(certPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
@@ -176,11 +167,6 @@ func writeCertAndKey(cert *pem.Block, key *pem.Block, certPath string, keyPath s
 // writePrivateKey encodes and saves a private key to the specified path in PEM
 // format.
 func writePrivateKey(key any, path string) error {
-	// Create the parent directories if they don't exist.
-	if err := ensureDir(path); err != nil {
-		return err
-	}
-
 	// Setup PEM block.
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
@@ -199,14 +185,4 @@ func writePrivateKey(key any, path string) error {
 	defer file.Close()
 
 	return pem.Encode(file, keyPEM)
-}
-
-// ensureDir creates any necessary parent directories for the given path if
-// they don't already exist.
-func ensureDir(path string) error {
-	d := filepath.Dir(path)
-	if d != "." {
-		return os.MkdirAll(d, 0755)
-	}
-	return nil
 }
