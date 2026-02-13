@@ -169,20 +169,6 @@ func (tdb *threatDB) loadCSV() error {
 // threatfeed to be restored after a restart. It is independent of the live
 // in-memory feed.
 func (tdb *threatDB) saveCSV() error {
-	// Copy db to a temporary slice, to minimize lock time.
-	tdb.Lock()
-	tempDB := make([]threatRecord, 0, len(tdb.entries))
-	for ip, t := range tdb.entries {
-		tempDB = append(tempDB, threatRecord{
-			IP:           ip,
-			Added:        t.added,
-			LastSeen:     t.lastSeen,
-			Observations: t.observations,
-		})
-	}
-	tdb.Unlock()
-
-	// Prepare a temp file.
 	tmpFile := cfg.ThreatFeed.DatabasePath + ".tmp"
 	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
@@ -198,18 +184,35 @@ func (tdb *threatDB) saveCSV() error {
 	if _, err := w.WriteString(strings.Join(csvHeader, ",") + "\n"); err != nil {
 		return err
 	}
+
+	// Reusable buffer for AppendTo, AppendFormat, and AppendInt (reduces
+	// memory allocations over netip.String, time.Format, and strconv.Itoa).
+	var buf []byte
+
 	// Write the entries.
-	for _, t := range tempDB {
-		_, err := fmt.Fprintf(w, "%s,%s,%s,%d\n",
-			t.IP,
-			t.Added.Format(dateFormat),
-			t.LastSeen.Format(dateFormat),
-			t.Observations,
-		)
-		if err != nil {
-			return err
-		}
+	tdb.Lock()
+	for ip, t := range tdb.entries {
+		// IP.
+		buf = ip.AppendTo(buf[:0])
+		w.Write(buf)
+		w.WriteByte(',')
+
+		// Added.
+		buf = t.added.AppendFormat(buf[:0], dateFormat)
+		w.Write(buf)
+		w.WriteByte(',')
+
+		// LastSeen.
+		buf = t.lastSeen.AppendFormat(buf[:0], dateFormat)
+		w.Write(buf)
+		w.WriteByte(',')
+
+		// Observations.
+		buf = strconv.AppendInt(buf[:0], int64(t.observations), 10)
+		w.Write(buf)
+		w.WriteByte('\n')
 	}
+	tdb.Unlock()
 
 	// Flush the buffer, commit to storage, and close the temp file.
 	if err := w.Flush(); err != nil {
