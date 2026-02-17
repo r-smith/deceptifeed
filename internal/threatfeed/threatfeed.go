@@ -69,9 +69,12 @@ type threatDB struct {
 // Update records a honeypot interaction for the given IP address in the
 // threatfeed database.
 func Update(ip netip.Addr) {
-	// Filter out invalid, loopback, and private IPs (if configured).
+	// Filter out invalid, loopback, private (if configured), and excluded IPs.
 	ip = ip.Unmap()
-	if !ip.IsValid() || ip.IsLoopback() || (!cfg.ThreatFeed.IsPrivateIncluded && ip.IsPrivate()) {
+	if !ip.IsValid() ||
+		ip.IsLoopback() ||
+		(!cfg.ThreatFeed.IsPrivateIncluded && (ip.IsPrivate() || ip.IsLinkLocalUnicast())) ||
+		isExcluded(ip) {
 		return
 	}
 
