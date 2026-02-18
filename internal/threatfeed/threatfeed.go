@@ -19,27 +19,6 @@ import (
 	"github.com/r-smith/deceptifeed/internal/stix"
 )
 
-const (
-	// dateFormat specifies the timestamp format used for threatfeed entries.
-	dateFormat = time.RFC3339Nano
-
-	// maxObservations is the maximum number of interactions the threatfeed
-	// will record for each IP.
-	maxObservations = 999_999_999
-)
-
-var (
-	// db is the global instance of the threatfeed database used to track IP
-	// address activity. It serves as the central repository for all recorded
-	// honeypot interactions and is the source for serving the feed to clients.
-	db = &threatDB{
-		entries: make(map[netip.Addr]*threat),
-	}
-
-	// csvHeader defines the header row for saved threatfeed data.
-	csvHeader = []string{"ip", "added", "last_seen", "observations"}
-)
-
 // threat stores the interaction history for a unique IP address in the
 // threatfeed.
 type threat struct {
@@ -66,9 +45,28 @@ type threatDB struct {
 	hasChanged atomic.Bool
 }
 
+const (
+	// dateFormat specifies the timestamp format used for threatfeed entries.
+	dateFormat = time.RFC3339Nano
+)
+
+var (
+	// db is the global instance of the threatfeed database used to track IP
+	// address activity. It serves as the central repository for all recorded
+	// honeypot interactions and is the source for serving the feed to clients.
+	db = &threatDB{
+		entries: make(map[netip.Addr]*threat),
+	}
+
+	// csvHeader defines the header row for saved threatfeed data.
+	csvHeader = []string{"ip", "added", "last_seen", "observations"}
+)
+
 // Update records a honeypot interaction for the given IP address in the
 // threatfeed database.
 func Update(ip netip.Addr) {
+	const maxObservations = 999_999_999
+
 	// Filter out invalid, loopback, private (if configured), and excluded IPs.
 	ip = ip.Unmap()
 	if !ip.IsValid() ||
