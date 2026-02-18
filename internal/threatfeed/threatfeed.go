@@ -30,6 +30,14 @@ type threat struct {
 
 	// observations is the total number of times this IP has been detected.
 	observations int
+
+	// weeklyHits is the number of detections for this IP within the current
+	// week (resets via weekly timer in reports.go).
+	weeklyHits int
+
+	// dailyHits is the number of detections for this IP within the current
+	// day (resets via daily timer in reports.go).
+	dailyHits int
 }
 
 // threatDB provides a thread-safe container for managing records in the
@@ -40,9 +48,12 @@ type threatDB struct {
 	// entries stores all tracked IP addresses and their interaction history.
 	entries map[netip.Addr]*threat
 
-	// hasChanged indicates if the in-memory data has been modified since the
-	// last save to disk.
+	// hasChanged indicates if the threatfeed was modified since the last save.
 	hasChanged atomic.Bool
+
+	// hourlyHits tracks the total interactions across all IPs in the past hour
+	// (resets via hourly ticker in reports.go).
+	hourlyHits int
 }
 
 const (
@@ -86,6 +97,8 @@ func Update(ip netip.Addr) {
 		t.lastSeen = now
 		if t.observations < maxObservations {
 			t.observations++
+			t.dailyHits++
+			t.weeklyHits++
 		}
 	} else {
 		// Create a new entry.
@@ -93,9 +106,12 @@ func Update(ip netip.Addr) {
 			added:        now,
 			lastSeen:     now,
 			observations: 1,
+			weeklyHits:   1,
+			dailyHits:    1,
 		}
 	}
 
+	db.hourlyHits++
 	db.hasChanged.Store(true)
 }
 
