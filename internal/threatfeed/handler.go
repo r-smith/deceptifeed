@@ -24,8 +24,13 @@ import (
 //go:embed templates
 var templates embed.FS
 
-// parsedTemplates is the global cache for pre-compiled HTML templates.
-var parsedTemplates = template.Must(template.ParseFS(templates, "templates/*.html"))
+var (
+	// parsedTemplates is the global cache for pre-compiled HTML templates.
+	parsedTemplates = template.Must(template.ParseFS(templates, "templates/*.html"))
+
+	// csvHeader is the header row used when serving the threatfeed as CSV.
+	csvHeader = []string{"ip", "added", "last_seen", "observations"}
+)
 
 // handlePlain handles HTTP requests to serve the threatfeed in plain text. It
 // returns a list of IP addresses that interacted with the honeypot servers.

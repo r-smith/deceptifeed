@@ -56,22 +56,15 @@ type threatDB struct {
 	hourlyHits int
 }
 
-const (
-	// dateFormat specifies the timestamp format used for threatfeed entries.
-	dateFormat = time.RFC3339Nano
-)
+// dateFormat specifies the timestamp format used for threatfeed entries.
+const dateFormat = time.RFC3339Nano
 
-var (
-	// db is the global instance of the threatfeed database used to track IP
-	// address activity. It serves as the central repository for all recorded
-	// honeypot interactions and is the source for serving the feed to clients.
-	db = &threatDB{
-		entries: make(map[netip.Addr]*threat),
-	}
-
-	// csvHeader defines the header row for saved threatfeed data.
-	csvHeader = []string{"ip", "added", "last_seen", "observations"}
-)
+// db is the global instance of the threatfeed database used to track IP
+// address activity. It serves as the central repository for all recorded
+// honeypot interactions and is the source for serving the feed to clients.
+var db = &threatDB{
+	entries: make(map[netip.Addr]*threat),
+}
 
 // Update records a honeypot interaction for the given IP address in the
 // threatfeed database.
@@ -186,6 +179,8 @@ func (tdb *threatDB) loadCSV() error {
 // threatfeed to be restored after a restart. It is independent of the live
 // in-memory feed.
 func (tdb *threatDB) saveCSV() error {
+	const header = "ip,added,last_seen,observations"
+
 	tmpFile := cfg.ThreatFeed.DatabasePath + ".tmp"
 	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
@@ -198,13 +193,13 @@ func (tdb *threatDB) saveCSV() error {
 	w := bufio.NewWriterSize(f, 65536)
 
 	// Write the header row.
-	if _, err := w.WriteString(strings.Join(csvHeader, ",") + "\n"); err != nil {
+	if _, err := w.WriteString(header + "\n"); err != nil {
 		return err
 	}
 
 	// Reusable buffer for AppendTo, AppendFormat, and AppendInt (reduces
 	// memory allocations over netip.String, time.Format, and strconv.Itoa).
-	var buf []byte
+	buf := make([]byte, 0, 64)
 
 	// Write the entries.
 	tdb.Lock()
