@@ -123,54 +123,80 @@ func (tdb *threatDB) loadCSV() error {
 	}
 	defer f.Close()
 
-	reader := csv.NewReader(f)
+	r := csv.NewReader(f)
+	r.FieldsPerRecord = -1
+	r.ReuseRecord = true
 
 	// Read and discard the header line.
-	reader.FieldsPerRecord = -1
-	if _, err := reader.Read(); err != nil {
+	if _, err := r.Read(); err != nil {
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("couldn't read header row: %w", err)
 	}
 
-	// Process remaining lines with 4 fields required per line.
-	reader.FieldsPerRecord = 4
+	// Process the remaining lines. All fields are optional except for the IP.
+	now := time.Now()
 	for {
-		record, err := reader.Read()
+		record, err := r.Read()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			// Skip over lines with the wrong number of fields.
-			continue
+			return fmt.Errorf("parse error: %w", err)
 		}
 
-		// Parse IP.
+		// Parse IP (required).
 		ip, err := netip.ParseAddr(strings.TrimSpace(record[0]))
 		if err != nil {
 			continue
 		}
 
-		// Parse added, defaulting to current time.
-		added, err := time.Parse(dateFormat, record[1])
-		if err != nil {
-			added = time.Now()
+		// Defaults for optional fields.
+		added := now
+		lastSeen := now
+		observations := 1
+		weeklyHits := 0
+		dailyHits := 0
+
+		// Parse 'added'.
+		if len(record) >= 2 {
+			if v, err := time.Parse(dateFormat, record[1]); err == nil {
+				added = v
+			}
+		}
+		// Parse 'last_seen'.
+		if len(record) >= 3 {
+			if v, err := time.Parse(dateFormat, record[2]); err == nil {
+				lastSeen = v
+			}
+		}
+		// Parse 'observations'.
+		if len(record) >= 4 {
+			if v, err := strconv.Atoi(strings.TrimSpace(record[3])); err == nil {
+				observations = v
+			}
+		}
+		// Parse 'weekly_hits'.
+		if len(record) >= 5 {
+			if v, err := strconv.Atoi(strings.TrimSpace(record[4])); err == nil {
+				weeklyHits = v
+			}
+		}
+		// Parse 'daily_hits'.
+		if len(record) >= 6 {
+			if v, err := strconv.Atoi(strings.TrimSpace(record[5])); err == nil {
+				dailyHits = v
+			}
 		}
 
-		// Parse lastSeen, defaulting to current time.
-		lastSeen, err := time.Parse(dateFormat, record[2])
-		if err != nil {
-			lastSeen = time.Now()
+		tdb.entries[ip] = &threat{
+			added:        added,
+			lastSeen:     lastSeen,
+			observations: observations,
+			weeklyHits:   weeklyHits,
+			dailyHits:    dailyHits,
 		}
-
-		// Parse observation count, defaulting to 1.
-		count, err := strconv.Atoi(strings.TrimSpace(record[3]))
-		if err != nil {
-			count = 1
-		}
-
-		tdb.entries[ip] = &threat{added: added, lastSeen: lastSeen, observations: count}
 	}
 	return nil
 }
@@ -179,7 +205,7 @@ func (tdb *threatDB) loadCSV() error {
 // threatfeed to be restored after a restart. It is independent of the live
 // in-memory feed.
 func (tdb *threatDB) saveCSV() error {
-	const header = "ip,added,last_seen,observations"
+	const header = "ip,added,last_seen,observations,weekly_hits,daily_hits"
 
 	tmpFile := cfg.ThreatFeed.DatabasePath + ".tmp"
 	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
@@ -199,30 +225,35 @@ func (tdb *threatDB) saveCSV() error {
 
 	// Reusable buffer for AppendTo, AppendFormat, and AppendInt (reduces
 	// memory allocations over netip.String, time.Format, and strconv.Itoa).
-	buf := make([]byte, 0, 64)
+	buf := make([]byte, 0, 128)
 
 	// Write the entries.
 	tdb.Lock()
 	for ip, t := range tdb.entries {
 		// IP.
 		buf = ip.AppendTo(buf[:0])
-		w.Write(buf)
-		w.WriteByte(',')
+		buf = append(buf, ',')
 
 		// Added.
-		buf = t.added.AppendFormat(buf[:0], dateFormat)
-		w.Write(buf)
-		w.WriteByte(',')
+		buf = t.added.AppendFormat(buf, dateFormat)
+		buf = append(buf, ',')
 
 		// LastSeen.
-		buf = t.lastSeen.AppendFormat(buf[:0], dateFormat)
-		w.Write(buf)
-		w.WriteByte(',')
+		buf = t.lastSeen.AppendFormat(buf, dateFormat)
+		buf = append(buf, ',')
 
 		// Observations.
-		buf = strconv.AppendInt(buf[:0], int64(t.observations), 10)
+		buf = strconv.AppendInt(buf, int64(t.observations), 10)
+		buf = append(buf, ',')
+
+		// WeeklyHits.
+		buf = strconv.AppendInt(buf, int64(t.weeklyHits), 10)
+		buf = append(buf, ',')
+
+		// DailyHits.
+		buf = strconv.AppendInt(buf, int64(t.dailyHits), 10)
+		buf = append(buf, '\n')
 		w.Write(buf)
-		w.WriteByte('\n')
 	}
 	tdb.Unlock()
 
