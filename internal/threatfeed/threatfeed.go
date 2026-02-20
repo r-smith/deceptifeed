@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/r-smith/deceptifeed/internal/console"
 	"github.com/r-smith/deceptifeed/internal/stix"
 )
 
@@ -270,6 +271,25 @@ func (tdb *threatDB) saveCSV() error {
 
 	// Replace (or create) the database file with the temp file.
 	return os.Rename(tmpFile, cfg.ThreatFeed.DatabasePath)
+}
+
+// runMaintenance performs periodic maintenance tasks for the threatfeed. It
+// reloads the exclude list (if changed), deletes expired threatfeed entries,
+// and saves the threatfeed database to disk (if changed).
+func (tdb *threatDB) runMaintenance(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		reloadExcludeList(cfg.ThreatFeed.ExcludeListPath)
+
+		if tdb.hasChanged.CompareAndSwap(true, false) {
+			tdb.deleteExpired()
+			if err := tdb.saveCSV(); err != nil {
+				console.Error(console.Feed, "Failed to save threatfeed database '%s': %v", cfg.ThreatFeed.DatabasePath, err)
+			}
+		}
+	}
 }
 
 // deleteExpired deletes expired threatfeed entries from the database.
