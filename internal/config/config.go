@@ -222,16 +222,16 @@ func Load(filename string) (*Config, error) {
 	}
 
 	// Finalize honeypot configuration.
-	if err := cfg.prepare(); err != nil {
+	if err := cfg.Prepare(); err != nil {
 		return nil, err
 	}
 
 	return &cfg, nil
 }
 
-// prepare finalizes the configuration for each honeypot server. It applies
+// Prepare finalizes the configuration for each honeypot server. It applies
 // defaults, ensures a log path is defined, and ensures rules are compiled.
-func (c *Config) prepare() error {
+func (c *Config) Prepare() error {
 	var errs []error
 	seenPorts := make(map[uint16]string)
 
