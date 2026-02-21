@@ -6,25 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/r-smith/deceptifeed/internal/logmonitor"
 	"github.com/r-smith/deceptifeed/internal/logrotate"
 )
-
-// Version stores Deceptifeed's version number. This variable is set at build
-// time using the `-X` option with `-ldflags` and is assigned the latest Git
-// tag. Refer to the Makefile in the project root for details on how it's set.
-var Version = "undefined"
-
-// Hostname identifies the system running Deceptifeed and is primarily used
-// with honeypot logs. It is set once at startup from the DECEPTIFEED_HOSTNAME
-// environment variable or the OS-reported name.
-var Hostname string
 
 const (
 	DefaultEnableHTTP           = true
@@ -51,6 +40,19 @@ const (
 	DefaultReportHour           = 9
 )
 
+var (
+	// Version stores Deceptifeed's version number. This variable is set at
+	// build time using the `-X` option with `-ldflags` and is assigned the
+	// latest Git tag. Refer to the Makefile in the project root for details on
+	// how it's set.
+	Version = "undefined"
+
+	// Hostname identifies the system running Deceptifeed and is primarily used
+	// with honeypot logs. It is set once at startup from the
+	// DECEPTIFEED_HOSTNAME environment variable or the OS-reported name.
+	Hostname string
+)
+
 // Config stores the application's settings. It includes honeypot configuration,
 // threatfeed configuration, and loggers.
 type Config struct {
@@ -59,234 +61,6 @@ type Config struct {
 	ThreatFeed ThreatFeed          `xml:"threatFeed"`
 	FilePath   string              `xml:"-"`
 	Monitor    *logmonitor.Monitor `xml:"-"`
-}
-
-// ThreatFeed defines the settings for the threatfeed server.
-type ThreatFeed struct {
-	Enabled           bool      `xml:"enabled"`
-	Port              uint16    `xml:"port"`
-	DatabasePath      string    `xml:"databasePath"`
-	ExcludeListPath   string    `xml:"excludeListPath"`
-	ExpiryHours       int       `xml:"threatExpiryHours"`
-	IsPrivateIncluded bool      `xml:"includePrivateIPs"`
-	EnableTLS         bool      `xml:"enableTLS"`
-	CertPath          string    `xml:"certPath"`
-	KeyPath           string    `xml:"keyPath"`
-	Reporting         reporting `xml:"reporting"`
-}
-
-// reporting defines the settings for the threatfeed reporting and alerting
-// system.
-type reporting struct {
-	HistoryPath string         `xml:"historyPath"`
-	Daily       dailySchedule  `xml:"daily"`
-	Weekly      weeklySchedule `xml:"weekly"`
-}
-
-// dailySchedule stores the configuration for a recurring daily event.
-type dailySchedule struct {
-	Time   string `xml:"time"`
-	Hour   int    `xml:"-"`
-	Minute int    `xml:"-"`
-}
-
-// weeklySchedule stores the configuration for a recurring weekly event. It
-// extends dailySchedule to include a day of the week.
-type weeklySchedule struct {
-	dailySchedule
-	Day     string       `xml:"day"`
-	Weekday time.Weekday `xml:"-"`
-}
-
-// init prepares a daily schedule by parsing a time string and storing the
-// result.
-func (ds *dailySchedule) init() error {
-	h, m, err := parseTime(ds.Time)
-	if err != nil {
-		return err
-	}
-	ds.Hour, ds.Minute = h, m
-	return nil
-}
-
-// init prepares a weekly schedule by parsing day and time strings and storing
-// the results.
-func (ws *weeklySchedule) init() error {
-	if err := ws.dailySchedule.init(); err != nil {
-		return err
-	}
-
-	d, err := parseDay(ws.Day)
-	if err != nil {
-		return err
-	}
-	ws.Weekday = d
-	return nil
-}
-
-// parseDay converts a string representation of a day (such as "Monday") into a
-// time.Weekday.
-func parseDay(s string) (time.Weekday, error) {
-	if s == "" {
-		return DefaultReportDay, nil
-	}
-
-	days := map[string]time.Weekday{
-		"sunday":    time.Sunday,
-		"monday":    time.Monday,
-		"tuesday":   time.Tuesday,
-		"wednesday": time.Wednesday,
-		"thursday":  time.Thursday,
-		"friday":    time.Friday,
-		"saturday":  time.Saturday,
-	}
-
-	d, ok := days[strings.ToLower(strings.TrimSpace(s))]
-	if !ok {
-		return 0, fmt.Errorf("invalid <day>: '%s'", s)
-	}
-	return d, nil
-}
-
-// parseTime parses a time string in "HH:MM" format into hour and minute ints.
-func parseTime(s string) (int, int, error) {
-	if s == "" {
-		return DefaultReportHour, 0, nil
-	}
-
-	var h, m int
-	n, err := fmt.Sscanf(strings.TrimSpace(s), "%d:%d", &h, &m)
-	if err != nil || n != 2 || h < 0 || h > 23 || m < 0 || m > 59 {
-		return 0, 0, fmt.Errorf("invalid <time>: '%s'", s)
-	}
-	return h, m, nil
-}
-
-// Server defines the settings for honeypot servers.
-type Server struct {
-	Type               ServerType        `xml:"type,attr"`
-	Enabled            bool              `xml:"enabled"`
-	Port               uint16            `xml:"port"`
-	LogPath            string            `xml:"logPath"`
-	LogConnections     bool              `xml:"logConnections"`
-	LogInteractions    bool              `xml:"logInteractions"`
-	ReportConnections  bool              `xml:"reportConnections"`
-	ReportInteractions bool              `xml:"reportInteractions"`
-	SessionTimeout     int               `xml:"sessionTimeout"`
-	UseProxyProtocol   bool              `xml:"useProxyProtocol"`
-	SourceIPHeader     string            `xml:"sourceIpHeader"`
-	CertPath           string            `xml:"certPath"`
-	KeyPath            string            `xml:"keyPath"`
-	HomePagePath       string            `xml:"homePagePath"`
-	ErrorPagePath      string            `xml:"errorPagePath"`
-	ErrorCode          int               `xml:"errorCode"`
-	Headers            []string          `xml:"headers>header"`
-	CustomHeaders      map[string]string `xml:"-"`
-	Prompts            []Prompt          `xml:"prompts>prompt"`
-	Rules              Rules             `xml:"rules"`
-	Banner             string            `xml:"banner"`
-	LogFile            *logrotate.File   `xml:"-"`
-	Logger             *slog.Logger      `xml:"-"`
-}
-
-// Rules define the criteria for reporting client IPs to the threatfeed.
-type Rules struct {
-	Include []Rule `xml:"include"`
-	Exclude []Rule `xml:"exclude"`
-}
-
-// Rule represents a regex pattern.
-type Rule struct {
-	Target  string         `xml:"target,attr"`
-	Pattern string         `xml:",chardata"`
-	Negate  bool           `xml:"negate,attr"`
-	Re      *regexp.Regexp `xml:"-"`
-}
-
-// Prompt defines a text prompt used by TCP honeypots. It displays the message,
-// waits for client input, and logs the response. If multiple prompts are
-// configured, they are displayed sequentially.
-type Prompt struct {
-	Text string `xml:",chardata"`
-
-	// Log is an optional label used when logging the client's response. When
-	// set to "none", the response is not logged.
-	Log string `xml:"log,attr"`
-}
-
-// ServerType identifies the protocol used by a honeypot server. It determines
-// how the server listens, responds, and logs activity.
-type ServerType int
-
-const (
-	HTTP ServerType = iota
-	HTTPS
-	SSH
-	TCP
-	UDP
-)
-
-// String returns a string represenation of ServerType.
-func (t ServerType) String() string {
-	return [...]string{"http", "https", "ssh", "tcp", "udp"}[t]
-}
-
-// UnmarshalXMLAttr unmarshals the XML 'type' attribute from 'server' elements
-// into a ServerType.
-//
-// Example XML snippet:
-// <server type="http"><enabled>true</enabled></server>
-func (t *ServerType) UnmarshalXMLAttr(attr xml.Attr) error {
-	switch attr.Value {
-	case "http":
-		*t = HTTP
-	case "https":
-		*t = HTTPS
-	case "ssh":
-		*t = SSH
-	case "tcp":
-		*t = TCP
-	case "udp":
-		*t = UDP
-	default:
-		return fmt.Errorf("invalid server type: %s", attr.Value)
-	}
-	return nil
-}
-
-// UnmarshalXML is a custom unmarshaler for the Server struct. It provides
-// backwards compatibility for deprecated XML tags.
-func (s *Server) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	type alias Server
-
-	var aux struct {
-		*alias
-		Timeout *int  `xml:"sessionTimeout"`
-		OldLog  *bool `xml:"logEnabled"`
-		OldFeed *bool `xml:"sendToThreatFeed"`
-	}
-	aux.alias = (*alias)(s)
-
-	if err := d.DecodeElement(&aux, &start); err != nil {
-		return err
-	}
-
-	// Capture the timeout value. Use -1 to identify when no value is provided.
-	if aux.Timeout != nil {
-		s.SessionTimeout = *aux.Timeout
-	} else {
-		s.SessionTimeout = -1 // Indicates "not set".
-	}
-
-	// Use the deprecated XML tags if they're provided.
-	if aux.OldLog != nil {
-		s.LogInteractions = *aux.OldLog
-	}
-	if aux.OldFeed != nil {
-		s.ReportInteractions = *aux.OldFeed
-	}
-
-	return nil
 }
 
 // Load reads an XML configuration file, decodes it into a Config struct, and
@@ -313,7 +87,7 @@ func Load(filename string) (*Config, error) {
 		return nil, err
 	}
 
-	// Finalize honeypot configuration.
+	// Finalize the configuration.
 	if err := cfg.Prepare(); err != nil {
 		return nil, err
 	}
@@ -321,8 +95,8 @@ func Load(filename string) (*Config, error) {
 	return &cfg, nil
 }
 
-// Prepare finalizes the configuration for each honeypot server. It applies
-// defaults, ensures a log path is defined, and ensures rules are compiled.
+// Prepare finalizes the threatfeed and honeypot server configuration. It
+// applies defaults, performs validation, and ensures settings are initialized.
 func (c *Config) Prepare() error {
 	var errs []error
 	seenPorts := make(map[uint16]string)
@@ -378,8 +152,8 @@ func (c *Config) Prepare() error {
 			}
 		}
 
-		// Parse headers to a map[string]string (used by http.Header().Set()).
-		s.CustomHeaders = parseCustomHeaders(s.Headers)
+		// Parse custom HTTP response headers.
+		s.parseHeaders()
 
 		// Validate and compile regex rules.
 		if err := s.compileRules(); err != nil {
@@ -535,4 +309,57 @@ func (c *Config) ActivePaths() []*string {
 	}
 
 	return paths
+}
+
+// GetHostIP returns the local IP address of the system, defaulting to
+// "127.0.0.1" if it cannot be determined. If there is more than one active IP
+// address on the system, only the first found is returned.
+func GetHostIP() string {
+	const failedLookup = "127.0.0.1"
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return failedLookup
+	}
+
+	for _, i := range interfaces {
+		if i.Flags&net.FlagUp == 0 {
+			continue
+		}
+
+		addrs, err := i.Addrs()
+		if err != nil {
+			return failedLookup
+		}
+
+		for _, addr := range addrs {
+			if ip, ok := addr.(*net.IPNet); ok && !ip.IP.IsLoopback() {
+				if ip.IP.To4() != nil {
+					return ip.IP.String()
+				}
+			}
+		}
+	}
+	return failedLookup
+}
+
+// InitHostname resolves the system's hostname and stores it in the global
+// Hostname variable. It should be called once during application startup.
+func InitHostname() {
+	Hostname = getHostname()
+}
+
+// getHostname returns the system's hostname. It first checks for a value
+// provided via environment variable, then falls back to the name reported by
+// the OS.
+func getHostname() string {
+	if h, ok := os.LookupEnv("DECEPTIFEED_HOSTNAME"); ok {
+		return h
+	}
+
+	if h, err := os.Hostname(); err == nil {
+		return h
+	}
+
+	return ""
 }
