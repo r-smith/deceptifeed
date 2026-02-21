@@ -19,14 +19,14 @@ import (
 	"github.com/r-smith/deceptifeed/internal/taxii"
 )
 
-// templates embeds all web-related content in the ./templates directory.
+// templateFS holds the contents of the templates directory.
 //
 //go:embed templates
-var templates embed.FS
+var templateFS embed.FS
 
 var (
 	// parsedTemplates is the global cache for pre-compiled HTML templates.
-	parsedTemplates = template.Must(template.ParseFS(templates, "templates/*.html"))
+	parsedTemplates = template.Must(template.ParseFS(templateFS, "templates/*.html"))
 
 	// csvHeader is the header row used when serving the threatfeed as CSV.
 	csvHeader = []string{"ip", "added", "last_seen", "observations"}
@@ -304,7 +304,7 @@ func handleDocs(w http.ResponseWriter, r *http.Request) {
 
 // handleCSS serves a CSS stylesheet for styling HTML templates.
 func handleCSS(w http.ResponseWriter, r *http.Request) {
-	data, err := templates.ReadFile("templates/css/style.css")
+	data, err := templateFS.ReadFile("templates/css/style.css")
 	if err != nil {
 		http.NotFound(w, r)
 		return
