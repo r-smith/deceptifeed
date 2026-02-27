@@ -1,29 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="full-width">
-    <header>
-        {{template "nav" .NavData}}
-    </header>
-    <main class="full-width">
-        {{if .Data}}
-        <table class="logs logs-http">
-            <thead>
-                <tr><th>Time<th>Source IP<th>Method<th>Path</tr>
-            </thead>
-            <tbody>
-                {{range .Data}}<tr><td>{{.Time.Format "2006-01-02 15:04:05"}}<td>{{.SourceIP}}<td>{{.Details.Method}}<td>{{.Details.Path}}</tr>
-                {{end}}
-            </tbody>
-        </table>
-        {{else}}
-        <p class="no-results">No log data found</p>
-        {{end}}
-    </main>
+  <header>
+    {{- template "nav" .NavData }}
+  </header>
+
+  <main class="full-width">
+    {{- if .Data }}
+    <table class="logs logs-http">
+      <thead>
+        <tr><th>Time<th>Source IP<th>Method<th>Path
+      </thead>
+      <tbody>
+        {{- range .Data }}
+        <tr><td>{{ .Time.Format "2006-01-02 15:04:05" }}<td>{{ .SourceIP }}<td>{{ .Details.Method }}<td>{{ .Details.Path }}
+        {{- end }}
+      </tbody>
+    </table>
+    {{- else }}
+    <p class="no-results">No log data found</p>
+    {{- end }}
+  </main>
 </body>
 </html>

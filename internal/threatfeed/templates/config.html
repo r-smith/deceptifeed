@@ -1,73 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <header>
-        {{template "nav" .NavData}}
-    </header>
-    <main>
-        <article>
-            <h2>Configuration</h2>
-            <table class="config-info server-info">
-                <tbody>
-                    <tr><th>Deceptifeed Version</th></tr>
-                    <tr><td class="yellow">{{.Version}}</td></tr>
-                    <tr><th>Configuration File</th></tr>
-                    <tr><td>{{if .C.FilePath}}<span class="gray">{{.C.FilePath}}{{else}}<span class="red">(not set){{end}}</span></td></tr>
-                </tbody>
-            </table>
+  <header>
+    {{- template "nav" .NavData }}
+  </header>
 
-            <table class="server-info">
-                <thead>
-                    <tr><th class="cyan" colspan="2">Threat Feed</th></tr>
-                    <tr><th class="gray" colspan="2">Port: <span class="orange">{{.C.ThreatFeed.Port}}</span></th></tr>
-                </thead>
-                <tbody>
-                    <tr><th>State</th><td>{{if .C.ThreatFeed.Enabled}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    <tr><th>TLS</th><td>{{if .C.ThreatFeed.EnableTLS}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    {{if .C.ThreatFeed.EnableTLS}}<tr><th>Certificate</th><td class="blue">{{if .C.ThreatFeed.CertPath}}{{.C.ThreatFeed.CertPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
-                    {{if .C.ThreatFeed.EnableTLS}}<tr><th>Private Key</th><td class="blue">{{if .C.ThreatFeed.KeyPath}}{{.C.ThreatFeed.KeyPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
-                    <tr><th>Threat Database</th><td class="blue">{{if .C.ThreatFeed.DatabasePath}}{{.C.ThreatFeed.DatabasePath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
-                    <tr><th>Include Private IPs</th><td>{{if .C.ThreatFeed.IsPrivateIncluded}}<span class="red">Yes{{else}}<span class="green">No{{end}}</span></td></tr>
-                    <tr><th>Expiry Hours</th><td class="orange">{{if eq .C.ThreatFeed.ExpiryHours 0}}<span class="gray">(never expire)</span>{{else}}{{.C.ThreatFeed.ExpiryHours}}{{end}}</td></tr>
-                    <tr><th>Exclude List</th><td class="blue">{{if .C.ThreatFeed.ExcludeListPath}}{{.C.ThreatFeed.ExcludeListPath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
-                </tbody>
-            </table>
+  <main>
+    <article>
+      <h2>Configuration</h2>
+      <table class="config-info server-info">
+        <tbody>
+          <tr><th>Deceptifeed Version</th></tr>
+          <tr><td class="yellow">{{ .Version }}</td></tr>
+          <tr><th>Configuration File</th></tr>
+          <tr><td>{{ if .C.FilePath }}<span class="gray">{{ .C.FilePath }}{{ else }}<span class="red">(not set){{ end }}</span></td></tr>
+        </tbody>
+      </table>
 
-            {{range .C.Servers}}
-            <table class="server-info">
-                <thead>
-                    <tr><th class="cyan" colspan="2"><span style="text-transform: uppercase;">{{.Type}}</span> Honeypot</th></tr>
-                    <tr><th class="gray" colspan="2">Port: <span class="orange">{{.Port}}</span></th></tr>
-                </thead>
-                <tbody>
-                    <tr><th>State</th><td>{{if .Enabled}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    {{if ne .Type.String "udp"}}<tr><th>Report Connections</th><td>{{if .ReportConnections}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>{{end}}
-                    <tr><th>Report Interactions</th><td>{{if .ReportInteractions}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    {{if ne .Type.String "udp"}}<tr><th>Log Connections</th><td>{{if .LogConnections}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>{{end}}
-                    <tr><th>Log Interactions</th><td>{{if .LogInteractions}}<span class="green">Enabled{{else}}<span class="red">Disabled{{end}}</span></td></tr>
-                    <tr><th>Log Path</th><td class="blue">{{if .LogPath}}{{.LogPath}}{{else}}<span class="gray">(not set)</span>{{end}}</td></tr>
-                    {{if ne .Type.String "udp"}}<tr><th>Session Timeout</th><td><span class="yellow">{{.SessionTimeout}} second{{if ne .SessionTimeout 1}}s{{end}}</span></td></tr>{{end}}
-                    {{if ne .Type.String "udp"}}<tr><th>Proxy Protocol</th><td>{{if .UseProxyProtocol}}<span class="green">Enabled{{else}}<span class="gray">Disabled{{end}}</span></td></tr>{{end}}
-                    {{if .SourceIPHeader}}<tr><th>Source IP Header</th><td class="yellow">{{.SourceIPHeader}}</td></tr>{{end}}
-                    {{if eq .Type.String "https"}}<tr><th>Certificate</th><td class="blue">{{if .CertPath}}{{.CertPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
-                    {{if or (eq .Type.String "https") (eq .Type.String "ssh")}}<tr><th>Private Key</th><td class="blue">{{if .KeyPath}}{{.KeyPath}}{{else}}<span class="gray">(not set){{end}}</span></td></tr>{{end}}
-                    {{if .HomePagePath}}<tr><th>Home Page</th><td class="blue">{{.HomePagePath}}</td></tr>{{end}}
-                    {{if .ErrorPagePath}}<tr><th>Error Page</th><td class="blue">{{.ErrorPagePath}}</td></tr>{{end}}
-                    {{if .Banner}}<tr><th>Banner</th><td class="magenta">{{.Banner}}</td></tr>{{end}}
-                    {{if .Headers}}<tr><th>Headers</th><td class="magenta">{{range .Headers}}{{.}}<br />{{end}}</td></tr>{{end}}
-                    {{if .Prompts}}<tr><th>Prompts</th><td class="magenta">{{range .Prompts}}{{if .Text}}{{.Text}}<br />{{end}}{{end}}</td></tr>{{end}}
-                    {{if .Rules.Include}}{{range .Rules.Include}}<tr><th>Include Rule</th><td><span class="gray">Target:</span> <span class="white">{{.Target}}</span><br /><span class="gray">Negate:</span> <span class="white">{{.Negate}}</span><br /><span class="gray">Regex:</span> <span class="yellow">{{.Pattern}}</span></td></tr>{{end}}{{end}}
-                    {{if .Rules.Exclude}}{{range .Rules.Exclude}}<tr><th>Exclude Rule</th><td><span class="gray">Target:</span> <span class="white">{{.Target}}</span><br /><span class="gray">Negate:</span> <span class="white">{{.Negate}}</span><br /><span class="gray">Regex:</span> <span class="yellow">{{.Pattern}}</span></td></tr>{{end}}{{end}}
-                </tbody>
-            </table>
-            {{end}}
-        </article>
-    </main>
+      <table class="server-info">
+        <thead>
+          <tr><th class="cyan" colspan="2">Threat Feed</th></tr>
+          <tr><th class="gray" colspan="2">Port: <span class="orange">{{ .C.ThreatFeed.Port }}</span></th></tr>
+        </thead>
+        <tbody>
+          <tr><th>State</th><td>{{ if .C.ThreatFeed.Enabled }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+          <tr><th>TLS</th><td>{{ if .C.ThreatFeed.EnableTLS }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+          {{- if .C.ThreatFeed.EnableTLS }}
+          <tr><th>Certificate</th><td class="blue">{{ if .C.ThreatFeed.CertPath }}{{ .C.ThreatFeed.CertPath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+          {{- end }}
+          {{- if .C.ThreatFeed.EnableTLS }}
+          <tr><th>Private Key</th><td class="blue">{{ if .C.ThreatFeed.KeyPath }}{{ .C.ThreatFeed.KeyPath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+          {{- end }}
+          <tr><th>Threat Database</th><td class="blue">{{ if .C.ThreatFeed.DatabasePath }}{{ .C.ThreatFeed.DatabasePath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+          <tr><th>Include Private IPs</th><td>{{ if .C.ThreatFeed.IsPrivateIncluded }}<span class="red">Yes</span>{{ else }}<span class="green">No</span>{{ end }}</td></tr>
+          <tr><th>Expiry Hours</th><td class="orange">{{ if eq .C.ThreatFeed.ExpiryHours 0 }}<span class="gray">(never expire)</span>{{ else }}{{ .C.ThreatFeed.ExpiryHours }}{{ end }}</td></tr>
+          <tr><th>Exclude List</th><td class="blue">{{ if .C.ThreatFeed.ExcludeListPath }}{{ .C.ThreatFeed.ExcludeListPath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+        </tbody>
+      </table>
+
+      {{- range .C.Servers }}
+
+      <table class="server-info">
+        <thead>
+          <tr><th class="cyan" colspan="2"><span style="text-transform: uppercase;">{{ .Type }}</span> Honeypot</th></tr>
+          <tr><th class="gray" colspan="2">Port: <span class="orange">{{ .Port }}</span></th></tr>
+        </thead>
+        <tbody>
+          <tr><th>State</th><td>{{ if .Enabled }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+
+          {{- if ne .Type.String "udp" }}
+          <tr><th>Report Connections</th><td>{{ if .ReportConnections }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+          {{- end }}
+          <tr><th>Report Interactions</th><td>{{ if .ReportInteractions }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+          
+          {{- if ne .Type.String "udp" }}
+          <tr><th>Log Connections</th><td>{{ if .LogConnections }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+          {{- end }}
+          <tr><th>Log Interactions</th><td>{{ if .LogInteractions }}<span class="green">Enabled</span>{{ else }}<span class="red">Disabled</span>{{ end }}</td></tr>
+          <tr><th>Log Path</th><td class="blue">{{ if .LogPath }}{{ .LogPath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+
+          {{- if ne .Type.String "udp" }}
+          <tr><th>Session Timeout</th><td><span class="yellow">{{ .SessionTimeout }} second{{ if ne .SessionTimeout 1 }}s{{ end }}</span></td></tr>
+          {{- end }}
+
+          {{- if ne .Type.String "udp" }}
+          <tr><th>Proxy Protocol</th><td>{{ if .UseProxyProtocol }}<span class="green">Enabled</span>{{ else }}<span class="gray">Disabled</span>{{ end }}</td></tr>
+          {{- end }}
+
+          {{- if .SourceIPHeader }}
+          <tr><th>Source IP Header</th><td class="yellow">{{ .SourceIPHeader }}</td></tr>
+          {{- end }}
+
+          {{- if eq .Type.String "https" }}
+          <tr><th>Certificate</th><td class="blue">{{ if .CertPath }}{{ .CertPath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+          {{- end }}
+
+          {{- if or (eq .Type.String "https") (eq .Type.String "ssh") }}
+          <tr><th>Private Key</th><td class="blue">{{ if .KeyPath }}{{ .KeyPath }}{{ else }}<span class="gray">(not set)</span>{{ end }}</td></tr>
+          {{- end }}
+
+          {{- if .HomePagePath }}
+          <tr><th>Home Page</th><td class="blue">{{ .HomePagePath }}</td></tr>
+          {{- end }}
+
+          {{- if .ErrorPagePath }}
+          <tr><th>Error Page</th><td class="blue">{{ .ErrorPagePath }}</td></tr>
+          {{- end }}
+
+          {{- if .Banner }}
+          <tr><th>Banner</th><td class="magenta">{{ .Banner }}</td></tr>
+          {{- end }}
+
+          {{- if .Headers }}
+          <tr><th>Headers</th><td class="magenta">{{ range .Headers }}{{ . }}<br />{{ end }}</td></tr>
+          {{- end }}
+
+          {{- if .Prompts }}
+          <tr><th>Prompts</th><td class="magenta">{{ range .Prompts }}{{ if .Text }}{{ .Text }}<br />{{ end }}{{ end }}</td></tr>
+          {{- end }}
+
+          {{- if .Rules.Include }}
+          {{- range .Rules.Include }}
+          <tr>
+            <th>Include Rule</th>
+            <td>
+              <span class="gray">Target:</span> <span class="white">{{ .Target }}</span><br />
+              <span class="gray">Negate:</span> <span class="white">{{ .Negate }}</span><br />
+              <span class="gray">Regex:</span> <span class="yellow">{{ .Pattern }}</span>
+            </td>
+          </tr>
+          {{- end }}
+          {{- end }}
+
+          {{- if .Rules.Exclude }}
+          {{- range .Rules.Exclude }}
+          <tr>
+            <th>Exclude Rule</th>
+            <td>
+              <span class="gray">Target:</span> <span class="white">{{ .Target }}</span><br />
+              <span class="gray">Negate:</span> <span class="white">{{ .Negate }}</span><br />
+              <span class="gray">Regex:</span> <span class="yellow">{{ .Pattern }}</span>
+            </td>
+          </tr>
+          {{- end }}
+          {{- end }}
+        </tbody>
+      </table>
+      {{- end }}
+    </article>
+  </main>
 </body>
 </html>

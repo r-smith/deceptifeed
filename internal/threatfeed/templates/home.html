@@ -1,48 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <header>
-        {{template "nav" .}}
-    </header>
-    <main>
-        <article>
-            <h2>Threat Feed</h2>
-            <p>The threat feed lists IP addresses that have interacted with Deceptifeed's honeypots. Its goal is to
-                help you build an automated defense system.
-            </p>
-            <p>
-                <a href="/webfeed">View the threat feed</a> from your browser, or
-                <a href="/docs">see the documentation</a> for other ways to access the data.
-            </p>
-            <p>
-            Supported formats include:
-            </p>
-            <ul>
-                <li><a href="/plain">Plain text</a> is the most commonly used format for integration with firewalls.</li>
-                <li><a href="/json">JSON</a> and <a href="/csv">CSV</a> formats offer flexibility for integrating with various tools and workflows.</li>
-                <li><a href="/taxii2/">TAXII</a> is designed for integration with Threat Intelligence Platforms (TIPs).</li>
-            </ul>
-        </article>
-    </main>
+  <header>
+    {{- template "nav" . }}
+  </header>
 
-    <script>
-        window.addEventListener('DOMContentLoaded', function () {
-            // This script ensures the hover effect on the Deceptifeed logo
-            // doesn't restart if you navigate home from a different page.
-            // Initially, the logo is in the 'no-hover' class which disables
-            // the hover effect. After a short delay, this script removes the
-            // class which re-enables the effect.
-            const logoLink = document.getElementById('logo-link');
-            setTimeout(function() {
-                logoLink.classList.remove('no-hover');
-            }, 100);
-        });
-    </script>
+  <main>
+    <article>
+      <h2>Threat Feed</h2>
+      <p>The threat feed lists IP addresses that have interacted with Deceptifeed's honeypots. Its goal is to
+        help you build an automated defense system.
+      </p>
+      <p>
+        <a href="/webfeed">View the threat feed</a> from your browser, or
+        <a href="/docs">see the documentation</a> for other ways to access the data.
+      </p>
+      <p>Supported formats include:</p>
+      <ul>
+        <li><a href="/plain">Plain text</a> is the most commonly used format for integration with firewalls.</li>
+        <li><a href="/json">JSON</a> and <a href="/csv">CSV</a> formats offer flexibility for integrating with various tools and workflows.</li>
+        <li><a href="/taxii2/">TAXII</a> is designed for integration with Threat Intelligence Platforms (TIPs).</li>
+      </ul>
+    </article>
+  </main>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      {{/*
+      // This script ensures the hover effect on the Deceptifeed logo
+      // doesn't restart if you navigate home from a different page.
+      // Initially, the logo is in the 'no-hover' class which disables
+      // the hover effect. After a short delay, this script removes the
+      // class which re-enables the effect.
+      */}}
+      const logoLink = document.getElementById('logo-link');
+      setTimeout(function() {
+        logoLink.classList.remove('no-hover');
+      }, 100);
+    });
+  </script>
 </body>
 </html>

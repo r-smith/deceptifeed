@@ -7,16 +7,17 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <header>
-        {{template "nav" .NavData}}
-    </header>
-    <main>
-        <article>
-            <h1 class="error">Error opening log files</h1>
-            {{if .Error}}
-            <p class="error">{{.Error}}</p>
-            {{end}}
-        </article>
-    </main>
+  <header>
+    {{- template "nav" .NavData }}
+  </header>
+
+  <main>
+    <article>
+      <h1 class="error">Error opening log files</h1>
+      {{- if .Error }}
+      <p class="error">{{ .Error }}</p>
+      {{- end }}
+    </article>
+  </main>
 </body>
 </html>

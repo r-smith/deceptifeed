@@ -1,215 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="full-width">
-    <header>
-        {{template "nav" .}}
-    </header>
-    <main>
-        <div id="ws-status"></div>
-        <table id="logs" class="live-logs"></table>
-    </main>
+  <header>
+    {{- template "nav" . }}
+  </header>
 
-    <script>
-        const maxLogs = 200;
-        const logs = document.getElementById('logs');
-        const wsStatus = document.getElementById('ws-status');
-        const wsURL = '/live-ws';
-        const initialReconnectDelay = 1000;
-        const maxReconnectDelay = 15000;
-        const maxReconnectAttempts = 100;
-        const timeFormat = new Intl.DateTimeFormat([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
-        let ws;
-        let reconnectAttempts = 0;
-        let isInitialBatchProcessed = false;
+  <main>
+    <div id="ws-status"></div>
+    <table id="logs" class="live-logs"></table>
+  </main>
 
-        function handleWS() {
-            ws = new WebSocket(wsURL);
+  <script>
+    const maxLogs = 200;
+    const logs = document.getElementById('logs');
+    const wsStatus = document.getElementById('ws-status');
+    const wsURL = '/live-ws';
+    const initialReconnectDelay = 1000;
+    const maxReconnectDelay = 15000;
+    const maxReconnectAttempts = 100;
+    const timeFormat = new Intl.DateTimeFormat([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    let ws;
+    let reconnectAttempts = 0;
+    let isInitialBatchProcessed = false;
 
-            ws.onopen = () => {
-                reconnectAttempts = 0;
-                wsStatus.textContent = '';
-                wsStatus.className = '';
-            };
+    function handleWS() {
+      ws = new WebSocket(wsURL);
 
-            ws.onmessage = (event) => {
-                if (event.data === '---end---') {
-                    isInitialBatchProcessed = true;
-                    return;
-                }
-                handleMessage(event.data, isInitialBatchProcessed);
-            };
+      ws.onopen = () => {
+        reconnectAttempts = 0;
+        wsStatus.textContent = '';
+        wsStatus.className = '';
+      };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-
-            ws.onclose = () => {
-                reconnectWS();
-            };
+      ws.onmessage = (event) => {
+        if (event.data === '---end---') {
+          isInitialBatchProcessed = true;
+          return;
         }
+        handleMessage(event.data, isInitialBatchProcessed);
+      };
 
-        function reconnectWS() {
-            if (reconnectAttempts > maxReconnectAttempts) {
-                wsStatus.textContent = 'Failed connecting to Deceptifeed';
-                wsStatus.className = 'red';
-                return;
-            }
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
 
-            const delay = Math.min(
-                maxReconnectDelay,
-                initialReconnectDelay * (2 ** reconnectAttempts),
-            );
-            const finalDelay = delay + (Math.random() * delay * 0.2);
+      ws.onclose = () => {
+        reconnectWS();
+      };
+    }
 
-            setTimeout(() => {
-                reconnectAttempts++;
-                wsStatus.textContent = 'Connecting... ';
-                wsStatus.classList.add('gray', 'connecting');
-                handleWS();
-            }, finalDelay);
-        }
+    function reconnectWS() {
+      if (reconnectAttempts > maxReconnectAttempts) {
+        wsStatus.textContent = 'Failed connecting to Deceptifeed';
+        wsStatus.className = 'red';
+        return;
+      }
 
-        function handleMessage(data, shouldAnimate) {
-            try {
-                const d = JSON.parse(data);
+      const delay = Math.min(
+        maxReconnectDelay,
+        initialReconnectDelay * (2 ** reconnectAttempts),
+      );
+      const finalDelay = delay + (Math.random() * delay * 0.2);
 
-                const timeElement = document.createElement('td');
-                const initialTime = new Date(d.time);
-                timeElement.textContent = timeFormat.format(initialTime);
-                timeElement.className = 'timestamp';
-
-                const srcIPElement = document.createElement('td');
-                srcIPElement.textContent = d.source_ip;
-                srcIPElement.className = 'source-ip';
-
-                const eventDetails = document.createElement('td');
-                eventDetails.className = 'event-details';
-
-                switch (d.event_type) {
-                    case 'http': {
-                        const httpMethod = document.createElement('span');
-                        httpMethod.textContent = `${d.event_details.method} `;
-                        httpMethod.className = 'magenta';
-
-                        const httpPath = document.createTextNode(d.event_details.path);
-
-                        const tooltipContent = document.createElement('pre');
-                        tooltipContent.className = 'tooltip-content';
-                        let jsonDetails = JSON.stringify(d.event_details, null, 2);
-                        // Remove outer braces.
-                        jsonDetails = jsonDetails.slice(2, -1);
-                        // Remove initial 2-space indent.
-                        jsonDetails = jsonDetails.replace(/^ {2}/gm, '');
-                        jsonDetails = jsonDetails.replace(/"([^"]+)":/g, '$1:');
-                        tooltipContent.textContent = jsonDetails
-
-                        eventDetails.classList.add('tooltip');
-                        eventDetails.appendChild(httpMethod);
-                        eventDetails.appendChild(httpPath);
-                        eventDetails.appendChild(tooltipContent);
-
-                        break;
-                    }
-                    case 'ssh': {
-                        // Display username.
-                        const usernameLabel = document.createElement('span');
-                        usernameLabel.textContent = 'User: ';
-                        usernameLabel.className = 'magenta';
-                        const username = document.createTextNode(d.event_details.username);
-
-                        eventDetails.appendChild(usernameLabel);
-                        eventDetails.appendChild(username);
-                        eventDetails.appendChild(document.createElement('br'));
-
-                        // Check auth method.
-                        if (d.event_details.auth_method === 'publickey') {
-                            // Public key auth.
-                            const pkLabel = document.createElement('span');
-                            pkLabel.textContent = 'Public Key Authentication';
-                            pkLabel.className = 'gray';
-                            eventDetails.appendChild(pkLabel);
-                        } else {
-                            // Password auth.
-                            const passwordLabel = document.createElement('span');
-                            passwordLabel.textContent = 'Pass: ';
-                            passwordLabel.className = 'magenta';
-                            const password = document.createTextNode(d.event_details.password);
-                            eventDetails.appendChild(passwordLabel);
-                            eventDetails.appendChild(password);
-                        }
-
-                        break;
-                    }
-                    case 'udp': {
-                        // Remove '[unreliable]' string from IP found in UDP logs.
-                        const spaceIndex = d.source_ip.indexOf(' ');
-                        if (spaceIndex >= 0) {
-                            srcIPElement.textContent = d.source_ip.slice(0, spaceIndex);
-                        }
-
-                        const udpLabel = document.createElement('span');
-                        udpLabel.textContent = `[UDP:${d.server_port}] `;
-                        udpLabel.className = 'magenta';
-
-                        const udpData = document.createTextNode(d.event_details.data);
-
-                        eventDetails.appendChild(udpLabel);
-                        eventDetails.appendChild(udpData);
-
-                        break;
-                    }
-                    case 'connection': {
-                        const connLabel = document.createElement('span');
-                        connLabel.textContent = `Connected to port ${d.server_port}`;
-                        connLabel.className = 'magenta';
-                        eventDetails.appendChild(connLabel);
-                        
-                        break;
-                    }
-                    default: {
-                        const protoLabel = document.createElement('span');
-                        protoLabel.textContent = `[${d.event_type.toUpperCase()}:${d.server_port}] `;
-                        protoLabel.className = 'magenta';
-
-                        const protoData = document.createTextNode(JSON.stringify(d.event_details, null, 1));
-
-                        eventDetails.appendChild(protoLabel);
-                        eventDetails.appendChild(protoData);
-                    }
-                }
-                
-                // Add log entry to table.
-                const logEntry = document.createElement('tr');
-                logEntry.appendChild(timeElement);
-                logEntry.appendChild(srcIPElement);
-                logEntry.appendChild(eventDetails);
-
-                if (shouldAnimate) {
-                    logEntry.className = 'fade-in';
-                }
-                
-                logs.insertBefore(logEntry, logs.firstChild);
-
-                if (logs.children.length > maxLogs) {
-                    logs.removeChild(logs.lastChild);
-                }
-            }
-            catch (error) {
-                console.error('Failed to parse log data:', error);
-            }
-        }
-
+      setTimeout(() => {
+        reconnectAttempts++;
+        wsStatus.textContent = 'Connecting... ';
+        wsStatus.classList.add('gray', 'connecting');
         handleWS();
-    </script>
+      }, finalDelay);
+    }
+
+    function handleMessage(data, shouldAnimate) {
+      try {
+        const d = JSON.parse(data);
+
+        const timeElement = document.createElement('td');
+        const initialTime = new Date(d.time);
+        timeElement.textContent = timeFormat.format(initialTime);
+        timeElement.className = 'timestamp';
+
+        const srcIPElement = document.createElement('td');
+        srcIPElement.textContent = d.source_ip;
+        srcIPElement.className = 'source-ip';
+
+        const eventDetails = document.createElement('td');
+        eventDetails.className = 'event-details';
+
+        switch (d.event_type) {
+          case 'http': {
+            const httpMethod = document.createElement('span');
+            httpMethod.textContent = `${d.event_details.method} `;
+            httpMethod.className = 'magenta';
+
+            const httpPath = document.createTextNode(d.event_details.path);
+
+            const tooltipContent = document.createElement('pre');
+            tooltipContent.className = 'tooltip-content';
+            let jsonDetails = JSON.stringify(d.event_details, null, 2);
+            // Remove outer braces.
+            jsonDetails = jsonDetails.slice(2, -1);
+            // Remove initial 2-space indent.
+            jsonDetails = jsonDetails.replace(/^ {2}/gm, '');
+            jsonDetails = jsonDetails.replace(/"([^"]+)":/g, '$1:');
+            tooltipContent.textContent = jsonDetails
+
+            eventDetails.classList.add('tooltip');
+            eventDetails.appendChild(httpMethod);
+            eventDetails.appendChild(httpPath);
+            eventDetails.appendChild(tooltipContent);
+
+            break;
+          }
+          case 'ssh': {
+            // Display username.
+            const usernameLabel = document.createElement('span');
+            usernameLabel.textContent = 'User: ';
+            usernameLabel.className = 'magenta';
+            const username = document.createTextNode(d.event_details.username);
+
+            eventDetails.appendChild(usernameLabel);
+            eventDetails.appendChild(username);
+            eventDetails.appendChild(document.createElement('br'));
+
+            // Check auth method.
+            if (d.event_details.auth_method === 'publickey') {
+              // Public key auth.
+              const pkLabel = document.createElement('span');
+              pkLabel.textContent = 'Public Key Authentication';
+              pkLabel.className = 'gray';
+              eventDetails.appendChild(pkLabel);
+            } else {
+              // Password auth.
+              const passwordLabel = document.createElement('span');
+              passwordLabel.textContent = 'Pass: ';
+              passwordLabel.className = 'magenta';
+              const password = document.createTextNode(d.event_details.password);
+              eventDetails.appendChild(passwordLabel);
+              eventDetails.appendChild(password);
+            }
+
+            break;
+          }
+          case 'udp': {
+            // Remove '[unreliable]' string from IP found in UDP logs.
+            const spaceIndex = d.source_ip.indexOf(' ');
+            if (spaceIndex >= 0) {
+              srcIPElement.textContent = d.source_ip.slice(0, spaceIndex);
+            }
+
+            const udpLabel = document.createElement('span');
+            udpLabel.textContent = `[UDP:${d.server_port}] `;
+            udpLabel.className = 'magenta';
+
+            const udpData = document.createTextNode(d.event_details.data);
+
+            eventDetails.appendChild(udpLabel);
+            eventDetails.appendChild(udpData);
+
+            break;
+          }
+          case 'connection': {
+            const connLabel = document.createElement('span');
+            connLabel.textContent = `Connected to port ${d.server_port}`;
+            connLabel.className = 'magenta';
+            eventDetails.appendChild(connLabel);
+            
+            break;
+          }
+          default: {
+            const protoLabel = document.createElement('span');
+            protoLabel.textContent = `[${d.event_type.toUpperCase()}:${d.server_port}] `;
+            protoLabel.className = 'magenta';
+
+            const protoData = document.createTextNode(JSON.stringify(d.event_details, null, 1));
+
+            eventDetails.appendChild(protoLabel);
+            eventDetails.appendChild(protoData);
+          }
+        }
+        
+        // Add log entry to table.
+        const logEntry = document.createElement('tr');
+        logEntry.appendChild(timeElement);
+        logEntry.appendChild(srcIPElement);
+        logEntry.appendChild(eventDetails);
+
+        if (shouldAnimate) {
+            logEntry.className = 'fade-in';
+        }
+        
+        logs.insertBefore(logEntry, logs.firstChild);
+
+        if (logs.children.length > maxLogs) {
+            logs.removeChild(logs.lastChild);
+        }
+      }
+      catch (error) {
+        console.error('Failed to parse log data:', error);
+      }
+    }
+
+    handleWS();
+  </script>
 </body>
 </html>

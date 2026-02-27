@@ -1,129 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <header>
-        {{template "nav" .}}
-    </header>
-    <main>
-        <article>
-            <h2>Threat Feed API</h2>
-            <table class="api-table">
-                <thead>
-                    <tr>
-                        <th>Endpoint</th>
-                        <th>Format</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/plain">/plain</a></td>
-                        <td row-header="Format"><span class="badge">Plain</span></td>
-                        <td>One IP address per line. Suitable for firewall integration.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/csv">/csv</a></td>
-                        <td row-header="Format"><span class="badge">CSV</span></td>
-                        <td>CSV format containing full threat feed details.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/json">/json</a></td>
-                        <td row-header="Format"><span class="badge">JSON</span></td>
-                        <td>JSON format containing full threat feed details.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/stix">/stix</a></td>
-                        <td row-header="Format"><span class="badge">STIX</span></td>
-                        <td>STIX <em>Indicators</em> containing full threat feed details.</td>
-                    </tr>
-                    <tr>
-                        <td row-header="Endpoint"><a class="endpoint" href="/taxii2">/taxii2</a></td>
-                        <td row-header="Format"><span class="badge">TAXII</span></td>
-                        <td>TAXII server. See the <em>TAXII</em> section for usage instructions.</td>
-                    </tr>
-                </tbody>
-            </table>
+  <header>
+    {{- template "nav" . }}
+  </header>
 
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the threat feed formatted as plain text:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/plain"</pre>
-            </figure>
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the threat feed formatted as JSON:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/json"</pre>
-            </figure>
-        </article>
+  <main>
+    <article>
+      <h2>Threat Feed API</h2>
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Format</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td row-header="Endpoint"><a class="endpoint" href="/plain">/plain</a></td>
+            <td row-header="Format"><span class="badge">Plain</span></td>
+            <td>One IP address per line. Suitable for firewall integration.</td>
+          </tr>
+          <tr>
+            <td row-header="Endpoint"><a class="endpoint" href="/csv">/csv</a></td>
+            <td row-header="Format"><span class="badge">CSV</span></td>
+            <td>CSV format containing full threat feed details.</td>
+          </tr>
+          <tr>
+            <td row-header="Endpoint"><a class="endpoint" href="/json">/json</a></td>
+            <td row-header="Format"><span class="badge">JSON</span></td>
+            <td>JSON format containing full threat feed details.</td>
+          </tr>
+          <tr>
+            <td row-header="Endpoint"><a class="endpoint" href="/stix">/stix</a></td>
+            <td row-header="Format"><span class="badge">STIX</span></td>
+            <td>STIX <em>Indicators</em> containing full threat feed details.</td>
+          </tr>
+          <tr>
+            <td row-header="Endpoint"><a class="endpoint" href="/taxii2">/taxii2</a></td>
+            <td row-header="Format"><span class="badge">TAXII</span></td>
+            <td>TAXII server. See the <em>TAXII</em> section for usage instructions.</td>
+          </tr>
+        </tbody>
+      </table>
 
-        <article>
-            <h2>Query Parameters</h2>
-            <p>All endpoints support optional query parameters to customize how the threat feed is formatted.
-                The following query parameters are supported:</p>
-            <table class="docs-table">
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody class="align-top">
-                    <tr>
-                        <td><code>sort</code></td>
-                        <td>Sort the results by a specific field. Valid values are:
-                            <ul class="no-bullets">
-                                <li><code>added</code></li>
-                                <li><code>ip</code></li>
-                                <li><code>last_seen</code></li>
-                                <li><code>observations</code></li>
-                            </ul>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>direction</code></td>
-                        <td>Specify the sorting direction. Valid values are:
-                            <ul class="no-bullets">
-                                <li><code>asc</code> - Ascending order</li>
-                                <li><code>desc</code> - Descending order</li>
-                            </ul>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><code>last_seen_hours</code></td>
-                        <td>Filter results to only include entries seen within the last specified number of hours.</td>
-                    </tr>
-                </tbody>
-            </table>
+      <figure>
+        <figcaption><b>Example:</b> Retrieve the threat feed formatted as plain text:</figcaption>
+        <pre>curl "http://threatfeed.example.com:9000/plain"</pre>
+      </figure>
+      <figure>
+        <figcaption><b>Example:</b> Retrieve the threat feed formatted as JSON:</figcaption>
+        <pre>curl "http://threatfeed.example.com:9000/json"</pre>
+      </figure>
+    </article>
 
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the JSON feed, sorted by the last seen date in descending order:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/json?sort=last_seen&direction=desc"</pre>
-            </figure>
-            <figure>
-                <figcaption><b>Example:</b> Retrieve the plain text feed, filtered to include only IP addresses seen within the last 24 hours:</figcaption>
-                <pre>curl "http://threatfeed.example.com:9000/plain?last_seen_hours=24"</pre>
-            </figure>
-        </article>
+    <article>
+      <h2>Query Parameters</h2>
+      <p>All endpoints support optional query parameters to customize how the threat feed is formatted.
+        The following query parameters are supported:</p>
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody class="align-top">
+          <tr>
+            <td><code>sort</code></td>
+            <td>Sort the results by a specific field. Valid values are:
+              <ul class="no-bullets">
+                <li><code>added</code></li>
+                <li><code>ip</code></li>
+                <li><code>last_seen</code></li>
+                <li><code>observations</code></li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td><code>direction</code></td>
+            <td>Specify the sorting direction. Valid values are:
+              <ul class="no-bullets">
+                <li><code>asc</code> - Ascending order</li>
+                <li><code>desc</code> - Descending order</li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td><code>last_seen_hours</code></td>
+            <td>Filter results to only include entries seen within the last specified number of hours.</td>
+          </tr>
+        </tbody>
+      </table>
 
-        <article>
-            <h2>TAXII</h2>
-            <p>The threat feed is accessible via TAXII 2.1.
-                This allows for integration with Threat Intelligence Platforms (TIPs) like <i>OpenCTI</i> and <i>Microsoft Sentinel</i>.</p>
-            <p>To access via TAXII, clients require the API root URL and a collection ID.
-                The API root URL is available at the path <b>/taxii2/api/</b>.
-                Three collections are available: <b>indicators</b>, <b>sightings</b>, and <b>observables</b>.</p>
-            <h3>Key Details</h3>
-            <ul class="no-bullets">
-                <li>API root URL: <code>http://threatfeed.example.com:9000/taxii2/api/</code></li>
-                <li>Collection ID: <code>indicators</code></li>
-                <li>Collection ID: <code>observables</code></li>
-                <li>Collection ID: <code>sightings</code></li>
-            </ul>
-        </article>
-    </main>
+      <figure>
+        <figcaption><b>Example:</b> Retrieve the JSON feed, sorted by the last seen date in descending order:</figcaption>
+        <pre>curl "http://threatfeed.example.com:9000/json?sort=last_seen&direction=desc"</pre>
+      </figure>
+      <figure>
+        <figcaption><b>Example:</b> Retrieve the plain text feed, filtered to include only IP addresses seen within the last 24 hours:</figcaption>
+        <pre>curl "http://threatfeed.example.com:9000/plain?last_seen_hours=24"</pre>
+      </figure>
+    </article>
+
+    <article>
+      <h2>TAXII</h2>
+      <p>The threat feed is accessible via TAXII 2.1.
+        This allows for integration with Threat Intelligence Platforms (TIPs) like <i>OpenCTI</i> and <i>Microsoft Sentinel</i>.</p>
+      <p>To access via TAXII, clients require the API root URL and a collection ID.
+        The API root URL is available at the path <b>/taxii2/api/</b>.
+        Three collections are available: <b>indicators</b>, <b>sightings</b>, and <b>observables</b>.</p>
+      <h3>Key Details</h3>
+      <ul class="no-bullets">
+        <li>API root URL: <code>http://threatfeed.example.com:9000/taxii2/api/</code></li>
+        <li>Collection ID: <code>indicators</code></li>
+        <li>Collection ID: <code>observables</code></li>
+        <li>Collection ID: <code>sightings</code></li>
+      </ul>
+    </article>
+  </main>
 </body>
 </html>

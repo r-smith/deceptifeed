@@ -1,35 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <header>
-        {{template "nav" .}}
-    </header>
-    <main>
-        <article>
-            <h2>Honeypot Logs</h2>
-            <ul class="log-list">
-                <li><a href="/logs/ssh">SSH Logs</a></li>
-                <li><a href="/logs/http">HTTP Logs</a></li>
-            </ul>
-            <ul class="log-list">
-                <li><a href="/logs/ssh/ip">Unique: SSH Source IPs</a></li>
-                <li><a href="/logs/ssh/username">Unique: SSH Usernames</a></li>
-                <li><a href="/logs/ssh/password">Unique: SSH Passwords</a></li>
-                <li><a href="/logs/ssh/client">Unique: SSH Clients</a></li>
-                <li><a href="/logs/http/ip">Unique: HTTP Source IPs</a></li>
-                <li><a href="/logs/http/useragent">Unique: HTTP User-Agents</a></li>
-                <li><a href="/logs/http/path">Unique: HTTP Paths</a></li>
-                <li><a href="/logs/http/query">Unique: HTTP Queries</a></li>
-                <li><a href="/logs/http/method">Unique: HTTP Methods</a></li>
-                <li><a href="/logs/http/host">Unique: HTTP Host Headers</a></li>
-            </ul>
-        </article>
-    </main>
+  <header>
+    {{- template "nav" .}}
+  </header>
+
+  <main>
+    <article>
+      <h2>Honeypot Logs</h2>
+      <ul class="log-list">
+        <li><a href="/logs/ssh">SSH Logs</a></li>
+        <li><a href="/logs/http">HTTP Logs</a></li>
+      </ul>
+      <ul class="log-list">
+        <li><a href="/logs/ssh/ip">Unique: SSH Source IPs</a></li>
+        <li><a href="/logs/ssh/username">Unique: SSH Usernames</a></li>
+        <li><a href="/logs/ssh/password">Unique: SSH Passwords</a></li>
+        <li><a href="/logs/ssh/client">Unique: SSH Clients</a></li>
+        <li><a href="/logs/http/ip">Unique: HTTP Source IPs</a></li>
+        <li><a href="/logs/http/useragent">Unique: HTTP User-Agents</a></li>
+        <li><a href="/logs/http/path">Unique: HTTP Paths</a></li>
+        <li><a href="/logs/http/query">Unique: HTTP Queries</a></li>
+        <li><a href="/logs/http/method">Unique: HTTP Methods</a></li>
+        <li><a href="/logs/http/host">Unique: HTTP Host Headers</a></li>
+      </ul>
+    </article>
+  </main>
 </body>
 </html>

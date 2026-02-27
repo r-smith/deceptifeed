@@ -1,93 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deceptifeed</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deceptifeed</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="full-width">
-    <header>
-        {{template "nav" .NavData}}
-    </header>
-    <main class="full-width">
-        {{if .Data}}
-        <table id="webfeed" class="webfeed">
-            <thead>
-                <tr>
-                <th><a href="?sort=ip&direction={{if and (eq .SortMethod "ip") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                    IP
-                    </a>{{if eq .SortMethod "ip"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                </th>
-                <th><a href="?sort=added&direction={{if and (eq .SortMethod "added") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                    Added
-                    </a>{{if eq .SortMethod "added"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                </th>
-                <th><a href="?sort=last_seen&direction={{if and (eq .SortMethod "last_seen") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                    Last Seen
-                    </a>{{if eq .SortMethod "last_seen"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                </th>
-                <th><a href="?sort=observations&direction={{if and (eq .SortMethod "observations") (eq .SortDirection "asc")}}desc{{else}}asc{{end}}">
-                    Observations
-                    </a>{{if eq .SortMethod "observations"}}<span class="sort-arrow {{if eq .SortDirection "asc"}}asc{{else}}desc{{end}}"></span>{{end}}
-                </th>
-                </tr>
-            </thead>
-            <tbody>
-            {{range .Data}}<tr><td>{{.IP}}<td>{{.Added.UTC.Format "2006-01-02T15:04:05.000Z"}}<td>{{.LastSeen.UTC.Format "2006-01-02T15:04:05.000Z"}}<td>{{.Observations}}
-            {{end}}
-            </tbody>
-        </table>
-        {{else}}
-        <p class="no-results">The threat feed is currently empty</p>
-        {{end}}
-    </main>
+  <header>
+    {{- template "nav" .NavData }}
+  </header>
 
-    <script>
-        function formatDatesAndNumbers() {
-            // Format 'Added' as YYYY-MM-DD.
-            const addedDateFormat = new Intl.DateTimeFormat('en-CA', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-            });
+  <main class="full-width">
+    {{- if .Data }}
+    <table id="webfeed" class="webfeed">
+      <thead>
+        <tr>
+          <th><a href="?sort=ip&direction=
+            {{- if and (eq .SortMethod "ip") (eq .SortDirection "asc") }}desc{{ else }}asc{{ end }}">IP</a>
+            {{- if eq .SortMethod "ip" }}<span class="sort-arrow {{ if eq .SortDirection "asc" }}asc{{ else }}desc{{ end }}"></span>{{ end }}
+          <th><a href="?sort=added&direction=
+            {{- if and (eq .SortMethod "added") (eq .SortDirection "asc") }}desc{{ else }}asc{{ end }}">Added</a>
+            {{- if eq .SortMethod "added" }}<span class="sort-arrow {{ if eq .SortDirection "asc" }}asc{{ else }}desc{{ end }}"></span>{{ end }}
+          <th><a href="?sort=last_seen&direction=
+            {{- if and (eq .SortMethod "last_seen") (eq .SortDirection "asc") }}desc{{ else }}asc{{ end }}">Last Seen</a>
+            {{- if eq .SortMethod "last_seen" }}<span class="sort-arrow {{ if eq .SortDirection "asc" }}asc{{ else }}desc{{ end }}"></span>{{ end }}
+          <th><a href="?sort=observations&direction=
+            {{- if and (eq .SortMethod "observations") (eq .SortDirection "asc") }}desc{{ else }}asc{{ end }}">Observations</a>
+            {{- if eq .SortMethod "observations" }}<span class="sort-arrow {{ if eq .SortDirection "asc" }}asc{{ else }}desc{{ end }}"></span>{{ end }}
+      </thead>
+      <tbody>
+        {{- range .Data }}
+        <tr><td>{{ .IP }}<td>{{ .Added.UTC.Format "2006-01-02T15:04:05.000Z" }}<td>{{ .LastSeen.UTC.Format "2006-01-02T15:04:05.000Z" }}<td>{{ .Observations }}
+        {{- end }}
+      </tbody>
+    </table>
+    {{- else }}
+    <p class="no-results">The threat feed is currently empty</p>
+    {{- end }}
+  </main>
 
-            // Format 'Last Seen' as YYYY-MM-DD hh:mm.
-            const lastSeenDateFormat = new Intl.DateTimeFormat('en-CA', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            });
+  <script>
+    function formatDatesAndNumbers() {
+      // Format 'Added' as YYYY-MM-DD.
+      const addedDateFormat = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
 
-            // Format 'Observations' with a thousands separator based on user's locale.
-            const numberFormat = new Intl.NumberFormat();
+      // Format 'Last Seen' as YYYY-MM-DD hh:mm.
+      const lastSeenDateFormat = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
 
-            // Apply formats to table.
-            document.querySelectorAll("#webfeed tbody tr").forEach(row => {
-                // Apply format to 'Added' cell (row.cells[1]).
-                let date = new Date(row.cells[1].textContent);
-                if (!isNaN(date.valueOf())) {
-                    row.cells[1].textContent = addedDateFormat.format(date);
-                }
-                
-                // Apply format to 'Last Seen' cell (row.cells[2]).
-                date = new Date(row.cells[2].textContent);
-                if (!isNaN(date.valueOf())) {
-                    row.cells[2].textContent = lastSeenDateFormat.format(date).replace(',', ''); 
-                }
+      // Format 'Observations' with a thousands separator based on user's locale.
+      const numberFormat = new Intl.NumberFormat();
 
-                // Apply format to 'Observations' cell (row.cells[3]).
-                const observationCount = parseInt(row.cells[3].textContent, 10);
-                if (!isNaN(observationCount)) {
-                    row.cells[3].textContent = numberFormat.format(observationCount);
-                }
-            });
+      // Apply formats to table.
+      document.querySelectorAll("#webfeed tbody tr").forEach(row => {
+        // Apply format to 'Added' cell (row.cells[1]).
+        let date = new Date(row.cells[1].textContent);
+        if (!isNaN(date.valueOf())) {
+          row.cells[1].textContent = addedDateFormat.format(date);
+        }
+        
+        // Apply format to 'Last Seen' cell (row.cells[2]).
+        date = new Date(row.cells[2].textContent);
+        if (!isNaN(date.valueOf())) {
+          row.cells[2].textContent = lastSeenDateFormat.format(date).replace(',', '');
         }
 
-        formatDatesAndNumbers();
-    </script>
+        // Apply format to 'Observations' cell (row.cells[3]).
+        const observationCount = parseInt(row.cells[3].textContent, 10);
+        if (!isNaN(observationCount)) {
+          row.cells[3].textContent = numberFormat.format(observationCount);
+        }
+      });
+    }
+
+    formatDatesAndNumbers();
+  </script>
 </body>
 </html>
