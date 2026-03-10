@@ -40,13 +40,20 @@ func Start(c *config.Config) {
 	const saveInterval = 20 * time.Second
 	go db.runMaintenance(saveInterval)
 
+	// Load Atom feed and start timers/tickers to gather reporting statistics.
+	rpt := newReporter(&cfg.ThreatFeed.Reporting)
+	rpt.load()
+	go rpt.startHourly()
+	go rpt.startDaily()
+	go rpt.startWeekly()
+
 	// Handle WebSocket clients in the web UI (/live).
 	go broadcastLogsToClients()
 
 	// Setup HTTP configuration and start the server.
 	srv := &http.Server{
 		Addr:         net.JoinHostPort("", strconv.Itoa(int(c.ThreatFeed.Port))),
-		Handler:      newHandler(),
+		Handler:      newHandler(rpt),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  0,
@@ -122,7 +129,7 @@ func configureTLS(srv *http.Server) error {
 
 // newHandler constructs the primary mux for the threatfeed server. It maps URL
 // patterns to their respective handlers.
-func newHandler() http.Handler {
+func newHandler(rpt *reporter) http.Handler {
 	mux := http.NewServeMux()
 
 	// Web UI.
@@ -140,6 +147,7 @@ func newHandler() http.Handler {
 	mux.HandleFunc("GET /csv", enforcePrivateIP(disableCache(handleCSV)))
 	mux.HandleFunc("GET /json", enforcePrivateIP(disableCache(handleJSON)))
 	mux.HandleFunc("GET /stix", enforcePrivateIP(disableCache(handleSTIX)))
+	mux.HandleFunc("GET /reports/{type}", enforcePrivateIP(rpt.serveReport))
 	// TAXII.
 	mux.HandleFunc("GET /taxii2/", enforcePrivateIP(handleNotFound))
 	mux.HandleFunc("POST /taxii2/", enforcePrivateIP(handleNotFound))

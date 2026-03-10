@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:deceptifeed.com,2025:{{ .ID }}:{{- if .Interval.IsWeekly }}weekly{{ else if .Interval.IsDaily }}daily{{ else }}hourly{{ end }}-reports</id>
+  <link rel="alternate" href="{{ .Link }}/" />
+  <link rel="self" href="{{ .Link }}/reports/{{ .Path }}" />
+  <title>Deceptifeed</title>
+  <subtitle>{{- if .Interval.IsWeekly }}Weekly{{ else if .Interval.IsDaily }}Daily{{ else }}Hourly{{ end }} threat reports based on honeypot activity</subtitle>
+  <updated>{{ .Updated.UTC.Format "2006-01-02T15:04:05Z" }}</updated>
+  <generator uri="https://www.deceptifeed.com">Deceptifeed</generator>
+  <author>
+    <name>Deceptifeed</name>
+  </author>
+  {{ range .Records }}
+  <entry>
+    <id>tag:deceptifeed.com,2025:{{ $.ID }}:{{- if $.Interval.IsWeekly }}weekly{{ else if $.Interval.IsDaily }}daily{{ else }}hourly{{ end -}}:{{ .Timestamp.UTC.Format "20060102T1504Z" }}</id>
+    <updated>{{ .Timestamp.UTC.Format "2006-01-02T15:04:05Z" }}</updated>
+    <published>{{ .Timestamp.UTC.Format "2006-01-02T15:04:05Z" }}</published>
+    <link href="{{ $.Link }}/" />
+    <title>{{- if $.Interval.IsWeekly }}Weekly{{ else if $.Interval.IsDaily }}Daily{{ else }}Hourly{{ end }} Threat Report - {{ .Timestamp.Format "January 2, 2006" }}</title>
+    <content type="html">
+
+    {{- /*
+    // Note: This HTML template is optimized for Outlook. The use of tables and
+    // styling is intentional.
+    */}}
+    <![CDATA[
+    <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="min-width: 100%;">
+    <tr>
+    <td align="left">
+
+    {{- /* "Ghost table" to force Outlook to respect max-width */}}
+    <!--[if mso]>
+      <table align="left" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%;">
+      <tr>
+      <td>
+    <![endif]-->
+    <div style="color: inherit; font-family: sans-serif; line-height: 1.5; margin: 0; max-width: 600px;">
+
+      {{- /*
+      ## Summary stats ##
+      ###################
+      */}}
+      <h3 style="margin-bottom: 10px;">Honeypot Activity (Last {{ if $.Interval.IsWeekly }}7 Days{{ else if $.Interval.IsDaily }}24 Hours{{ else }}Hour{{ end }})</h3>
+      <table width="auto" border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+        <tr><td style="padding: 1.25px 0;">Active IPs: {{ .ActiveIPs }}</td></tr>
+        <tr><td style="padding: 1.25px 0;">New sightings: {{ .NewIPs }}</td></tr>
+        <tr><td style="padding: 1.25px 0;">Interactions: {{ .Hits }} hits</td></tr>
+        <tr><td style="padding: 1.25px 0;">Threatfeed size: {{ .FeedSize }} entr{{ if ne .FeedSize 1}}ies{{ else }}y{{ end }}</td></tr>
+      </table>
+
+      {{- if not $.Interval.IsHourly }}
+      {{- /*
+      ## Most hits ##
+      ###############
+      */}}
+      <h3 style="margin-bottom: 10px; margin-top: 40px;">Most Hits (Last {{ if $.Interval.IsWeekly }}7 Days{{ else if $.Interval.IsDaily }}24 Hours{{ end }})</h3>
+      <table width="auto" border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th align="left" style="border-bottom: 1px solid #ccc; padding: 5px 20px 5px 0; text-align: left;">IP Address</th>
+            <th align="right" style="border-bottom: 1px solid #ccc; padding: 5px 0; text-align: right;">Hits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range .MostHits }}
+          <tr>
+            <td style="padding: 3px 20px 3px 0; vertical-align: top; white-space: nowrap;">{{ .IP }}</td>
+            <td align="right" style="padding: 3px 0; text-align: right; vertical-align: top;">{{ .Count }}</td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+
+      {{- /*
+      ## Oldest active ##
+      ###################
+      */}}
+      <h3 style="margin-bottom: 10px; margin-top: 40px;">Oldest Active (All-Time)</h3>
+      <table width="auto" border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th align="left" style="border-bottom: 1px solid #ccc; padding: 5px 20px 5px 0; text-align: left;">IP Address</th>
+            <th align="right" style="border-bottom: 1px solid #ccc; padding: 5px 0; text-align: right;">Age</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range .OldestActive }}
+          <tr>
+            <td style="padding: 3px 20px 3px 0; vertical-align: top; white-space: nowrap;">{{ .IP }}</td>
+            <td align="right" style="padding: 3px 0; text-align: right; vertical-align: top;">{{ .Count }} day{{ if ne .Count 1}}s{{ end }}</td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+
+      {{- /*
+      ## Summary paragraph ##
+      #######################
+      */}}
+      <table width="100%" border="0" cellpadding="0" cellspacing="0">
+        <tr><td height="35" style="line-height: 35px;">&nbsp;</td></tr>
+        <tr>
+          <td style="border-left: 3px solid #ccc; font-style: italic; padding: 2px 10px;">
+            In the last {{ if $.Interval.IsWeekly }}7 days{{ else if $.Interval.IsDaily }}24 hours{{ else }}hour{{ end }},
+            our honeypots recorded {{ .Hits }} interaction{{ if ne .Hits 1 }}s{{ end }}
+            from {{ .ActiveIPs }} unique IP address{{ if ne .ActiveIPs 1 }}es{{ end }},
+            {{ .NewIPs }} of which {{ if ne .NewIPs 1 }}were{{ else }}was{{ end }} previously unseen.
+            The threatfeed now contains {{ .FeedSize }} entr{{ if ne .FeedSize 1}}ies{{ else }}y{{ end }}.
+          </td>
+        </tr>
+      </table>
+
+      {{- end }}
+    </div>
+    <!--[if mso]>
+      </td>
+      </tr>
+      </table>
+    <![endif]-->
+    </td>
+    </tr>
+    </table>
+    ]]>
+    </content>
+  </entry>
+  {{ end }}
+</feed>

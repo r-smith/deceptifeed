@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:deceptifeed.com,2025:{{ .ID }}:alerts</id>
+  <link rel="alternate" href="{{ .Link }}/" />
+  <link rel="self" href="{{ .Link }}/reports/{{ .Path }}" />
+  <title>Deceptifeed Alerts</title>
+  <subtitle>Alerts based on honeypot activity</subtitle>
+  <updated>{{ .Updated.UTC.Format "2006-01-02T15:04:05Z" }}</updated>
+  <generator uri="https://www.deceptifeed.com">Deceptifeed</generator>
+  <author>
+    <name>Deceptifeed</name>
+  </author>
+  {{ range .Records }}
+  <entry>
+    <id>tag:deceptifeed.com,2025:{{ $.ID }}:alert:{{ .Timestamp.UTC.Format "20060102T1504Z" }}</id>
+    <updated>{{ .Timestamp.UTC.Format "2006-01-02T15:04:05Z" }}</updated>
+    <published>{{ .Timestamp.UTC.Format "2006-01-02T15:04:05Z" }}</published>
+    <link href="{{ $.Link }}/" />
+    <title>{{ .Category }}: {{ .IP }}</title>
+    <content type="html">
+    <![CDATA[
+    <h2>{{ .Category }}: {{ .IP }}</h2>
+    ]]>
+    </content>
+  </entry>
+  {{ end }}
+</feed>
