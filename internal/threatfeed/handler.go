@@ -251,7 +251,7 @@ func handleTAXIIObjects(w http.ResponseWriter, r *http.Request) {
 	if objectCount > 0 {
 		// Loop twice: the first iteration accesses the first element of the
 		// Objects slice, and the second iteration accesses the last element.
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			element := 0
 			if i == 1 {
 				element = len(result.Objects) - 1
