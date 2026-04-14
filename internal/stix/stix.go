@@ -23,7 +23,7 @@ const (
 // Object represents a STIX Object, a general term for a STIX Domain Object
 // (SDO), STIX Cyber-observable Object (SCO), STIX Relationship Object (SRO),
 // or STIX Meta Object.
-type Object interface{}
+type Object any
 
 // Bundle represents a STIX Bundle Object. A Bundle is a collection of
 // arbitrary STIX Objects grouped together in a single container.
