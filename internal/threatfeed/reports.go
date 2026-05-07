@@ -112,7 +112,7 @@ func (rpt *reporter) run(interval reportInterval) error {
 		}
 	case weekly:
 		rpt.history.Weekly = append(rpt.history.Weekly, s)
-		if len(rpt.history.Weekly) > 12 {
+		if len(rpt.history.Weekly) > 24 {
 			rpt.history.Weekly = rpt.history.Weekly[1:]
 		}
 	}
