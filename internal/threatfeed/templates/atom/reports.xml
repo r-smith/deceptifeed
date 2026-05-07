@@ -15,7 +15,7 @@
     <id>tag:deceptifeed.com,2025:{{ $.ID }}:{{- if $.Interval.IsWeekly }}weekly{{ else if $.Interval.IsDaily }}daily{{ else }}hourly{{ end -}}:{{ .Timestamp.UTC.Format "20060102T1504Z" }}</id>
     <updated>{{ .Timestamp.UTC.Format "2006-01-02T15:04:05Z" }}</updated>
     <published>{{ .Timestamp.UTC.Format "2006-01-02T15:04:05Z" }}</published>
-    <link href="{{ $.Link }}/" />
+    <link href="{{ $.Link }}/?interval={{- if $.Interval.IsWeekly }}weekly{{ else if $.Interval.IsDaily }}daily{{ else }}hourly{{ end -}}#timestamp={{ .Timestamp.UTC.Format "20060102T1504Z" }}" />
     <title>{{- if $.Interval.IsWeekly }}Weekly{{ else if $.Interval.IsDaily }}Daily{{ else }}Hourly{{ end }} Threat Report - {{ .Timestamp.Format "January 2, 2006" }}</title>
     <content type="html">
 
