@@ -17,6 +17,16 @@
     <enableTLS>false</enableTLS>
     <certPath>/opt/deceptifeed/certs/threatfeed-cert.pem</certPath>
     <keyPath>/opt/deceptifeed/certs/threatfeed-key.pem</keyPath>
+    <reporting>
+      <historyPath>/opt/deceptifeed/logs/history.json</historyPath>
+      <weekly>
+        <day>monday</day>
+        <time>9:00</time>
+      </weekly>
+      <daily>
+        <time>9:00</time>
+      </daily>
+    </reporting>
   </threatFeed>
 
   <!-- Honeypot server configuration -->
